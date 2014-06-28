@@ -11,9 +11,8 @@ General Description
 
 This project provides a synthesizable microprogrammed IP core that implements 
 the instruction set architecture (ISA) of the 6502/65C02 microprocessors. The 
-initial release provides the instruction set of the 65C02 plus the WAI 
-instruction added by WDC in its W65C02S processor. The next release will add the 
-Rockwell instructions and the the W65C02S' STP instruction.
+initial release provides the instruction set of the 65C02 plus the WAI and STP
+instructions added by WDC in its W65C02S processor. 
 
 The M65C02A core features a completely reworked microprogrammed control 
 structure compared to that used in the M65C02 project. In addition, the basic 
