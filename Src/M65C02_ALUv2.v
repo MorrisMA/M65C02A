@@ -1,4 +1,42 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Copyright 2013-2014 by Michael A. Morris, dba M. A. Morris & Associates
+//
+//  All rights reserved. The source code contained herein is publicly released
+//  under the terms and conditions of the GNU Lesser Public License. No part of
+//  this source code may be reproduced or transmitted in any form or by any
+//  means, electronic or mechanical, including photocopying, recording, or any
+//  information storage and retrieval system in violation of the license under
+//  which the source code is released.
+//
+//  The source code contained herein is free; it may be redistributed and/or
+//  modified in accordance with the terms of the GNU Lesser General Public
+//  License as published by the Free Software Foundation; either version 2.1 of
+//  the GNU Lesser General Public License, or any later version.
+//
+//  The source code contained herein is freely released WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+//  PARTICULAR PURPOSE. (Refer to the GNU Lesser General Public License for
+//  more details.)
+//
+//  A copy of the GNU Lesser General Public License should have been received
+//  along with the source code contained herein; if not, a copy can be obtained
+//  by writing to:
+//
+//  Free Software Foundation, Inc.
+//  51 Franklin Street, Fifth Floor
+//  Boston, MA  02110-1301 USA
+//
+//  Further, no use of this source code is permitted in any form or means
+//  without inclusion of this banner prominently in any derived works.
+//
+//  Michael A. Morris
+//  Huntsville, AL
+//
+////////////////////////////////////////////////////////////////////////////////
+
 `timescale 1ns / 1ps
+
 ////////////////////////////////////////////////////////////////////////////////
 // Company:         M. A. Morris & Associates 
 // Engineer:        Michael A. Morris
@@ -263,6 +301,8 @@
 //                          including 1 or -1, and to support LU operations with
 //                          its own mask values.
 //
+//  1.31    14G04   MAM     Exposed the Accumulator as a module port.
+//
 // Additional Comments:
 //
 //  Revision 1.10 of the module incorporates all those features required to pro-
@@ -363,6 +403,7 @@ module M65C02_ALUv2 (
 
     //  Internal Processor Registers
     
+    output  reg [7:0] A,    // Accumulator Register
     output  reg [7:0] X,    // X Index Register
     output  reg [7:0] Y,    // Y Index Register
     
@@ -474,8 +515,6 @@ wire    LU_Z;                   // Zero Detector for BIT/TRB/TSB/BBR/BBS
 //  ALU Registers
 
 wire    SelA, SelX, SelY, SelP; // ALU Register Selects
-
-reg     [7:0] A;                // ALU Accumulator
 
 wire    N, V, D, Z, C;          // ALU PSW flags
 

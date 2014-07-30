@@ -1,4 +1,42 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Copyright 2013-2014 by Michael A. Morris, dba M. A. Morris & Associates
+//
+//  All rights reserved. The source code contained herein is publicly released
+//  under the terms and conditions of the GNU Lesser Public License. No part of
+//  this source code may be reproduced or transmitted in any form or by any
+//  means, electronic or mechanical, including photocopying, recording, or any
+//  information storage and retrieval system in violation of the license under
+//  which the source code is released.
+//
+//  The source code contained herein is free; it may be redistributed and/or
+//  modified in accordance with the terms of the GNU Lesser General Public
+//  License as published by the Free Software Foundation; either version 2.1 of
+//  the GNU Lesser General Public License, or any later version.
+//
+//  The source code contained herein is freely released WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+//  PARTICULAR PURPOSE. (Refer to the GNU Lesser General Public License for
+//  more details.)
+//
+//  A copy of the GNU Lesser General Public License should have been received
+//  along with the source code contained herein; if not, a copy can be obtained
+//  by writing to:
+//
+//  Free Software Foundation, Inc.
+//  51 Franklin Street, Fifth Floor
+//  Boston, MA  02110-1301 USA
+//
+//  Further, no use of this source code is permitted in any form or means
+//  without inclusion of this banner prominently in any derived works.
+//
+//  Michael A. Morris
+//  Huntsville, AL
+//
+////////////////////////////////////////////////////////////////////////////////
+
 `timescale 1ns / 100ps
+
 ////////////////////////////////////////////////////////////////////////////////
 // Company:         M. A. Morris & Associates 
 // Engineer:        Michael A. Morris 
@@ -71,8 +109,8 @@ module M65C02_CoreV2 #(
     parameter pRst_Addrs   = 0,     // MPC Reset Address
         
     parameter pInt_Hndlr   = 0,     // _Int microroutine address, Reset default
-    parameter pM65C02_uPgm = "Src/M65C02_uPgm_V4.coe",
-    parameter pM65C02_IDec = "Src/M65C02_IDecode_ROM.coe",
+    parameter pM65C02_uPgm = "Pgms/M65C02_uPgm_V4.coe",
+    parameter pM65C02_IDec = "Pgms/M65C02_IDecode_ROM.coe",
 
     parameter pStkPtr_Rst  = 2      // Stk Ptr Value after Reset
 )(
@@ -82,9 +120,13 @@ module M65C02_CoreV2 #(
     //  Processor Core Interrupt Interface
     
     output  IRQ_Msk,        // Interrupt mask from P to Interrupt Handler
-    input   xIRQ,           // External Maskable Interrupt Request Input
+    output  LE_Int,         // Interrupt Latch Enable - Hold Int until serviced
+
     input   Int,            // Interrupt input from Interrupt Handler
+    input   xIRQ,           // External Maskable Interrupt Request Input
     input   [15:0] Vector,  // ISR Vector from Interrupt Handler
+
+    output  reg VP,         // Interrupt Vector Pull Indicator
     
     input   SO,             // Set oVerflow Flag in PSW
     output  Clr_SO,         // Clr SO Command - Acknowledge
@@ -95,8 +137,6 @@ module M65C02_CoreV2 #(
     output  SC,             // Single Cycle Instruction
     output  [2:0] Mode,     // Mode - Instruction Type/Mode
     output  RMW,            // Read-Modify-Write Operation
-    output  reg IntSvc,     // Interrupt Service Start Indicator
-    output  ISR,            // Interrupt Vector Pull Start Flag
     
     //  Processor Core Memory Controller Interface
     
@@ -108,7 +148,15 @@ module M65C02_CoreV2 #(
     output  [ 1:0] IO_Op,   // Instruction Fetch Strobe
     output  [15:0] AO,      // External Address
     input   [ 7:0] DI,      // External Data In (Registered Data Path)
-    output  [ 7:0] DO       // External Data Out
+    output  [ 7:0] DO,      // External Data Out
+    
+    output  [ 7:0] A,       // Internal Processor Registers
+    output  [ 7:0] X,
+    output  [ 7:0] Y,
+    output  [ 7:0] P,
+    
+    output  reg [ 7:0] OP1, // Internal Temporary/Operand Registers
+    output  reg [ 7:0] OP2
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -180,7 +228,6 @@ wire    [ 2:0] Reg_WE;                  // Register Write Enable Control Field
 wire    En;                             // ALU Enable Control Field
 
 wire    CE_IR, CE_OP1, CE_OP2;          // Clock Enables: IR, OP1
-reg     [7:0] OP1, OP2;                 // Instruction and Operand Registers
 
 //  Instruction Decoder ROM
 
@@ -209,8 +256,6 @@ wire    [ 7:0] S;                   // Stack Pointer
 wire    [7:0] DO_ALU;               // M65C02 ALU Data Output Bus
 wire    Valid;                      // M65C02 ALU Output Valid Signal
 wire    CC;                         // ALU Condition Code Output
-
-wire    [7:0] X, Y, P;              // ALU Index Registers
 
 wire    SelS;                       // Stack Pointer Select
 
@@ -336,7 +381,7 @@ assign Page   = uPCntl[0];      // Explicit page select for address wrap ops.
 assign Ld_OP1 = IO_Op[1] & DI_Op[2];
 assign Ld_OP2 = IO_Op[1] & DI_Op[1];
 
-assign Sel_BA = DI_Op[0];
+assign Sel_BA = (uPCntl == 2'b01);
 
 //  Operand Register 1
 
@@ -437,9 +482,9 @@ M65C02_AddrGenV2    #(
 always @(posedge Clk)
 begin
     if(Rst)
-        IntSvc <= #1 0;
+        VP <= #1 0;
     else if(ISR)
-        IntSvc <= #1 uPCntl[0];
+        VP <= #1 uPCntl[0];
 end
 
 //  Instantiate the M65C02 ALU Module
@@ -479,6 +524,7 @@ M65C02_ALUv2    ALU (
                     .Val(Valid),        // M65C02 ALU Output Valid Strobe
                     .CC_Out(CC),        // M65C02 ALU Condition Code Mux
 
+                    .A(A),              // M65C02 ALU Accumulator Register
                     .X(X),              // M65C02 ALU Pre-Index Register
                     .Y(Y),              // M65C02 ALU Post-Index Register
 
@@ -497,6 +543,10 @@ assign OutMux = ((DO_Op[2]) ? PC[ 7:0] : 0);
 assign OutMux = ((DO_Op[3]) ? P        : 0);
 
 assign DO = OutMux;
+
+//  Assign External Interrupt Handler Control Signals
+
+assign LE_Int = BRV2;
 
 ////////////////////////////////////////////////////////////////////////////////
 //

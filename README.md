@@ -47,7 +47,7 @@ and several memory initialization files:
             M65C02_WrSel.v  - M65C02 ALU Register Write Enable module
             M65C02_PSWv2.v  - M65C02 ALU Processor Status Word module
     
-    M65C02_IDecod_ROM.coe   - M65C02A core microprogram ALU control fields
+    M65C02_IDecode_ROM.coe  - M65C02A core microprogram ALU control fields
     M65C02_uPgm_V4.coe      - M65C02A core microprogram (sequence control)
 
     M65C02_CoreV2.ucf       - User Constraints File: period and pin LOCs
@@ -120,3 +120,34 @@ structure and logic support the implementation of the Rockwell SMBx/RMBx and
 BBSx/BBRx instructions. The microprogram and logic structure also support the 
 inclusion of a stack relative addressing mode and instructions. It is also 
 possible to support virtual machines such as FORTH interpreter.
+
+###Release 2.2.0
+
+Release 2.2.0 provides the same basic core as Release 2.1.0, but the core has 
+been augmented by a rudimentary interrupt handler and MMU, 28kB internal 
+memory, and 1 SPI Master and 2 UART peripherals. In addition, the soft-processor 
+is being prepared to support Kernel and User modes.
+
+The mode of the processor will be kept in an unimplemented PSW bit, bit 5. The 
+normal setting of this is a logic 1, and that will signify Kernel mode. Access 
+to IO will be restricted to the Kernel mode. The top-most 256 bytes are 
+reserved for IO. The MMU included in this release includes support for the 
+Kernel/User mode. The peripherals included in the release are mapped to the 
+uppermost 128 bytes of the IO space. The vector table, which is considered 
+part of the IO space, is mapped back to the upper most 32 bytes of the 4kB 
+Monitor ROM.
+
+The multiplexers for the internal memories and the IO peripherals decrease the 
+raw performance that can be achieved. In a Spartan-3A XC3S200A-4VQG100I FPGA, 
+the best performance that can be achieved is approximately 30 MHz. In a 
+Spartan 6 XC6SLX9-3FTG256I FPGA, the best performance that can be achieved is 
+better than 40MHz. The improved performance is a result of two factors: (1) 
+the 6-bit LUTs of the Spartan-6 versus the 4-bit LUTs of the Spartan-3A.
+
+A TCL file is included with the repository that can be used to rebuild the 
+project. The source files for all of the HDL have been included. Further, all 
+of the memory initialization files have been included. Klaus Dormann's 
+6502_Functional_Test test program has been completed using ISIM through all of 
+the functional tests except binary and BCD addition/subtraction tests. A self-
+checking test bench for these tests is included.
+

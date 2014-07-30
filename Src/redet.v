@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  Copyright 2013-2014 by Michael A. Morris, dba M. A. Morris & Associates
+//  Copyright 2006-2014 by Michael A. Morris, dba M. A. Morris & Associates
 //
 //  All rights reserved. The source code contained herein is publicly released
 //  under the terms and conditions of the GNU Lesser Public License. No part of
@@ -37,56 +37,58 @@
 
 `timescale 1ns / 1ps
 
-////////////////////////////////////////////////////////////////////////////////
-// Company:         M. A. Morris & Associates 
-// Engineer:        Michael A. Morris
+//////////////////////////////////////////////////////////////////////////////////
+// Company:         M. A. Morris & Associates
+// Engineer:        Michael A. Morris 
 // 
-// Create Date:     08:15:35 09/15/2013 
-// Design Name:     WDC W65C02 Microprocessor Re-Implementation
-// Module Name:     M65C02_SU.v 
-// Project Name:    C:\XProjects\ISE10.1i\M6502A 
-// Target Devices:  Generic SRAM-based FPGA 
-// Tool versions:   Xilinx ISE10.1i SP3
-// 
-// Description:
+// Create Date:     11:45:29 12/31/2006 
+// Design Name:     USB MBP HDL 
+// Module Name:     re1ce 
+// Project Name:    USBMBP_HDL
+// Target Devices:  XC2S15-5TQ144
+// Tool versions:   ISE Webpack 8.2i
+// Description:     Multi-stage synchronizer with rising edge detection
 //
-// Dependencies:    None.
+// Dependencies:    None
 //
-// Revision:
-// 
-//  0.01    13I15   MAM     Initial coding. Pulled implementation details from
-//                          the parent module, M65C02_ALU.v, and generated a
-//                          standalone module instantiated in the parent.
+// Revision History:
 //
-//  1.00    13J23   MAM     Corrected error in the operation multiplexer. Op = 1
-//                          is for right shift/rotate operations, and Op = 0 is
-//                          for left shift/rotate operations.
+//  0.01    06L31   MAM     File Created
 //
 // Additional Comments: 
 //
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
-module M65C02_SU(
-    input   En,
-    
-    input   Op,
-    input   [7:0] SU,
-    input   Ci,
-    
-    output  reg [8:0] Out,
-    output  reg OV,
-    output  Val
-);
+module redet(rst, clk, din, pls);
 
-always @(*)
-begin
-    if(En)
-        {OV, Out} <= ((Op) ? {^SU[7:6], {SU[0], {Ci, SU[7:1]}}}     // LSR/ROR
-                           : {^SU[7:6], {SU[7], {SU[6:0], Ci}}});   // ASL/ROL
-    else
-        {OV, Out} <= 0;
+///////////////////////////////////////////////////////////////////////////////
+//
+//  Module Port Declarations
+//
+    
+    input   rst;
+    input   clk;
+    input   din;
+    output  pls;
+
+///////////////////////////////////////////////////////////////////////////////
+//
+//  Module Level Declarations
+//
+
+    reg [2:0] QSync;
+    
+///////////////////////////////////////////////////////////////////////////////
+//
+//  Implementation
+//
+
+always @(posedge clk or posedge rst) begin
+    if(rst)
+        QSync <= 3'b0;
+    else 
+        QSync <= #1 {QSync[0] & ~QSync[1], QSync[0], din};
 end
-
-assign Val = En;
+assign pls = QSync[2];
 
 endmodule
