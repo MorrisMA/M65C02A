@@ -5,7 +5,7 @@
 # 
 # This file contains several Tcl procedures (procs) that you can use to automate
 # your project by running from xtclsh or the Project Navigator Tcl console.
-# If you load this file (using the Tcl command: source C:/XProjects/ISE10.1i/M65C02A/Src/M65C02A.tcl, then you can
+# If you load this file (using the Tcl command: source M65C02A.tcl, then you can
 # run any of the procs included here.
 # You may also edit any of these procs to customize them. See comments in each
 # proc for more instructions.
@@ -32,7 +32,7 @@
 # 
 
 set myProject "M65C02A.ise"
-set myScript "C:/XProjects/ISE10.1i/M65C02A/Src/M65C02A.tcl"
+set myScript "M65C02A.tcl"
 
 # 
 # Main (top-level) routines

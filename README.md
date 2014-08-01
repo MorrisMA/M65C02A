@@ -151,3 +151,17 @@ of the memory initialization files have been included. Klaus Dormann's
 the functional tests except binary and BCD addition/subtraction tests. A self-
 checking test bench for these tests is included.
 
+###Release 2.2.0
+
+Release 2.2.0 provides an update that adds the capability to support both 8-bit
+and 16-bit relative addressing. Changes where made to the operand register data
+path and to the relative address mode multiplexer in the address generator. In
+the operand register data path, a sign extension multiplexer, explicitly con-
+trolled by the microprogram, allows the most significant operand register (OP2)
+to be loaded with either an 8-bit value (16-bit relative addressing) or the sign
+extension of the least significant operand register (OP1) (8-bit relative
+addressing). In addition, the previously unused DI_Op[0] field bit is used to
+controlled the sign extension multiplexer in the OP2 data path. To maintain the
+current 8-bit relative mode instructions, the microprogram for all of the branch
+instructions was updated. (Klaus Dormann's test suite was used for regression
+testing, and it passed.)

@@ -165,13 +165,13 @@ wire    CE_PC;                  // Program Counter Clock Enable
 // DPN:  11'b00_00100_000_0; // NA <= {  0,OP1}           + 0;
 // DPX:  11'b00_00100_100_0; // NA <= {  0,OP1} + {0,  X} + 0;
 // DPY:  11'b00_00100_010_0; // NA <= {  0,OP1} + {0,  Y} + 0;
-// LDA:  11'b00_00010_000_0; // NA <= {OP2,OP1}           + 0;
+// LDA:  11'b00_00010_000_0; // NA <= {OP2,OP1}             + 0;
 // LDAX: 11'b00_00010_100_0; // NA <= {OP2,OP1} + {0,  X} + 0;
 // LDAY: 11'b00_00010_010_0; // NA <= {OP2,OP1} + {0,  Y} + 0;
 // Nxt:  11'b00_00001_000_0; // NA <= MAR                 + 1;
-// MAR:  11'b00_00001_000_1; // NA <= MAR                 + 0;
-                          
+// MAR:  11'b00_00001_000_1; // NA <= MAR                 + 0;                         
 //
+
 assign Ld_PC   = NA_Op[10];
 assign StkRel  = NA_Op[ 9];
 //
@@ -189,7 +189,7 @@ assign Ci      = NA_Op[ 0];
 
 //  Generate Relative Address
 
-assign Rel = ((CC) ? {{8{OP1[7]}}, OP1} : 0);
+assign Rel = ((CC) ? {OP2, OP1} : 0);
 
 //  Generate Left Address Operand
 
@@ -201,9 +201,9 @@ assign AL = ((Sel_MAR) ? MAR          : 0);
 
 //  Generate Right Address Operand
 
-assign AR = ((Sel_X  ) ? {8'h00, X } : 0);
-assign AR = ((Sel_Y  ) ? {8'h00, Y } : 0);
-assign AR = ((Sel_Rel) ? Rel         : 0);
+assign AR = ((Sel_X  ) ? {8'h00, X} : 0);
+assign AR = ((Sel_Y  ) ? {8'h00, Y} : 0);
+assign AR = ((Sel_Rel) ? Rel        : 0);
 
 //  Compute Next Address
 

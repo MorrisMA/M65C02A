@@ -87,7 +87,7 @@
 //                              M65C02_uPgm_V4.coe      (M65C02_uPgm_V4.txt)
 //                              M65C02_IDecode_ROM.coe  (M65C02_IDecode_ROM.txt)
 //                          M65C02_AddrGenV2.v
-//                              M65C02_StkPtrV2.v 
+//                              M65C02_StkPtr.v 
 //                          M65C02_ALUv2.v
 //                              M65C02_LST.v
 //                              M65C02_LU.v 
@@ -96,7 +96,7 @@
 //                              M65C02_WrSel.v 
 //                              M65C02_PSWv2.v
 //                      M65C02_IntHndlrV2.v     (Interrupt Handler)
-//                      M65C02_MMUv2.v          (Memory Management Unit)
+//                      M65C02_MMU.v            (Memory Management Unit)
 //                      M65C02_SPIxIF.v         (SPI Master I/F)
 //                          DPSFmnCE.v          (Transmit & Receive FIFOs)
 //                          SPIxIF.v            (Configurable SPI Master)
@@ -146,11 +146,9 @@ module M65C02A #(
     
     parameter pInt_Hndlr      = 9'h021,     // Microprogram Interrupt Handler
 
-    parameter pINV            = 3'b000,     // INValid instructions
-    parameter pVAL            = 3'b001,     // VALid instructions
+    parameter pVAL            = 3'b000,     // VALid instructions
+    parameter pINV            = 3'b001,     // INValid instructions
     parameter pCOP            = 3'b010,     // CO-Processor instruction
-    parameter pSYS            = 3'b011,     // SYStem Call (XCE) instruction
-    parameter pMMU            = 3'b100,     // MMU instructions
     parameter pBRK            = 3'b101,     // BRK instruction
     parameter pSTP            = 3'b110,     // STP instruction
     parameter pWAI            = 3'b111,     // WAI instruction
@@ -159,8 +157,8 @@ module M65C02A #(
 
     parameter pWS_Delay       = 4'b0011,    // Default Internal Wait State Delay
 
-    parameter pFrequency      = 14745600,  
-//    parameter pFrequency       = 29491200,  // (14.7456 MHz * 2)
+//    parameter pFrequency      = 14745600,   // M65C02 Development Board 
+    parameter pFrequency       = 29491200,  // Chameleon Board
 
     parameter pUART_LCR       = 8'h40,  // ~BRRE, RTSo, 232 w/o HS, 8N1 
     parameter pUART_IER       = 8'h00,  // No interrupts enabled
@@ -278,21 +276,21 @@ wire    [ 7:0] CPU_DO;          // M65C02 Core Data Output
 
 wire    [ 7:0] Y, P;            // M65C02 Core Processor Registers 
 wire    Kernel;                 // M65C02 Core Operating Mode
+
 wire    WE, RE;                 // M65C02 Core Decoded IO Operations
+
 wire    INV;                    // M65C02 Core Decoded INValid instructions
 wire    COP;                    // M65C02 Core Decoded COP instruction
-wire    SYS;                    // M65C02 Core Decoded SYS instruction
-wire    MMU;                    // M65C02 Core Decoded MMU instruction
 wire    BRK;                    // M65C02 Core Decoded BRK instruction
 wire    STP;                    // M65C02 Core Decoded STP instruction
 wire    WAI;                    // M65C02 Core Decoded WAI instruction
 
 wire    IO_Page;                // IO Page Decode
 reg     [5:0] IO_Sel;           // IO Selects: Vec, MAP, MMU, SPI0, COM0, COM1
-wire    Sel_VEC;
-wire    Sel_MAP, Sel_MMU;
-wire    Sel_SPI0;
-wire    Sel_COM0, Sel_COM1;
+wire    Sel_VEC;                // Vector Table Select; maps to Monitor ROM/RAM
+wire    Sel_MAP, Sel_MMU;       // Mapping RAM and MMU Control/Status Registers
+wire    Sel_SPI0;               // SPI Master Select
+wire    Sel_COM0, Sel_COM1;     // COM0, COM1 UART Selects
 
 wire    [ 7:0] MMU_DO;          // MMU Data Output - Used to read MMU registers
 wire    [19:0] PA;              // MMU Physical Address Output              
@@ -373,7 +371,7 @@ M65C02_IntHndlrV2   IntHndlr (
                         
                         .ABRT(ABRT),            // MMU Trap (Not Implemented)
                         .INV(1'b0),             // INValid instruction Trap
-                        .SYS(SYS),              // SYS Call Trap
+                        .SYS(1'b0),             // SYS Call Trap
                         .NMI(NMI),              // NMI input 
                         .IRQ(IRQ),              // IRQ input
                         .RQST({COM0_IRQ, COM1_IRQ, SPI0_IRQ, 5'b0}),
@@ -441,8 +439,6 @@ assign RE  = IO_Op[1];
 
 assign INV = (Mode == pINV);
 assign COP = (Mode == pCOP);
-assign SYS = (Mode == pSYS);
-assign MMU = (Mode == pMMU);
 assign BRK = (Mode == pBRK);
 assign STP = (Mode == pSTP);
 assign WAI = (Mode == pWAI);
