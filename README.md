@@ -151,9 +151,9 @@ of the memory initialization files have been included. Klaus Dormann's
 the functional tests except binary and BCD addition/subtraction tests. A self-
 checking test bench for these tests is included.
 
-###Release 2.2.0
+###Release 2.2.1
 
-Release 2.2.0 provides an update that adds the capability to support both 8-bit
+Release 2.2.1 provides an update that adds the capability to support both 8-bit
 and 16-bit relative addressing. Changes where made to the operand register data
 path and to the relative address mode multiplexer in the address generator. In
 the operand register data path, a sign extension multiplexer, explicitly con-
