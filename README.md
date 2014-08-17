@@ -231,6 +231,6 @@ The complete opcode matrix for the M65C02A 6502/65C02-compatible soft-core can
 be found in the Images subdirectory. The following two images define the 
 instruction set of the M65C02A:
 
-![M65C02A Enhanced Instruction Set: 0x00-0x7F](https://github.com/MorrisMA/M65C02A/tree/master/Images/M65C02A-InstructioSetMatrix(00-7F).JPG)
+![M65C02A Enhanced Instruction Set: 0x00-0x7F](https://github.com/MorrisMA/M65C02A/blob/master/Images/M65C02A-InstructionSetMatrix%2800-7F%29.JPG)
 
-![M65C02A Enhanced Instruction Set: 0x80-0xFF](https://github.com/MorrisMA/M65C02A/tree/master/Images/M65C02A-InstructioSetMatrix(80-FF).JPG)
+![M65C02A Enhanced Instruction Set: 0x80-0xFF](https://github.com/MorrisMA/M65C02A/blob/master/Images/M65C02A-InstructionSetMatrix%2800-7F%29.JPG)
