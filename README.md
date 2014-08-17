@@ -4,7 +4,7 @@ M65C02A Microprocessor Core
 Copyright (C) 2014, Michael A. Morris <morrisma@mchsi.com>.
 All Rights Reserved.
 
-Released under LGPL.
+Released under GPL v3.
 
 General Description
 -------------------
