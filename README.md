@@ -176,7 +176,7 @@ microcomputer is able to achieve operation at 30+ MHz in its target FPGA:
 XC3S200A-4VQG100I. Speeds in excess of 40+ MHz are reported in an
 XC6SLX9-3FGG256I FPGA.
 
-Improved the support for 16-bit relative addressing. Incorporated the 
+Improved the support for 16-bit relative addressing. Incorporated and tested the 
 following instructions:
 
     COP zp                                      : CO-Processor Trap - 0xFFF4, X <= operand
@@ -195,41 +195,8 @@ following instructions:
     BRA rel16                                   : Branch PC-relative
     PHW abs                                     : Push 16-bit operand abs direct    
     BBRx/BBSx zp,rel                            : Rockwell bit-oriented branches
-    
-The following instructions need verification:
 
-    COP zp                                      : CO-Processor Trap - 0xFFF4
-    COP #imm                                    :    X <= operand
-    ORA/AND/EOR/ADC/LDA/STA/CMP/SBC sp,S        : Stk Relative
-    ORA/AND/EOR/ADC/LDA/STA/CMP/SBC (sp,S),Y    : Stk Relative Indexed Indirect
-    
-All other instructions have been tested. Regression tests with Klaus Dormann's
-6502 Functional Test program is run after all changes.
-
-###Release 2.2.3
-
-Completed testing of the M65C02A Enhanced Instruction Set:
-
-    COP zp                                      : CO-Processor Trap - 0xFFF4, X <= operand
-    JSR (sp,S),Y                                : Stk Relative Indexed Indirect
-    COP #imm                                    : CO-Processor Trap - 0xFFF4, X <= operand
-    PHR rel16                                   : Push 16-bit PC-relative addrs
-    JMP (sp,S),Y                                : Stk Relative Indexed Indirect
-    PLW zp                                      : Pull 16-bit operand zp direct
-    PLW abs                                     : Pull 16-bit operand abd direct
-    ORA/AND/EOR/ADC/STA/LDA/CMP/SBC sp,S        : Stk Relative
-    ORA/AND/EOR/ADC/STA/LDA/CMP/SBC (sp,S),Y    : Stk Relative Indexed Indirect
-    PHW zp                                      : Push 16-bit operand zp direct
-    PHW #imm16                                  : Push 16-bit constant
-    RMBx/SMBx zp                                : Rockwell bit-oriented set/clr
-    BSR rel16                                   : Branch to Subroutine PC-relative
-    BRA rel16                                   : Branch PC-relative
-    PHW abs                                     : Push 16-bit operand abs direct    
-    BBRx/BBSx zp,rel                            : Rockwell bit-oriented branches
-
-The complete opcode matrix for the M65C02A 6502/65C02-compatible soft-core can 
-be found in the Images subdirectory. The following two images define the 
-instruction set of the M65C02A:
+The following two images define the complete opcode matrix of the M65C02A:
 
 ![M65C02A Enhanced Instruction Set: 0x00-0x7F](https://github.com/MorrisMA/M65C02A/blob/master/Images/M65C02A-InstructionSetMatrix%2800-7F%29.JPG)
 
