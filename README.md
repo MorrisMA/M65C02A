@@ -47,12 +47,16 @@ and several memory initialization files:
             M65C02_WrSel.v  - M65C02 ALU Register Write Enable module
             M65C02_PSWv2.v  - M65C02 ALU Processor Status Word module
     
-    M65C02_IDecode_ROM.coe  - M65C02A core microprogram ALU control fields
-    M65C02_uPgm_V4.coe      - M65C02A core microprogram (sequence control)
+    M65C02_IDecode_ROMa.coe - M65C02A core microprogram ALU control fields
+    M65C02_uPgm_V4a.coe     - M65C02A core microprogram (sequence control)
+
+    M65C02_IDecode_ROMa.txt - M65C02A core microprogram ALU control fields
+    M65C02_uPgm_V4a.txt     - M65C02A core microprogram (sequence control)
 
     M65C02_CoreV2.ucf       - User Constraints File: period and pin LOCs
     M65C02A.tcl             - Project settings file
     
+    tb_M65C02A.v            - Completed M65C02A soft-microcomputer testbench
     tb_M65C02_CoreV2.v      - Completed core testbench with test RAM
     
     M65C02_Tst3.txt         - Memory configuration file of M65C02 "ROM" program
@@ -75,10 +79,9 @@ M65C02 core:
 The ISE 10.1i SP3 implementation results are as follows:
 
     Core:                           M65C02A       M65C02
-    Number of Slice FFs:              181           191
-    Number of 4-input LUTs:           458           747
-    Number of Occupied Slices:        236           459
-    Total Number of 4-input LUTs:     467           760
+    Number of Slice FFs:              125           191
+    Number of 4-input LUTs:           482           747
+    Number of Occupied Slices:        346           459
     
     Number of BUFGMUXs:                1             1
     Number of RAMB16BWEs               2             2
@@ -165,3 +168,47 @@ controlled the sign extension multiplexer in the OP2 data path. To maintain the
 current 8-bit relative mode instructions, the microprogram for all of the branch
 instructions was updated. (Klaus Dormann's test suite was used for regression
 testing, and it passed.)
+
+###Release 2.2.2
+
+With the IO peripheral complement and full BRAM complement, the M65C02A 
+microcomputer is able to achieve operation at 30+ MHz in its target FPGA: 
+XC3S200A-4VQG100I. Speeds in excess of 40+ MHz are reported in an
+XC6SLX9-3FGG256I FPGA.
+
+Improved the support for 16-bit relative addressing. Incorporated the 
+following instructions:
+
+    COP zp                                      : CO-Processor Trap - 0xFFF4
+    COP #imm                                    :    X <= operand
+    ORA/AND/EOR/ADC/LDA/STA/CMP/SBC sp,S        : Stk Relative
+    ORA/AND/EOR/ADC/LDA/STA/CMP/SBC (sp,S),Y    : Stk Relative Indexed Indirect
+    JSR/JMP (sp,S),Y                            : Stk Relative Indexed Indirect
+    PHW #imm16                                  : Push 16-bit constant
+    PHW zp                                      : Push 16-bit operand zp direct
+    PHW abs                                     : Push 16-bit operand abs direct    
+    PHR rel16                                   : Push 16-bit PC-relative addrs
+    PLW zp                                      : Pull 16-bit operand zp direct
+    PLW abs                                     : Pull 16-bit operand abd direct
+    RMBx/SMBx zp                                : Rockwell bit-oriented set/clr
+    BSR/BRA rel16                               : Call/Jump PC-relative
+    BBRx/BBSx zp,rel                            : Rockwell bit-oriented branches
+    
+The following instructions need verification:
+
+    COP zp                                      : CO-Processor Trap - 0xFFF4
+    COP #imm                                    :    X <= operand
+    ORA/AND/EOR/ADC/LDA/STA/CMP/SBC sp,S        : Stk Relative
+    ORA/AND/EOR/ADC/LDA/STA/CMP/SBC (sp,S),Y    : Stk Relative Indexed Indirect
+    
+The following instructions need to be defined and implemented:
+
+    MWT zp,(Y)          : Move word from zero page to IO page
+    MWF zp,(Y)          : Move word from IO page to zero page 
+    IND                 : Change addressing mode from direct to indirect
+    SIZ                 : Change Accumulator operation from 8 to 16 bits
+    ESC                 : Change both addressing mode and Accumulator operation
+    INW/DEW zp          : Increment/Decrement Word zero page direct
+    
+All other instructions have been tested. Regression tests with Klaus Dormann's
+6502 Functional Test program is run after all changes.

@@ -1,6 +1,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  Copyright 2007-2013 by Michael A. Morris, dba M. A. Morris & Associates
+//  Parameterizable Distributed RAM Synchronous FIFO module.
+// 
+//  Copyright 2007-2014 by Michael A. Morris, dba M. A. Morris & Associates
 //
 //  All rights reserved. The source code contained herein is publicly released
 //  under the terms and conditions of the GNU Lesser Public License. No part of
