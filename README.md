@@ -233,4 +233,4 @@ instruction set of the M65C02A:
 
 ![M65C02A Enhanced Instruction Set: 0x00-0x7F](https://github.com/MorrisMA/M65C02A/blob/master/Images/M65C02A-InstructionSetMatrix%2800-7F%29.JPG)
 
-![M65C02A Enhanced Instruction Set: 0x80-0xFF](https://github.com/MorrisMA/M65C02A/blob/master/Images/M65C02A-InstructionSetMatrix%2800-7F%29.JPG)
+![M65C02A Enhanced Instruction Set: 0x80-0xFF](https://github.com/MorrisMA/M65C02A/blob/master/Images/M65C02A-InstructionSetMatrix%2880-FF%29.JPG)
