@@ -179,19 +179,21 @@ XC6SLX9-3FGG256I FPGA.
 Improved the support for 16-bit relative addressing. Incorporated the 
 following instructions:
 
-    COP zp                                      : CO-Processor Trap - 0xFFF4
-    COP #imm                                    :    X <= operand
-    ORA/AND/EOR/ADC/LDA/STA/CMP/SBC sp,S        : Stk Relative
-    ORA/AND/EOR/ADC/LDA/STA/CMP/SBC (sp,S),Y    : Stk Relative Indexed Indirect
-    JSR/JMP (sp,S),Y                            : Stk Relative Indexed Indirect
-    PHW #imm16                                  : Push 16-bit constant
-    PHW zp                                      : Push 16-bit operand zp direct
-    PHW abs                                     : Push 16-bit operand abs direct    
+    COP zp                                      : CO-Processor Trap - 0xFFF4, X <= operand
+    JSR (sp,S),Y                                : Stk Relative Indexed Indirect
+    COP #imm                                    : CO-Processor Trap - 0xFFF4, X <= operand
     PHR rel16                                   : Push 16-bit PC-relative addrs
+    JMP (sp,S),Y                                : Stk Relative Indexed Indirect
     PLW zp                                      : Pull 16-bit operand zp direct
     PLW abs                                     : Pull 16-bit operand abd direct
+    ORA/AND/EOR/ADC/STA/LDA/CMP/SBC sp,S        : Stk Relative
+    ORA/AND/EOR/ADC/STA/LDA/CMP/SBC (sp,S),Y    : Stk Relative Indexed Indirect
+    PHW zp                                      : Push 16-bit operand zp direct
+    PHW #imm16                                  : Push 16-bit constant
     RMBx/SMBx zp                                : Rockwell bit-oriented set/clr
-    BSR/BRA rel16                               : Call/Jump PC-relative
+    BSR rel16                                   : Branch to Subroutine PC-relative
+    BRA rel16                                   : Branch PC-relative
+    PHW abs                                     : Push 16-bit operand abs direct    
     BBRx/BBSx zp,rel                            : Rockwell bit-oriented branches
     
 The following instructions need verification:
@@ -201,14 +203,31 @@ The following instructions need verification:
     ORA/AND/EOR/ADC/LDA/STA/CMP/SBC sp,S        : Stk Relative
     ORA/AND/EOR/ADC/LDA/STA/CMP/SBC (sp,S),Y    : Stk Relative Indexed Indirect
     
-The following instructions need to be defined and implemented:
-
-    MWT zp,(Y)          : Move word from zero page to IO page
-    MWF zp,(Y)          : Move word from IO page to zero page 
-    IND                 : Change addressing mode from direct to indirect
-    SIZ                 : Change Accumulator operation from 8 to 16 bits
-    ESC                 : Change both addressing mode and Accumulator operation
-    INW/DEW zp          : Increment/Decrement Word zero page direct
-    
 All other instructions have been tested. Regression tests with Klaus Dormann's
 6502 Functional Test program is run after all changes.
+
+###Release 2.2.3
+
+Completed testing of the M65C02A Enhanced Instruction Set:
+
+    COP zp                                      : CO-Processor Trap - 0xFFF4, X <= operand
+    JSR (sp,S),Y                                : Stk Relative Indexed Indirect
+    COP #imm                                    : CO-Processor Trap - 0xFFF4, X <= operand
+    PHR rel16                                   : Push 16-bit PC-relative addrs
+    JMP (sp,S),Y                                : Stk Relative Indexed Indirect
+    PLW zp                                      : Pull 16-bit operand zp direct
+    PLW abs                                     : Pull 16-bit operand abd direct
+    ORA/AND/EOR/ADC/STA/LDA/CMP/SBC sp,S        : Stk Relative
+    ORA/AND/EOR/ADC/STA/LDA/CMP/SBC (sp,S),Y    : Stk Relative Indexed Indirect
+    PHW zp                                      : Push 16-bit operand zp direct
+    PHW #imm16                                  : Push 16-bit constant
+    RMBx/SMBx zp                                : Rockwell bit-oriented set/clr
+    BSR rel16                                   : Branch to Subroutine PC-relative
+    BRA rel16                                   : Branch PC-relative
+    PHW abs                                     : Push 16-bit operand abs direct    
+    BBRx/BBSx zp,rel                            : Rockwell bit-oriented branches
+
+The following two images define the instruction set of the M65C02A:
+
+![M65C02A Enhanced Instruction Set: 0x00-0x7F](https://github.com/MorrisMA/M65C02A/raw/master/Images/M65C02A-InstructioSetMatrix(00-7F).JPG)
+![M65C02A Enhanced Instruction Set: 0x80-0xFF](https://github.com/MorrisMA/M65C02A/raw/master/Images/M65C02A-InstructioSetMatrix(80-FF).JPG)
