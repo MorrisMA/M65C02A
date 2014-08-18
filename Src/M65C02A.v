@@ -1,27 +1,24 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  Copyright 2014 by Michael A. Morris, dba M. A. Morris & Associates
+//  M65C02A soft-core microcomputer project
+//
+//  Copyright (C) 2012-2014  Michael A. Morris
 //
 //  All rights reserved. The source code contained herein is publicly released
-//  under the terms and conditions of the GNU Lesser Public License. No part of
-//  this source code may be reproduced or transmitted in any form or by any
-//  means, electronic or mechanical, including photocopying, recording, or any
-//  information storage and retrieval system in violation of the license under
-//  which the source code is released.
+//  under the terms and conditions of the GNU General Public License as conveyed
+//  in the license provided below.
 //
-//  The source code contained herein is free; it may be redistributed and/or
-//  modified in accordance with the terms of the GNU Lesser General Public
-//  License as published by the Free Software Foundation; either version 2.1 of
-//  the GNU Lesser General Public License, or any later version.
+//  This program is free software: you can redistribute it and/or modify it
+//  under the terms of the GNU General Public License as published by the Free
+//  Software Foundation, either version 3 of the License, or any later version.
 //
-//  The source code contained herein is freely released WITHOUT ANY WARRANTY;
-//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-//  PARTICULAR PURPOSE. (Refer to the GNU Lesser General Public License for
-//  more details.)
+//  This program is distributed in the hope that it will be useful, but WITHOUT
+//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+//  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+//  more details.
 //
-//  A copy of the GNU Lesser General Public License should have been received
-//  along with the source code contained herein; if not, a copy can be obtained
-//  by writing to:
+//  You should have received a copy of the GNU General Public License along with
+//  this program.  If not, see <http://www.gnu.org/licenses/>, or write to
 //
 //  Free Software Foundation, Inc.
 //  51 Franklin Street, Fifth Floor
@@ -30,8 +27,10 @@
 //  Further, no use of this source code is permitted in any form or means
 //  without inclusion of this banner prominently in any derived works.
 //
-//  Michael A. Morris
-//  Huntsville, AL
+//  Michael A. Morris <morrisma_at_mchsi_dot_com>
+//  164 Raleigh Way
+//  Huntsville, AL 35811
+//  USA
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -127,30 +126,33 @@ module M65C02A #(
     parameter pKernel_SP_Rst  = 8'h02,      // SP Value after Rst
     parameter pUser_SP_Rst    = 8'hFF,      // SP Value after Rst
 
-    parameter pVec_RST        = 16'hFFFC,   // ReSeT Trap (Highest Priority)
-    parameter pVec_ABRT       = 16'hFFE0,   // MMU ABoRT Trap (N/S)
-    parameter pVec_NMI        = 16'hFFFA,   // Ex. Non-Maskable Interrupt
-    parameter pVec_INV        = 16'hFFE2,   // Invalid Instruction Trap (N/S)
-    parameter pVec_SYS        = 16'hFFE4,   // SYStem Call Trap
     parameter pVec_IRQ        = 16'hFFFE,   // Ext. Maskable Interrupt
-    parameter pVec_RQST7      = 16'hFFF6,   // Int. Maskable Interrupt 7 (COM0)
-    parameter pVec_RQST6      = 16'hFFF4,   // Int. Maskable Interrupt 6 (COM1)
-    parameter pVec_RQST5      = 16'hFFF2,   // Int. Maskable Interrupt 5 (SPI0)
-    parameter pVec_RQST4      = 16'hFFF0,   // Int. Maskable Interrupt 4 (N/U)
-    parameter pVec_RQST3      = 16'hFFEE,   // Int. Maskable Interrupt 3 (N/U)
-    parameter pVec_RQST2      = 16'hFFEC,   // Int. Maskable Interrupt 2 (N/U)
-    parameter pVec_RQST1      = 16'hFFEA,   // Int. Maskable Interrupt 1 (N/U)
-    parameter pVec_RQST0      = 16'hFFE8,   // Int. Maskable Interrupt 0 (N/U)
     parameter pVec_BRK        = 16'hFFFE,   // BReaK Instruction Trap
-    parameter pVec_COP        = 16'hFFE6,   // COP Instruction Trap (N/S)
+    parameter pVec_RST        = 16'hFFFC,   // ReSeT Trap (Highest Priority)
+    parameter pVec_NMI        = 16'hFFFA,   // Ex. Non-Maskable Interrupt
+    parameter pVec_ABRT       = 16'hFFF8,   // MMU ABoRT Trap (N/S)
+    parameter pVec_RSVD1      = 16'hFFF6,   // Reserved for Future Use (BRK)
+    parameter pVec_COP        = 16'hFFF4,   // COP Instruction Trap
+    parameter pVec_RSVD0      = 16'hFFF2,   // Reserved for Future Use
+    parameter pVec_INV        = 16'hFFF0,   // Invalid Instruction Trap
+    parameter pVec_RQST7      = 16'hFFEE,   // Int. Maskable Interrupt 7 (COM0)
+    parameter pVec_RQST6      = 16'hFFEC,   // Int. Maskable Interrupt 6 (COM1)
+    parameter pVec_RQST5      = 16'hFFEA,   // Int. Maskable Interrupt 5 (SPI0)
+    parameter pVec_RQST4      = 16'hFFE8,   // Int. Maskable Interrupt 4 (N/U)
+    parameter pVec_RQST3      = 16'hFFE6,   // Int. Maskable Interrupt 3 (N/U)
+    parameter pVec_RQST2      = 16'hFFE4,   // Int. Maskable Interrupt 2 (N/U)
+    parameter pVec_RQST1      = 16'hFFE2,   // Int. Maskable Interrupt 1 (N/U)
+    parameter pVec_RQST0      = 16'hFFE0,   // Int. Maskable Interrupt 0 (N/U)
     
     parameter pInt_Hndlr      = 9'h021,     // Microprogram Interrupt Handler
 
     parameter pVAL            = 3'b000,     // VALid instructions
     parameter pINV            = 3'b001,     // INValid instructions
     parameter pCOP            = 3'b010,     // CO-Processor instruction
-    parameter pBRK            = 3'b101,     // BRK instruction
-    parameter pSTP            = 3'b110,     // STP instruction
+    parameter pBRK            = 3'b011,     // BRK instruction
+    parameter pPFX            = 3'b100,     // PreFiX instructions (IND/SIZ)
+    parameter pPHR            = 3'b101,     // PHR instruction
+    parameter pPHW            = 3'b110,     // PHR instruction
     parameter pWAI            = 3'b111,     // WAI instruction
 
     parameter pNOP            = 8'hEA,      // M65C02 Core NOP instruction
@@ -282,7 +284,9 @@ wire    WE, RE;                 // M65C02 Core Decoded IO Operations
 wire    INV;                    // M65C02 Core Decoded INValid instructions
 wire    COP;                    // M65C02 Core Decoded COP instruction
 wire    BRK;                    // M65C02 Core Decoded BRK instruction
-wire    STP;                    // M65C02 Core Decoded STP instruction
+wire    PFX;                    // M65C02 Core Decoded PreFiX instructions
+wire    PHR;                    // M65C02 Core Decoded PHR instruction
+wire    PHW;                    // M65C02 Core Decoded PHW instructions
 wire    WAI;                    // M65C02 Core Decoded WAI instruction
 
 wire    IO_Page;                // IO Page Decode
@@ -370,8 +374,7 @@ M65C02_IntHndlrV2   IntHndlr (
                         .Rdy(Rdy),
                         
                         .ABRT(ABRT),            // MMU Trap (Not Implemented)
-                        .INV(1'b0),             // INValid instruction Trap
-                        .SYS(1'b0),             // SYS Call Trap
+                        .INV(INV),              // INValid instruction Trap
                         .NMI(NMI),              // NMI input 
                         .IRQ(IRQ),              // IRQ input
                         .RQST({COM0_IRQ, COM1_IRQ, SPI0_IRQ, 5'b0}),
@@ -440,7 +443,9 @@ assign RE  = IO_Op[1];
 assign INV = (Mode == pINV);
 assign COP = (Mode == pCOP);
 assign BRK = (Mode == pBRK);
-assign STP = (Mode == pSTP);
+assign PFX = (Mode == pPFX);
+assign PHR = (Mode == pPHR);
+assign PHW = (Mode == pPHW);
 assign WAI = (Mode == pWAI);
 
 //  MMU - Maps Virtual Addresses to Physical Addresses using 16 4kB pages

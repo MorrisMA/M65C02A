@@ -1,15 +1,51 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Testbench for M65C02A soft-core microcomputer project.
+//
+//  Copyright (C) 2014  Michael A. Morris
+//
+//  All rights reserved. The source code contained herein is publicly released
+//  under the terms and conditions of the GNU General Public License as conveyed
+//  in the license provided below.
+//
+//  This program is free software: you can redistribute it and/or modify it
+//  under the terms of the GNU General Public License as published by the Free
+//  Software Foundation, either version 3 of the License, or any later version.
+//
+//  This program is distributed in the hope that it will be useful, but WITHOUT
+//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+//  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+//  more details.
+//
+//  You should have received a copy of the GNU General Public License along with
+//  this program.  If not, see <http://www.gnu.org/licenses/>, or write to
+//
+//  Free Software Foundation, Inc.
+//  51 Franklin Street, Fifth Floor
+//  Boston, MA  02110-1301 USA
+//
+//  Further, no use of this source code is permitted in any form or means
+//  without inclusion of this banner prominently in any derived works.
+//
+//  Michael A. Morris <morrisma_at_mchsi_dot_com>
+//  164 Raleigh Way
+//  Huntsville, AL 35811
+//  USA
+//
+////////////////////////////////////////////////////////////////////////////////
+
 `timescale 1ns / 1ps
 
 ////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer:
+// Company:         M. A. Morris & Associates
+// Engineer:        Michael A. Morris
 //
-// Create Date:   19:44:19 07/04/2014
-// Design Name:   M65C02A
-// Module Name:   C:/XProjects/ISE10.1i/M65C02A/Src/tb_M65C02A.v
-// Project Name:  M65C02A
-// Target Device:  
-// Tool versions:  
+// Create Date:     19:44:19 07/04/2014
+// Design Name:     M65C02A
+// Module Name:     C:/XProjects/ISE10.1i/M65C02A/Src/tb_M65C02A.v
+// Project Name:    M65C02A
+// Target Device:   Xilinx SRAM FPGAs  
+// Tool versions:   ISE 10.1i SP3
 // Description: 
 //
 // Verilog Test Fixture created by ISE for module: M65C02A
@@ -17,7 +53,11 @@
 // Dependencies:
 // 
 // Revision:
-// Revision 0.01 - File Created
+// 
+//  0.00    14F04   MAM     Initial creation
+//
+//  1.00    14G08   MAM     Modified to override the default microprogram files.
+//
 // Additional Comments:
 // 
 ////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +106,10 @@ wire    COM1_DE;
 
 // Instantiate the Unit Under Test (UUT)
 
-M65C02A uut (
+M65C02A #(
+            .pM65C02_uPgm("Pgms/M65C02_uPgm_V4a.coe"),          // SEQ   :  2 kB
+            .pM65C02_IDec("Pgms/M65C02_IDecode_ROMa.coe")       // DEC   :  2 kB
+        ) uut (
             .nRst(nRst), 
             .Clk(Clk), 
             

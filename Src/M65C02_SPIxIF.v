@@ -1,27 +1,24 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  SPI Master module for M65C02A soft-core microcomputer project.
+// 
 //  Copyright 2013-2014 by Michael A. Morris, dba M. A. Morris & Associates
 //
 //  All rights reserved. The source code contained herein is publicly released
-//  under the terms and conditions of the GNU Lesser Public License. No part of
-//  this source code may be reproduced or transmitted in any form or by any
-//  means, electronic or mechanical, including photocopying, recording, or any
-//  information storage and retrieval system in violation of the license under
-//  which the source code is released.
+//  under the terms and conditions of the GNU General Public License as conveyed
+//  in the license provided below.
 //
-//  The source code contained herein is free; it may be redistributed and/or
-//  modified in accordance with the terms of the GNU Lesser General Public
-//  License as published by the Free Software Foundation; either version 2.1 of
-//  the GNU Lesser General Public License, or any later version.
+//  This program is free software: you can redistribute it and/or modify it
+//  under the terms of the GNU General Public License as published by the Free
+//  Software Foundation, either version 3 of the License, or any later version.
 //
-//  The source code contained herein is freely released WITHOUT ANY WARRANTY;
-//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-//  PARTICULAR PURPOSE. (Refer to the GNU Lesser General Public License for
-//  more details.)
+//  This program is distributed in the hope that it will be useful, but WITHOUT
+//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+//  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+//  more details.
 //
-//  A copy of the GNU Lesser General Public License should have been received
-//  along with the source code contained herein; if not, a copy can be obtained
-//  by writing to:
+//  You should have received a copy of the GNU General Public License along with
+//  this program.  If not, see <http://www.gnu.org/licenses/>, or write to
 //
 //  Free Software Foundation, Inc.
 //  51 Franklin Street, Fifth Floor
@@ -30,8 +27,10 @@
 //  Further, no use of this source code is permitted in any form or means
 //  without inclusion of this banner prominently in any derived works.
 //
-//  Michael A. Morris
-//  Huntsville, AL
+//  Michael A. Morris <morrisma_at_mchsi_dot_com>
+//  164 Raleigh Way
+//  Huntsville, AL 35811
+//  USA
 //
 ////////////////////////////////////////////////////////////////////////////////
 

@@ -1,6 +1,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  Copyright 2013 by Michael A. Morris, dba M. A. Morris & Associates
+//  Parameterizable BRAM module for M65C02A soft-core microcomputer project.
+// 
+//  Copyright 2013-2014 by Michael A. Morris, dba M. A. Morris & Associates
 //
 //  All rights reserved. The source code contained herein is publicly released
 //  under the terms and conditions of the GNU Lesser Public License. No part of
@@ -9,7 +11,7 @@
 //  information storage and retrieval system in violation of the license under
 //  which the source code is released.
 //
-//  The source code contained herein is free; it may be redistributed and/or 
+//  The source code contained herein is free; it may be redistributed and/or
 //  modified in accordance with the terms of the GNU Lesser General Public
 //  License as published by the Free Software Foundation; either version 2.1 of
 //  the GNU Lesser General Public License, or any later version.
@@ -28,7 +30,7 @@
 //  Boston, MA  02110-1301 USA
 //
 //  Further, no use of this source code is permitted in any form or means
-//  without inclusion of this banner prominently in any derived works. 
+//  without inclusion of this banner prominently in any derived works.
 //
 //  Michael A. Morris
 //  Huntsville, AL

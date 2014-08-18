@@ -1,27 +1,24 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  Address Generator module for M65C02A soft-core microcomputer project.
+// 
 //  Copyright 2013-2014 by Michael A. Morris, dba M. A. Morris & Associates
 //
 //  All rights reserved. The source code contained herein is publicly released
-//  under the terms and conditions of the GNU Lesser Public License. No part of
-//  this source code may be reproduced or transmitted in any form or by any
-//  means, electronic or mechanical, including photocopying, recording, or any
-//  information storage and retrieval system in violation of the license under
-//  which the source code is released.
+//  under the terms and conditions of the GNU General Public License as conveyed
+//  in the license provided below.
 //
-//  The source code contained herein is free; it may be redistributed and/or
-//  modified in accordance with the terms of the GNU Lesser General Public
-//  License as published by the Free Software Foundation; either version 2.1 of
-//  the GNU Lesser General Public License, or any later version.
+//  This program is free software: you can redistribute it and/or modify it
+//  under the terms of the GNU General Public License as published by the Free
+//  Software Foundation, either version 3 of the License, or any later version.
 //
-//  The source code contained herein is freely released WITHOUT ANY WARRANTY;
-//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-//  PARTICULAR PURPOSE. (Refer to the GNU Lesser General Public License for
-//  more details.)
+//  This program is distributed in the hope that it will be useful, but WITHOUT
+//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+//  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+//  more details.
 //
-//  A copy of the GNU Lesser General Public License should have been received
-//  along with the source code contained herein; if not, a copy can be obtained
-//  by writing to:
+//  You should have received a copy of the GNU General Public License along with
+//  this program.  If not, see <http://www.gnu.org/licenses/>, or write to
 //
 //  Free Software Foundation, Inc.
 //  51 Franklin Street, Fifth Floor
@@ -30,8 +27,10 @@
 //  Further, no use of this source code is permitted in any form or means
 //  without inclusion of this banner prominently in any derived works.
 //
-//  Michael A. Morris
-//  Huntsville, AL
+//  Michael A. Morris <morrisma_at_mchsi_dot_com>
+//  164 Raleigh Way
+//  Huntsville, AL 35811
+//  USA
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -89,6 +88,11 @@
 //                          flect changes to NA_Op to support stack relative
 //                          addressing.
 //
+//  2.01    14H09   MAM     Added comment line describing how (sp,S),Y address-
+//                          ing is implemented, added the {0, OP1} to AR to im-
+//                          plement stack relative addressing, and changed name
+//                          of StkRel signal to Stk_Rel.
+//
 // Additional Comments: 
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -124,6 +128,7 @@ module M65C02_AddrGenV2 #(
     input   SelS,                   // Stack Pointer Select
     output  [7:0] S,                // Stack Pointer Register
 
+    output  reg [15:0] MAR,         // Program Counter
     output  reg [15:0] PC           // Program Counter
 );
 
@@ -136,7 +141,6 @@ wor     [15:0] AL, AR;          // Wired-OR busses for address operands
 wire    [15:0] NA;              // Next Address (w/o application of % 256)
 
 wire    CE_MAR;                 // Memory Address Register Clock Enable
-reg     [15:0] MAR;             // Memory Address Register
 
 wire    [15:0] Rel;             // Branch Address Sign-Extended Offset
 wire    CE_PC;                  // Program Counter Clock Enable
@@ -154,18 +158,20 @@ wire    CE_PC;                  // Program Counter Clock Enable
 //           Pf CtPbA   e i
 //           Cf  k sR   l  
 // Vec:  11'b10_00000_000_0; // NA <= {OP2,OP1}           + 0; PC <= NA
-// Jmp:  11'b10_00000_000_0; // NA <= {OP2,OP1}           + 0; PC <= NA
-// Rtn:  11'b10_00000_000_1; // NA <= {OP2,OP1}           + 1; PC <= NA
+// Jmp:  11'b10_00010_000_0; // NA <= {OP2,OP1}           + 0; PC <= NA
+// JmpY: 11'b10_00010_010_0; // NA <= {OP2,OP1} + {0,  Y} + 0; PC <= NA
+// Rtn:  11'b10_00010_000_1; // NA <= {OP2,OP1}           + 1; PC <= NA
 // PC:   11'b10_10000_000_0; // NA <= PC                  + 0; PC <= NA
 // Inc:  11'b10_10000_000_1; // NA <= PC                  + 1; PC <= NA
-// Bra:  11'b10_10000_001_0; // NA <= PC        + Rel     + 0; PC <= NA
+// Bra:  11'b10_10000_001_0; // NA <= PC        + Rel     + 1; PC <= NA
+// Rel:  11'b00_10000_001_0; // NA <= PC        + Rel     + 1;
 // Psh:  11'b00_01000_000_0; // NA <= {  1, SP}           + 0;
 // Pop:  11'b00_01000_000_1; // NA <= {  1, SP}           + 1;
-// Stk:  11'b01_01000_000_0; // NA <= {  1, SP} + {0,OP1} + 0;
+// SPN:  11'b01_01000_000_0; // NA <= {  1, SP} + {0,OP1} + 1;
 // DPN:  11'b00_00100_000_0; // NA <= {  0,OP1}           + 0;
 // DPX:  11'b00_00100_100_0; // NA <= {  0,OP1} + {0,  X} + 0;
 // DPY:  11'b00_00100_010_0; // NA <= {  0,OP1} + {0,  Y} + 0;
-// LDA:  11'b00_00010_000_0; // NA <= {OP2,OP1}             + 0;
+// LDA:  11'b00_00010_000_0; // NA <= {OP2,OP1}           + 0;
 // LDAX: 11'b00_00010_100_0; // NA <= {OP2,OP1} + {0,  X} + 0;
 // LDAY: 11'b00_00010_010_0; // NA <= {OP2,OP1} + {0,  Y} + 0;
 // Nxt:  11'b00_00001_000_0; // NA <= MAR                 + 1;
@@ -173,7 +179,7 @@ wire    CE_PC;                  // Program Counter Clock Enable
 //
 
 assign Ld_PC   = NA_Op[10];
-assign StkRel  = NA_Op[ 9];
+assign Stk_Rel = NA_Op[ 9];
 //
 assign Sel_PC  = NA_Op[ 8];
 assign Sel_SP  = NA_Op[ 7];
@@ -201,9 +207,10 @@ assign AL = ((Sel_MAR) ? MAR          : 0);
 
 //  Generate Right Address Operand
 
-assign AR = ((Sel_X  ) ? {8'h00, X} : 0);
-assign AR = ((Sel_Y  ) ? {8'h00, Y} : 0);
-assign AR = ((Sel_Rel) ? Rel        : 0);
+assign AR = ((Sel_X  ) ? {8'h00,   X} : 0);
+assign AR = ((Sel_Y  ) ? {8'h00,   Y} : 0);
+assign AR = ((Sel_Rel) ? Rel          : 0);
+assign AR = ((Stk_Rel) ? {8'h00, OP1} : 0);
 
 //  Compute Next Address
 
@@ -222,7 +229,7 @@ end
 
 //  Memory Address Register
 
-assign CE_MAR = Rdy;
+assign CE_MAR = Rdy & ~(Sel_SP & ~Stk_Rel);
 
 always @(posedge Clk)
 begin
@@ -252,7 +259,7 @@ M65C02_StkPtr   #(
                     .Valid(Valid),
                     
                     .SelS(SelS), 
-                    .Stk_Op({Sel_SP & ~StkRel, Ci}), 
+                    .Stk_Op({Sel_SP & ~Stk_Rel, Ci}), 
                     .X(X),
                     
                     .S(S)

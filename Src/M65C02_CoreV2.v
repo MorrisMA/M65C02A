@@ -1,27 +1,24 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  M65C02A soft-core module for M65C02A soft-core microcomputer project.
+// 
 //  Copyright 2013-2014 by Michael A. Morris, dba M. A. Morris & Associates
 //
 //  All rights reserved. The source code contained herein is publicly released
-//  under the terms and conditions of the GNU Lesser Public License. No part of
-//  this source code may be reproduced or transmitted in any form or by any
-//  means, electronic or mechanical, including photocopying, recording, or any
-//  information storage and retrieval system in violation of the license under
-//  which the source code is released.
+//  under the terms and conditions of the GNU General Public License as conveyed
+//  in the license provided below.
 //
-//  The source code contained herein is free; it may be redistributed and/or
-//  modified in accordance with the terms of the GNU Lesser General Public
-//  License as published by the Free Software Foundation; either version 2.1 of
-//  the GNU Lesser General Public License, or any later version.
+//  This program is free software: you can redistribute it and/or modify it
+//  under the terms of the GNU General Public License as published by the Free
+//  Software Foundation, either version 3 of the License, or any later version.
 //
-//  The source code contained herein is freely released WITHOUT ANY WARRANTY;
-//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-//  PARTICULAR PURPOSE. (Refer to the GNU Lesser General Public License for
-//  more details.)
+//  This program is distributed in the hope that it will be useful, but WITHOUT
+//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+//  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+//  more details.
 //
-//  A copy of the GNU Lesser General Public License should have been received
-//  along with the source code contained herein; if not, a copy can be obtained
-//  by writing to:
+//  You should have received a copy of the GNU General Public License along with
+//  this program.  If not, see <http://www.gnu.org/licenses/>, or write to
 //
 //  Free Software Foundation, Inc.
 //  51 Franklin Street, Fifth Floor
@@ -30,8 +27,10 @@
 //  Further, no use of this source code is permitted in any form or means
 //  without inclusion of this banner prominently in any derived works.
 //
-//  Michael A. Morris
-//  Huntsville, AL
+//  Michael A. Morris <morrisma_at_mchsi_dot_com>
+//  164 Raleigh Way
+//  Huntsville, AL 35811
+//  USA
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -98,6 +97,15 @@
 //                          of the core which now pushes the PC and PSW to the
 //                          stack on reset; and (9) adjusted the connections of
 //                          the Tmp and M operand ports on the ALU module.
+//
+//  2.00    14H09   MAM     Added multiplexer, controlled by Sel_BA (uP_Cntl==1)
+//                          to support PHW (PEI/PEA/PHW) and PHR (PER) instruc-
+//                          tions. Modifications allow {OP2, OP1} to be pushed
+//                          onto the stack using PCH and PCL as the selects.
+//
+//  2.10    14H16   MAM     Added an additional qualifier to the CE_IR signal so
+//                          that the IR is not loaded unless the Sel_BA is also
+//                          asserted. 
 // 
 // Additional Comments:
 //
@@ -183,10 +191,10 @@ localparam  pIO_WR   = 2'b01;   // Memory Write
 localparam  pIO_RD   = 2'b10;   // Memory Read
 localparam  pIO_IF   = 2'b11;   // Instruction Fetch
 
-localparam  pDO_ALU  = 2'b00;   // DO    <= ALU_Out
-localparam  pDO_PCH  = 2'b01;   // DO    <= PC[15:8]
-localparam  pDO_PCL  = 2'b10;   // DO    <= PC[ 7:0]
-localparam  pDO_PSW  = 2'b11;   // DO    <= P (also available on ALU_Out)
+localparam  pDO_ALU  = 2'b00;   // DO <= ALU_Out
+localparam  pDO_MDH  = 2'b01;   // DO <= ((PHW) ? OP2:((PHR) ? Hi(MAR):Hi(PC)))
+localparam  pDO_MDL  = 2'b10;   // DO <= ((PHW) ? OP1:((PHR) ? Lo(MAR):Lo(PC)))
+localparam  pDO_PSW  = 2'b11;   // DO <= P (also available on ALU_Out)
 //
 localparam  pDI_Mem  = 2'b00;   // ALU_M <= DI
 localparam  pDI_OP2  = 2'b01;   // OP2   <= DI
@@ -197,12 +205,28 @@ localparam  pNOP     = 8'hEA;   // NOP opcode
 
 localparam  pIntMsk  = 2;       // Bit number of Interrupt mask bit in P
 
+localparam  pMd_WAI  = 7;       // Fixed Microcode Mode Field Decode
+localparam  pMd_PHW  = 6;
+localparam  pMd_PHR  = 5;
+localparam  pMd_PFX  = 4;
+localparam  pMd_BRK  = 3;
+localparam  pMd_COP  = 2;
+localparam  pMd_INV  = 1;
+localparam  pMd_VAL  = 0;
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Local Signal Declarations
 //
 
 wire    WAI;                            // Instruction Mode Decode for WAI
+wire    PHW;                            // Instruction Mode Decode for PHW
+wire    PHR;                            // Instruction Mode Decode for PHR
+wire    PFX;                            // Instruction Mode Decode for PFX
+wire    BRK;                            // Instruction Mode Decode for BRK
+wire    COP;                            // Instruction Mode Decode for COP
+wire    INV;                            // Instruction Mode Decode for INV
+wire    VAL;                            // Instruction Mode Decode for VAL
 
 wire    BRV1;                           // MPC BRV1 Instruction Decode
 wire    BRV3;                           // MPC BRV3 Instruction Decode
@@ -250,8 +274,9 @@ wire    [2:0] OSel;                 // M65C02 ALU Output Select Field
 wire    [3:0] CCSel;                // M65C02 ALU Condition Code Control Field
 wire    [7:0] Opcode;               // M65C02 Rockwell Instruction Mask Field
   
-wire    [15:0] PC;                  // PC and delayed PC (Pipeline Compensation)
-wire    [ 7:0] S;                   // Stack Pointer
+wire    [15:0] MAR;                 // M65C02 Memory Address Register (MAR)
+wire    [15:0] PC;                  // M65C02 Program Counter (PC)
+wire    [ 7:0] S;                   // M65C02 Stack Pointer (S)
 
 wire    [7:0] DO_ALU;               // M65C02 ALU Data Output Bus
 wire    Valid;                      // M65C02 ALU Output Valid Signal
@@ -259,7 +284,8 @@ wire    CC;                         // ALU Condition Code Output
 
 wire    SelS;                       // Stack Pointer Select
 
-wor     [7:0] OutMux;               // Data Output Multiplexer
+wire    [15:0] MuxDat;              // Multiplexer Data: {OP2,OP1}, MAR, PC
+wor     [ 7:0] OutMux;              // Data Output Multiplexer
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -378,10 +404,14 @@ assign Page   = uPCntl[0];      // Explicit page select for address wrap ops.
 
 //  Decode DI_Op Control Field
 
-assign Ld_OP1 = IO_Op[1] & DI_Op[2];
-assign Ld_OP2 = IO_Op[1] & DI_Op[1];
+assign Ld_OP1 = IO_Op[1] &  DI_Op[2];
+assign Ld_OP2 = IO_Op[1] &  DI_Op[1];
 
 assign Sel_BA = (uPCntl == 2'b01);
+
+//  Operand Register Data Input Bus
+
+wire [7:0] OP_DI = ((Sel_BA) ? uP_BA : DI);
 
 //  Operand Register 1
 
@@ -392,24 +422,26 @@ begin
     if(Rst | BRV2)
         OP1 <= #1 Vector[7:0];
     else if(CE_OP1)
-        OP1 <= #1 ((Sel_BA) ? uP_BA : DI);      // Load OP1 from DI | uP_BA
+        OP1 <= #1 OP_DI;      
 end
 
 //  Operand Register 2
 
 assign CE_OP2 = Ld_OP2 & Rdy & ~CE_IR;
+assign SignDI = DI_Op[0];
 
 always @(posedge Clk)
 begin
     if(Rst | BRV2)
         OP2 <= #1 Vector[15:8];
-    else if(CE_OP2)
-        OP2 <= #1 ((Sel_BA) ? uP_BA : DI);      // Load OP1 from DI | uP_BA
+    else if(CE_OP2)   // OP2: {sign(OP_DI),   OP_DI}
+        OP2 <= #1 ((SignDI) ? {8{OP_DI[7]}} : OP_DI);
 end
 
 //  Infer Instruction Decode ROM and initialize with file created by SMRTool
+//       Load IR from DI | uP_BA
 
-assign CE_IR  = (BRV1 | (BRV3 & ~Int)) & Rdy;   // Load IR from DI | uP_BA
+assign CE_IR  = (BRV1 | (BRV3 & ~Int) | (Sel_BA & DI_Op[3])) & Rdy;
 assign IDEC_A = ((Sel_BA) ? {uP_BA[3:0], uP_BA[7:4]} : {DI[3:0], DI[7:4]}); 
 
 initial
@@ -440,6 +472,13 @@ assign  Opcode = IDEC[ 7: 0];       // M65C02 Valid Opcode Control Field
 // Decode Mode for internal signals
 
 assign WAI = &Mode;                 // Current Instruction is WAI
+assign PHW = (Mode == pMd_PHW);     // Current Instruction is PHW
+assign PHR = (Mode == pMd_PHR);     // Current Instruction is PHR
+assign PFX = (Mode == pMd_PFX);     // Current Instruction is IND/SIZ
+assign BRK = (Mode == pMd_BRK);     // Current Instruction is BRK
+assign COP = (Mode == pMd_COP);     // Current Instruction is COP
+assign INV = (Mode == pMd_INV);     // Current Instruction is Invalid
+assign VAL = (Mode == pMd_VAL);     // Current Instruction is Valid
 
 //  Next Address Generator
 
@@ -474,6 +513,7 @@ M65C02_AddrGenV2    #(
                         .SelS(SelS),
                         .S(S),
                         
+                        .MAR(MAR),
                         .PC(PC)
                     );
 
@@ -537,10 +577,12 @@ assign IRQ_Msk = P[pIntMsk];            // Interrupt Mask Bit
 
 //  External Bus Data Output
 
-assign OutMux = ((DO_Op[0]) ? DO_ALU   : 0);
-assign OutMux = ((DO_Op[1]) ? PC[15:8] : 0);
-assign OutMux = ((DO_Op[2]) ? PC[ 7:0] : 0);
-assign OutMux = ((DO_Op[3]) ? P        : 0);
+assign MuxDat = ((PHW) ? {OP2, OP1} : ((PHR) ? MAR : PC));
+
+assign OutMux = ((DO_Op[0]) ? DO_ALU       : 0);
+assign OutMux = ((DO_Op[1]) ? MuxDat[15:8] : 0);
+assign OutMux = ((DO_Op[2]) ? MuxDat[ 7:0] : 0);
+assign OutMux = ((DO_Op[3]) ? P            : 0);
 
 assign DO = OutMux;
 

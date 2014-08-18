@@ -1,27 +1,24 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  Copyright 2013-2014 by Michael A. Morris, dba M. A. Morris & Associates
+//  Interrupt Handler module for M65C02A soft-core microcomputer project.
+//
+//  Copyright (C) 2013-2014  Michael A. Morris
 //
 //  All rights reserved. The source code contained herein is publicly released
-//  under the terms and conditions of the GNU Lesser Public License. No part of
-//  this source code may be reproduced or transmitted in any form or by any
-//  means, electronic or mechanical, including photocopying, recording, or any
-//  information storage and retrieval system in violation of the license under
-//  which the source code is released.
+//  under the terms and conditions of the GNU General Public License as conveyed
+//  in the license provided below.
 //
-//  The source code contained herein is free; it may be redistributed and/or
-//  modified in accordance with the terms of the GNU Lesser General Public
-//  License as published by the Free Software Foundation; either version 2.1 of
-//  the GNU Lesser General Public License, or any later version.
+//  This program is free software: you can redistribute it and/or modify it
+//  under the terms of the GNU General Public License as published by the Free
+//  Software Foundation, either version 3 of the License, or any later version.
 //
-//  The source code contained herein is freely released WITHOUT ANY WARRANTY;
-//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-//  PARTICULAR PURPOSE. (Refer to the GNU Lesser General Public License for
-//  more details.)
+//  This program is distributed in the hope that it will be useful, but WITHOUT
+//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+//  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+//  more details.
 //
-//  A copy of the GNU Lesser General Public License should have been received
-//  along with the source code contained herein; if not, a copy can be obtained
-//  by writing to:
+//  You should have received a copy of the GNU General Public License along with
+//  this program.  If not, see <http://www.gnu.org/licenses/>, or write to
 //
 //  Free Software Foundation, Inc.
 //  51 Franklin Street, Fifth Floor
@@ -30,8 +27,10 @@
 //  Further, no use of this source code is permitted in any form or means
 //  without inclusion of this banner prominently in any derived works.
 //
-//  Michael A. Morris
-//  Huntsville, AL
+//  Michael A. Morris <morrisma_at_mchsi_dot_com>
+//  164 Raleigh Way
+//  Huntsville, AL 35811
+//  USA
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -90,23 +89,24 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-module M65C02_IntHndlrV2 #(
-    parameter pVec_RST   = 16'hFFFC,    // Highest Priority
-    parameter pVec_ABRT  = 16'hFFE0,    // (Not Currently Supported - set to 0)
-    parameter pVec_NMI   = 16'hFFFA,    //
-    parameter pVec_INV   = 16'hFFE2,    //
-    parameter pVec_SYS   = 16'hFFE4,    //
-    parameter pVec_IRQ   = 16'hFFFE,    //
-    parameter pVec_RQST7 = 16'hFFF6,    //
-    parameter pVec_RQST6 = 16'hFFF4,    //
-    parameter pVec_RQST5 = 16'hFFF2,    //
-    parameter pVec_RQST4 = 16'hFFF0,    //
-    parameter pVec_RQST3 = 16'hFFEE,    //
-    parameter pVec_RQST2 = 16'hFFEC,    //
-    parameter pVec_RQST1 = 16'hFFEA,    //
-    parameter pVec_RQST0 = 16'hFFE8,    //
-    parameter pVec_BRK   = 16'hFFFE,    //
-    parameter pVec_COP   = 16'hFFE6     // Lowest Priority
+module M65C02_IntHndlrV2 #(             // Pri
+    parameter pVec_IRQ   = 16'hFFFE,    //  11
+    parameter pVec_BRK   = 16'hFFFE,    //   2
+    parameter pVec_RST   = 16'hFFFC,    //  15 - Highest Priority
+    parameter pVec_NMI   = 16'hFFFA,    //  13
+    parameter pVec_ABRT  = 16'hFFF8,    //  14 - Second Highest Priority
+    parameter pVec_RSVD1 = 16'hFFF6,    //   0 - Reserved for BRK
+    parameter pVec_COP   = 16'hFFF4,    //   1 - Lowest Practical Interrupt/Trap
+    parameter pVec_RSVD0 = 16'hFFF2,    //   0
+    parameter pVec_INV   = 16'hFFF0,    //  12
+    parameter pVec_RQST7 = 16'hFFEE,    //  10
+    parameter pVec_RQST6 = 16'hFFEC,    //   9
+    parameter pVec_RQST5 = 16'hFFEA,    //   8
+    parameter pVec_RQST4 = 16'hFFE8,    //   7
+    parameter pVec_RQST3 = 16'hFFE6,    //   6
+    parameter pVec_RQST2 = 16'hFFE4,    //   5
+    parameter pVec_RQST1 = 16'hFFE2,    //   4
+    parameter pVec_RQST0 = 16'hFFE0     //   3
 )(
     input   Rst,                // Highest Priority Interrupt Source            
     input   Clk,
@@ -116,7 +116,6 @@ module M65C02_IntHndlrV2 #(
     input   ABRT,               // ABoRT MMU trap
     input   NMI,                // Non-Maskable Interrupt Request (6502 NMI)
     input   INV,                // Invalid Instruction Trap
-    input   SYS,                // System Call Trap
     input   IRQ,                // Maskable Interrupt Request (6502 IRQ)
     input   [7:0] RQST,         // Maskable Interrupt Requests (RQST[7] highest)
     input   BRK,                // BReaK instruction trap
@@ -208,22 +207,21 @@ begin
     if(Rst)
         {Int, Vector} <= #1 {1'b0, pVec_RST};
     else if(~Hold)
-        casex({ABRT, rNMI, INV, SYS, iIRQ, iRQST, BRK, COP})
-            15'b1xxx_x_xxxxxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_ABRT };
-            15'b01xx_x_xxxxxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_NMI  };
-            15'b001x_x_xxxxxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_INV  };   
-            15'b0001_x_xxxxxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_SYS  };   
-            15'b0000_1_xxxxxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_IRQ  };   
-            15'b0000_0_1xxxxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST7};   
-            15'b0000_0_01xxxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST6};
-            15'b0000_0_001xxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST5};
-            15'b0000_0_0001xxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST4};
-            15'b0000_0_00001xxx_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST3};
-            15'b0000_0_000001xx_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST2};
-            15'b0000_0_0000001x_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST1};
-            15'b0000_0_00000001_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST0};
-            15'b0000_0_00000000_1x : {Int, Vector} <= #1 {1'b1, pVec_BRK  };
-            15'b0000_0_00000000_01 : {Int, Vector} <= #1 {1'b1, pVec_COP  };
+        casex({ABRT, rNMI, INV, iIRQ, iRQST, BRK, COP})
+            14'b1xx_x_xxxxxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_ABRT };
+            14'b01x_x_xxxxxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_NMI  };
+            14'b001_x_xxxxxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_INV  };   
+            14'b000_1_xxxxxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_IRQ  };   
+            14'b000_0_1xxxxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST7};   
+            14'b000_0_01xxxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST6};
+            14'b000_0_001xxxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST5};
+            14'b000_0_0001xxxx_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST4};
+            14'b000_0_00001xxx_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST3};
+            14'b000_0_000001xx_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST2};
+            14'b000_0_0000001x_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST1};
+            14'b000_0_00000001_xx : {Int, Vector} <= #1 {1'b1, pVec_RQST0};
+            14'b000_0_00000000_1x : {Int, Vector} <= #1 {1'b1, pVec_BRK  };
+            14'b000_0_00000000_01 : {Int, Vector} <= #1 {1'b1, pVec_COP  };
             default : {Int, Vector} <= #1 {1'b0, pVec_RST  };
         endcase
 end
