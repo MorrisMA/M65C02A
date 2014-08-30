@@ -224,5 +224,5 @@ prefix instruction for the following instructions:
     LDX/LDY dp              => LDX/LDY (dp)             : Added zero page indirect
     CPX/CPY dp              => CPX/CPY (dp)             : Added zero page indirect
     STZ/STY dp,X            => STZ/STY (dp,X)           : Added pre-indexed zero page indirect
-    STX dp,Y                => STZ (dp),Y               : Added post-indexed zero page indirect
+    STX dp,Y                => STX (dp),Y               : Added post-indexed zero page indirect
     
