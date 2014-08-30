@@ -164,7 +164,13 @@ module M65C02_CoreV2 #(
     output  [ 7:0] P,
     
     output  reg [ 7:0] OP1, // Internal Temporary/Operand Registers
-    output  reg [ 7:0] OP2
+    output  reg [ 7:0] OP2,
+    output  reg [ 7:0] IR,  // Instruction Register
+    
+    output  reg IND,        // Indirect Addressing Mode Override
+    output  reg SIZ,        // Size Override 
+    output  reg OAX,        // Override Op(A | S) with Op(X)
+    output  reg OAY         // Override Op(A | S) with Op(Y)
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -241,10 +247,10 @@ wire    [(pROM_AddrWidth - 1):0] MA;    // MPC uP ROM Address Output
 wire    [1:0] Via;                      // MPC Via Mux Control Output
 
 reg     [(pROM_Width - 1)    :0] uPL;   // MPC uP ROM Pipeline Register
-wire    [(pROM_AddrWidth - 1):0] uP_BA; // uP Branch Address Field
+wire    [(pROM_AddrWidth - 2):0] uP_BA; // uP Branch Address Field
 
 wire    [ 1:0] uPCntl;                  // Microprogram Control Field
-wire    [10:0] NA_Op;                   // Memory Address Register Control Fld
+wire    [11:0] NA_Op;                   // Memory Address Register Control Fld
 wire    [ 3:0] DI_Op;                   // Memory Data Input Control Field
 wire    [ 3:0] DO_Op;                   // Memory Data Output Control Field
 wire    [ 2:0] Reg_WE;                  // Register Write Enable Control Field
@@ -342,16 +348,16 @@ assign MW = ((WAI) ? {uP_BA[2], xIRQ, Int} : {uP_BA[2:1], Int});
 always @(*)
 begin
     case(Via)
-        pBRV1   : BA <= {{pBA_Fill{1'b1}}, DI[3:0], DI[7:4]};
+        pBRV1   : BA <= {{pBA_Fill{BRV1}}, DI[3:0], DI[7:4]};
         pBRV3   : BA <= ((Int) ? pInt_Hndlr
-                               : {{pBA_Fill{1'b1}}, DI[3:0], DI[7:4]});
-        default : BA <= uP_BA;
+                               : {{pBA_Fill{BRV3}}, DI[3:0], DI[7:4]});
+        default : BA <= {{pBA_Fill{1'b0}}, uP_BA};
     endcase
 end
 
 //  Assign Test Input Signals
 
-assign T = {3'b000, Valid};
+assign T = {IND, SIZ, OAY, OAX};
 
 //  Instantiate Microprogram Controller/Sequencer - modified F9408A MPC
 
@@ -388,9 +394,9 @@ end
 //  Assign uPL fields
 
 assign I      = uPL[35:32];     // MPC Instruction Field (4)
-assign uP_BA  = uPL[31:23];     // MPC Branch Address Field (9)
-assign uPCntl = uPL[22:21];     // Microprogram Control Field (2)
-assign NA_Op  = uPL[20:10];     // Next Address Operation (11)
+assign uP_BA  = uPL[31:24];     // MPC Branch Address Field (8)
+assign uPCntl = uPL[23:22];     // Microprogram Control Field (2)
+assign NA_Op  = uPL[21:10];     // Next Address Operation (12)
 assign IO_Op  = uPL[9:8];       // IO Operation Control (2)
 assign DI_Op  = uPL[7:4];       // DI Demultiplexer Control (4)
 assign DO_Op  = uPL[7:4];       // DO Multiplexer Control (4) (same as DI_Op)
@@ -438,11 +444,38 @@ begin
         OP2 <= #1 ((SignDI) ? {8{OP_DI[7]}} : OP_DI);
 end
 
-//  Infer Instruction Decode ROM and initialize with file created by SMRTool
-//       Load IR from DI | uP_BA
+//  Instruction Register
 
 assign CE_IR  = (BRV1 | (BRV3 & ~Int) | (Sel_BA & DI_Op[3])) & Rdy;
 assign IDEC_A = ((Sel_BA) ? {uP_BA[3:0], uP_BA[7:4]} : {DI[3:0], DI[7:4]}); 
+
+always @(posedge Clk)
+begin
+    if(Rst | BRV2)
+        IR <= #1 pNOP;
+    else if(CE_IR)   // IR: {uP_BA,  DI}
+        IR <= #1 ((Sel_BA) ? uP_BA : DI);
+end
+
+//  Implement Prefix Registers
+//      IND - Address mode override maps zp => (zp) and abs => (abs)
+//      SIZ - Operation Size override remaps operation from 8 to 16 bits
+//      OAX - Destination register override remaps instruction dest. regs
+
+always @(posedge Clk)
+begin
+    if(Rst)
+        {OAY, OAX, SIZ, IND} <= #1 0;
+    else if(CE_IR) begin
+        IND <= #1 ((PFX) ?  IR[5] &  IR[4] | IND : 0);  // IR == 8'hBB
+        SIZ <= #1 ((PFX) ?  IR[5] & ~IR[4] | SIZ : 0);  // IR == 8'hAB
+        OAX <= #1 ((PFX) ? ~IR[5] &  IR[4]       : 0);  // IR == 8'h9B
+        OAY <= #1 ((PFX) ? ~IR[5] & ~IR[4]       : 0);  // IR == 8'h8B
+    end
+end
+
+//  Infer Instruction Decode ROM and initialize with file created by SMRTool
+//       Load IR from DI | uP_BA
 
 initial
     $readmemb(pM65C02_IDec, ID_ROM, 0, (pDEC_Depth - 1));

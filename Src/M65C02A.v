@@ -394,45 +394,51 @@ M65C02_IntHndlrV2   IntHndlr (
 assign Wait = Int_Wait | Ext_Wait;
 
 M65C02_CoreV2   #(
-                    .pStkPtr_Rst(pKernel_SP_Rst),   // M65C02 Reset Value for S
-                    .pInt_Hndlr(pInt_Hndlr),        // M65C02 Int. Microroutine
-                    .pM65C02_uPgm(pM65C02_uPgm),    // M65C02 Microprogram COE
-                    .pM65C02_IDec(pM65C02_IDec)     // M65C02 Inst. Decoder COE
+                    .pStkPtr_Rst(pKernel_SP_Rst),   // M65C02A Reset Value for S
+                    .pInt_Hndlr(pInt_Hndlr),        // M65C02A Int. Microroutine
+                    .pM65C02_uPgm(pM65C02_uPgm),    // M65C02A Microprogram COE
+                    .pM65C02_IDec(pM65C02_IDec)     // M65C02A Inst. Decoder COE
                 ) uP (
                     .Rst(Rst),              // System Reset
                     .Clk(Clk),              // System Clock
                     
-                    .IRQ_Msk(IRQ_Msk),      // M65C02 Core Interrupt Mask
-                    .xIRQ(IRQ),             // M65C02 Core Extrn Interrupt Flag
-                    .Int(Int),              // M65C02 Core Interrupt Request
-                    .Vector(Vector),        // M65C02 Core Interrupt Vector
-                    .LE_Int(LE_Int),        // M65C02 Core Latch Enable Int/Vec
-                    .VP(VP),                // M65C02 Core Interrupt Vector Pull
+                    .IRQ_Msk(IRQ_Msk),      // M65C02A Core Interrupt Mask
+                    .xIRQ(IRQ),             // M65C02A Core Extrn Interrupt Flag
+                    .Int(Int),              // M65C02A Core Interrupt Request
+                    .Vector(Vector),        // M65C02A Core Interrupt Vector
+                    .LE_Int(LE_Int),        // M65C02A Core Latch Enable Int/Vec
+                    .VP(VP),                // M65C02A Core Interrupt Vec. Pull
 
-                    .SO(SO),                // M65C02 Core Set oVerflow Input
-                    .Clr_SO(Clr_SO),        // M65C02 Core Clr SO input
+                    .SO(SO),                // M65C02A Core Set oVerflow Input
+                    .Clr_SO(Clr_SO),        // M65C02A Core Clr SO input
 
-                    .Done(Done),            // M65C02 Core Instruction Complete
-                    .SC(),                  // M65C02 Core Single Cycle Flag
-                    .Mode(Mode),            // M65C02 Core Instruction Mode
-                    .RMW(RMW),              // M65C02 Core Read/Modify/Write
+                    .Done(Done),            // M65C02A Core Instruction Complete
+                    .SC(),                  // M65C02A Core Single Cycle Flag
+                    .Mode(Mode),            // M65C02A Core Instruction Mode
+                    .RMW(RMW),              // M65C02A Core Read/Modify/Write
                     
-                    .Wait(Wait),            // M65C02 Core Microcycle Wait Rqst
+                    .Wait(Wait),            // M65C02A Core Microcycle Wait Rqst
 
-                    .Rdy(Rdy),              // M65C02 Core Microcycle Ready Out
+                    .Rdy(Rdy),              // M65C02A Core Microcycle Ready Out
                     
-                    .IO_Op(IO_Op),          // M65C02 Core Bus Cycle Type
-                    .AO(VA),                // M65C02 Core Address Output Bus
-                    .DI(CPU_DI),            // M65C02 Core Data Input Bus
-                    .DO(CPU_DO),            // M65C02 Core Data Output Bus
+                    .IO_Op(IO_Op),          // M65C02A Core Bus Cycle Type
+                    .AO(VA),                // M65C02A Core Address Output Bus
+                    .DI(CPU_DI),            // M65C02A Core Data Input Bus
+                    .DO(CPU_DO),            // M65C02A Core Data Output Bus
                     
-                    .A(),                   // M65C02 Core Accumulator Register 
-                    .X(),                   // M65C02 Core X Index Register
-                    .Y(Y),                  // M65C02 Core Y Index Register
-                    .P(P),                  // M65C02 Core P Register
+                    .A(),                   // M65C02A Core Accumulator Register 
+                    .X(),                   // M65C02A Core X Index Register
+                    .Y(Y),                  // M65C02A Core Y Index Register
+                    .P(P),                  // M65C02A Core P Register
                     
-                    .OP1(),                 // M65C02 Core Operand Register 1
-                    .OP2()                  // M65C02 Core Operand Register 2
+                    .OP1(),                 // M65C02A Core Operand Register 1
+                    .OP2(),                 // M65C02A Core Operand Register 2
+                    .IR(),                  // M65C02A Core Instruction Register
+                    
+                    .IND(),                 // M65C02A Core Address Override
+                    .SIZ(),                 // M65C02A Core Size Override
+                    .OAX(),                 // M65C02A Core Op(A) <=> Op(X)
+                    .OAY()                  // M65C92A Core Op(A) <=> Op(Y)
                 );
 
 //  Decode Core Control Signals

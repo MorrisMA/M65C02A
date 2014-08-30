@@ -177,7 +177,7 @@ localparam pBTH3 = 11;  // Branch if T[3] is Logic 1, else fetch next instr.
 localparam pBTL0 = 12;  // Branch if T[0] is Logic 0, else fetch next instr.
 localparam pBTL1 = 13;  // Branch if T[1] is Logic 0, else fetch next instr.
 localparam pBTL2 = 14;  // Branch if T[2] is Logic 0, else fetch next instr.
-localparam pBTL3 = 15;  // Branch if T[3] is Logic 0, else fetch next instr.
+localparam pBMW3 = 15;  // Multi-way Branch on T[3]
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -271,7 +271,7 @@ begin
             4'b1100 : PC_In <= (T[0] ? Next : BA  );            // pBTL0   
             4'b1101 : PC_In <= (T[1] ? Next : BA  );            // pBTL1   
             4'b1110 : PC_In <= (T[2] ? Next : BA  );            // pBTL2   
-            4'b1111 : PC_In <= (T[3] ? Next : BA  );            // pBTL3   
+            4'b1111 : PC_In <= {BA[(pAddrWidth - 1):1], T[3]};  // pBMW3   
         endcase
 end
 

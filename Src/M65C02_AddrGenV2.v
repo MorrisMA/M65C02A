@@ -105,7 +105,7 @@ module M65C02_AddrGenV2 #(
 
     input   [15:0] Vector,          // Interrupt/Trap Vector
 
-    input   [10:0] NA_Op,           // Address Generator Operation Select
+    input   [11:0] NA_Op,           // Address Generator Operation Select
 
     input   Mod256,                 // Mod 256 Control - wrap address to page
     input   Page,                   // Address wrap page select
@@ -142,6 +142,8 @@ wire    [15:0] NA;              // Next Address (w/o application of % 256)
 
 wire    CE_MAR;                 // Memory Address Register Clock Enable
 
+//reg     dMod256, dPage;         // Delay Registers to Support % 256 addressing
+
 wire    [15:0] Rel;             // Branch Address Sign-Extended Offset
 wire    CE_PC;                  // Program Counter Clock Enable
 
@@ -154,28 +156,28 @@ wire    CE_PC;                  // Program Counter Clock Enable
 
 //  Decode Next Address Operation Field
 
-//           LO PSZAM XYR C
-//           Pf CtPbA   e i
-//           Cf  k sR   l  
-// Vec:  11'b10_00000_000_0; // NA <= {OP2,OP1}           + 0; PC <= NA
-// Jmp:  11'b10_00010_000_0; // NA <= {OP2,OP1}           + 0; PC <= NA
-// JmpY: 11'b10_00010_010_0; // NA <= {OP2,OP1} + {0,  Y} + 0; PC <= NA
-// Rtn:  11'b10_00010_000_1; // NA <= {OP2,OP1}           + 1; PC <= NA
-// PC:   11'b10_10000_000_0; // NA <= PC                  + 0; PC <= NA
-// Inc:  11'b10_10000_000_1; // NA <= PC                  + 1; PC <= NA
-// Bra:  11'b10_10000_001_0; // NA <= PC        + Rel     + 1; PC <= NA
-// Rel:  11'b00_10000_001_0; // NA <= PC        + Rel     + 1;
-// Psh:  11'b00_01000_000_0; // NA <= {  1, SP}           + 0;
-// Pop:  11'b00_01000_000_1; // NA <= {  1, SP}           + 1;
-// SPN:  11'b01_01000_000_0; // NA <= {  1, SP} + {0,OP1} + 1;
-// DPN:  11'b00_00100_000_0; // NA <= {  0,OP1}           + 0;
-// DPX:  11'b00_00100_100_0; // NA <= {  0,OP1} + {0,  X} + 0;
-// DPY:  11'b00_00100_010_0; // NA <= {  0,OP1} + {0,  Y} + 0;
-// LDA:  11'b00_00010_000_0; // NA <= {OP2,OP1}           + 0;
-// LDAX: 11'b00_00010_100_0; // NA <= {OP2,OP1} + {0,  X} + 0;
-// LDAY: 11'b00_00010_010_0; // NA <= {OP2,OP1} + {0,  Y} + 0;
-// Nxt:  11'b00_00001_000_0; // NA <= MAR                 + 1;
-// MAR:  11'b00_00001_000_1; // NA <= MAR                 + 0;                         
+//           LLO PSZAM XYR C
+//           ddf CtPbA   e i
+//           MPf  k sR   l  
+// Vec:  12'b110_00010_000_0; // NA <= {OP2,OP1}           + 0; PC <= NA
+// Jmp:  12'b110_00010_000_0; // NA <= {OP2,OP1}           + 0; PC <= NA
+// JmpY: 12'b110_00010_010_0; // NA <= {OP2,OP1} + {0,  Y} + 0; PC <= NA
+// Rtn:  12'b110_00010_000_1; // NA <= {OP2,OP1}           + 1; PC <= NA
+// PC:   12'b110_10000_000_0; // NA <= PC                  + 0; PC <= NA
+// Inc:  12'b110_10000_000_1; // NA <= PC                  + 1; PC <= NA
+// Bra:  12'b110_10000_001_0; // NA <= PC        + Rel     + 1; PC <= NA
+// Rel:  12'b100_10000_001_0; // NA <= PC        + Rel     + 1;
+// Psh:  12'b000_01000_000_0; // NA <= {  1, SP}           + 0;
+// Pop:  12'b000_01000_000_1; // NA <= {  1, SP}           + 1;
+// SPN:  12'b001_01000_000_0; // NA <= {  1, SP} + {0,OP1} + 1;
+// DPN:  12'b100_00100_000_0; // NA <= {  0,OP1}           + 0;
+// DPX:  12'b100_00100_100_0; // NA <= {  0,OP1} + {0,  X} + 0;
+// DPY:  12'b100_00100_010_0; // NA <= {  0,OP1} + {0,  Y} + 0;
+// LDA:  12'b100_00010_000_0; // NA <= {OP2,OP1}           + 0;
+// LDAX: 12'b100_00010_100_0; // NA <= {OP2,OP1} + {0,  X} + 0;
+// LDAY: 12'b100_00010_010_0; // NA <= {OP2,OP1} + {0,  Y} + 0;
+// Nxt:  12'b100_00001_000_0; // NA <= MAR                 + 1;
+// MAR:  12'b100_00001_000_1; // NA <= MAR                 + 0;                         
 //
 
 assign Ld_PC   = NA_Op[10];
@@ -192,6 +194,8 @@ assign Sel_Y   = NA_Op[ 2];
 assign Sel_Rel = NA_Op[ 1];
 //
 assign Ci      = NA_Op[ 0];
+//
+assign Ld_MAR  = ~(Sel_SP & ~Stk_Rel);
 
 //  Generate Relative Address
 
@@ -216,6 +220,11 @@ assign AR = ((Stk_Rel) ? {8'h00, OP1} : 0);
 
 assign NA = (AL + AR + Ci);
 
+////  Compute {Mod256, Page} and implement delay registers
+//
+//assign Mod256 = ((Sel_SP | Sel_ZP) ? 1'b1   : ((Sel_MAR) ? dMod256 : 1'b0));
+//assign Page   = ((Sel_SP | Sel_ZP) ? Sel_SP : ((Sel_MAR) ? dPage   : 1'b0));
+
 //  Generate Address Output - Truncate Next Address when Mod256 asserted
 //      When Mod256 is asserted, the memory page is determined by Page
 
@@ -229,13 +238,21 @@ end
 
 //  Memory Address Register
 
-assign CE_MAR = Rdy & ~(Sel_SP & ~Stk_Rel);
+assign CE_MAR = Rdy & Ld_MAR;
 
 always @(posedge Clk)
 begin
     if(CE_MAR)
         MAR <= #1 AO;
 end
+
+//always @(posedge Clk)
+//begin
+//    if(Rst)
+//        {dMod256, dPage} <= #1 0;
+//    else if(CE_Mar)
+//        {dMod256, dPage} <= #1 {Mod256, Page};
+//end
 
 //  Program Counter
 

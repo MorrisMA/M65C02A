@@ -1,8 +1,8 @@
 header
-Project: M65C02_IDecode_ROM
-File Revision: 0007
+Project: M65C02A_IDecode_ROM
+File Revision: 0008
 Author(s): Michael A. Morris
-Description: M65C02 Instruction Decoder ROM
+Description: M65C02A Instruction Decoder ROM
 endh
 
 --------------------------------------------------------------------------------
@@ -124,6 +124,8 @@ endh
 --                          served for the user. The expectation is that these
 --                          opcodes will be used for implementing primitive
 --                          operations/words useful in a FORTH virtual machine.
+--
+--  0008    14H23   mam     Changed project description to M65C02Axxx.
 --
 --------------------------------------------------------------------------------
 -- Mode Field
@@ -583,14 +585,14 @@ _User:      .org    0                                   -- User Mode
     INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x5B  -- 5B: NOP
     INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x6B  -- 6B: NOP
     INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x7B  -- 7B: NOP
-    INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x8B  -- 8B: NOP
-    INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x9B  -- 9B: NOP
-    INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xAB  -- AB: NOP
-    INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xBB  -- BB: NOP
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x8B  -- 8B:#IND  -- Indirect
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x9B  -- 9B:#OAX  -- A<=>X
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xAB  -- AB:#OAY  -- A<=>Y
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xBB  -- BB:#SIZ  -- Size OVR
     WAI     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xCB  -- CB:&WAI
     VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xDB  -- DB:&STP
-    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xEB  -- EB:#SIZ
-    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xFB  -- FB:#IND
+    INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xEB  -- EB: NOP
+    INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xFB  -- FB: NOP
 
 --------------------------------------------------------------------------------
 

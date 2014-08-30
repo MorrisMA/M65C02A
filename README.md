@@ -201,3 +201,28 @@ The following two images define the complete opcode matrix of the M65C02A:
 ![M65C02A Enhanced Instruction Set: 0x00-0x7F](https://github.com/MorrisMA/M65C02A/blob/master/Images/M65C02A-InstructionSetMatrix%2800-7F%29.JPG)
 
 ![M65C02A Enhanced Instruction Set: 0x80-0xFF](https://github.com/MorrisMA/M65C02A/blob/master/Images/M65C02A-InstructionSetMatrix%2880-FF%29.JPG)
+
+###Release 2.2.3
+
+Added four prefix instructions. Tested that the four set the appropriate 
+flags. Began applying the addressing mode modification prefix instruction: 
+IND. Remaining three prefix instructions implemented but their effects on the 
+instructions have not been implemented for this release.
+
+The microprogram and the microprogram has been modified to support the IND 
+prefix instruction for the following instructions:
+
+    JSR abs                 => JSR (abs)                : Added absolute indirect mode
+    PLW zp                  => PLW (dp)                 : Added zero page indirect
+    PLW abs                 => PLW (abs)                : Added absolute indirect
+    ORA/AND/EOR/ADC sp,S    => ORA/AND/EOR/ADC (sp,S)   : Added stack relative indirect
+    STA/LDA/CMP/SBC sp,S    => STA/LDA/CMP/SBC (sp,S)   : Added stack relative indirect
+    PHW zp                  => PHW (zp)                 : Added zero page indirect
+    PHW abs                 => PHW (abs)                : Added zero page indirect
+    TSB/TRB/BIT dp          => TSB/TRB/BIT (dp)         : Added zero page indirect
+    STZ/STX/STY dp          => STZ/STX/STY              : Added zero page indirect
+    LDX/LDY dp              => LDX/LDY (dp)             : Added zero page indirect
+    CPX/CPY dp              => CPX/CPY (dp)             : Added zero page indirect
+    STZ/STY dp,X            => STZ/STY (dp,X)           : Added pre-indexed zero page indirect
+    STX dp,Y                => STZ (dp),Y               : Added post-indexed zero page indirect
+    
