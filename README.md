@@ -220,7 +220,6 @@ prefix instruction for the following instructions:
     STA/LDA/CMP/SBC sp,S    => STA/LDA/CMP/SBC (sp,S)   : Added stack relative indirect
     PHW zp                  => PHW (zp)                 : Added zero page indirect
     PHW abs                 => PHW (abs)                : Added zero page indirect
-    TSB/TRB/BIT dp          => TSB/TRB/BIT (dp)         : Added zero page indirect
     STZ/STX/STY dp          => STZ/STX/STY (dp)         : Added zero page indirect
     LDX/LDY dp              => LDX/LDY (dp)             : Added zero page indirect
     CPX/CPY dp              => CPX/CPY (dp)             : Added zero page indirect
