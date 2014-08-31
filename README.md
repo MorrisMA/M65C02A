@@ -204,10 +204,11 @@ The following two images define the complete opcode matrix of the M65C02A:
 
 ###Release 2.2.3
 
-Added four prefix instructions. Tested that the four set the appropriate 
-flags. Began applying the addressing mode modification prefix instruction: 
-IND. Remaining three prefix instructions implemented but their effects on the 
-instructions have not been implemented for this release.
+Added four prefix instructions, and tested that they set the appropriate 
+internal flags. Began applying the addressing mode modification prefix 
+instruction: IND. Remaining three prefix instructions implemented, but their 
+intended effects on the instructions have not been implemented for this 
+release.
 
 The microprogram and the microprogram has been modified to support the IND 
 prefix instruction for the following instructions:
@@ -225,4 +226,4 @@ prefix instruction for the following instructions:
     CPX/CPY dp              => CPX/CPY (dp)             : Added zero page indirect
     STZ/STY dp,X            => STZ/STY (dp,X)           : Added pre-indexed zero page indirect
     STX dp,Y                => STX (dp),Y               : Added post-indexed zero page indirect
-    
+
