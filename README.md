@@ -213,7 +213,7 @@ release.
 The microprogram and the microprogram has been modified to support the IND 
 prefix instruction for the following instructions:
 
-    JSR abs                 => JSR (abs)                : Added absolute indirect mode
+    JSR abs                 => JSR (abs)                : Added absolute indirect
     PLW zp                  => PLW (zp)                 : Added zero page indirect
     PLW abs                 => PLW (abs)                : Added absolute indirect
     ORA/AND/EOR/ADC sp,S    => ORA/AND/EOR/ADC (sp,S)   : Added stack relative indirect
@@ -234,7 +234,7 @@ RMW instructions:
     TSB/TRB/BIT zp          => TSB/TRB/BIT (zp)         : Added zero page indirect
     BIT zp,X                => BIT (zp,X)               : Added pre-indexed zero page indirect
     ASL/ROL/LSR/ROR zp      => ASL/ROL/LSR/ROR (zp)     : Added zero page indirect
-    ASL/ROL/LSR/ROR zp,X    => STA/LDA/CMP/SBC (sp,X)   : Added pre-indexed zero page indirect
+    ASL/ROL/LSR/ROR zp,X    => STA/LDA/CMP/SBC (zp,X)   : Added pre-indexed zero page indirect
     DEC/INC zp              => DEC/INC (zp)             : Added zero page indirect
     DEC/INC zp,X            => DEC/INC (zp,X)           : Added pre-indexed zero page indirect
     RMBx/SMBx zp            => RMBx/SMBx (zp)           : Added zero page indirect
@@ -256,6 +256,6 @@ Read-Only and Write-Only Absolute Address Mode instructions:
     STY/LDY/CPY abs         => STY/LDY/CPY (abs)        : Added absolute indirect
     STX/LDX/CPX abs         => STX/LDX/CPX (abs)        : Added absolute indirect
     LDY abs,X               => LDY (abs,X)              : Added pre-indexed absolute indirect
-    LDX abs,Y               => LDY (abs),Y              : Added psot-indexed absolute indirect
+    LDX abs,Y               => LDX (abs),Y              : Added post-indexed absolute indirect
     STZ abs                 => STZ (abs)                : Added absolute indirect
     STZ abs,X               => STZ (abs,X)              : Added pre-indexed absolute indirect
