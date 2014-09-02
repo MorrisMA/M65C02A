@@ -226,8 +226,6 @@ prefix instruction for the following instructions:
     STZ/STY zp,X            => STZ/STY (zp,X)           : Added pre-indexed zero page indirect
     STX zp,Y                => STX (zp),Y               : Added post-indexed zero page indirect
 
-###Release 2.2.4
-
 Applied the addressing mode modification prefix instruction, IND, to the 
 RMW instructions:
 
