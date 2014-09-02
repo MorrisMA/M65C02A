@@ -226,3 +226,34 @@ prefix instruction for the following instructions:
     STZ/STY dp,X            => STZ/STY (dp,X)           : Added pre-indexed zero page indirect
     STX dp,Y                => STX (dp),Y               : Added post-indexed zero page indirect
 
+###Release 2.2.4
+
+Applied the addressing mode modification prefix instruction, IND, to the 
+RMW instructions:
+
+    TSB/TRB/BIT zp          => TSB/TRB/BIT (zp)         : Added zero page indirect
+    BIT zp,X                => BIT (zp,X)               : Added pre-indexed zero page indirect
+    ASL/ROL/LSR/ROR zp      => ASL/ROL/LSR/ROR (zp)     : Added zero page indirect
+    ASL/ROL/LSR/ROR zp,X    => STA/LDA/CMP/SBC (sp,X)   : Added pre-indexed zero page indirect
+    DEC/INC zp              => DEC/INC (zp)             : Added zero page indirect
+    DEC/INC zp,X            => DEC/INC (zp,X)           : Added pre-indexed zero page indirect
+    TSB/TRB/BIT abs         => TSB/TRB/BIT (abs)        : Added absolute indirect
+    BIT abs,X               => BIT (abs,X)              : Added pre-indexed absolute indirect
+    ASL/ROL/LSR/ROR abs     => ASL/ROL/LSR/ROR (abs)    : Added absolute indirect
+    ASL/ROL/LSR/ROR abs,X   => STA/LDA/CMP/SBC (abs,X)  : Added pre-indexed absolute indirect
+    DEC/INC abs             => DEC/INC (abs)            : Added absolute indirect
+    DEC/INC abs,X           => DEC/INC (abs,X)          : Added pre-indexed absolute indirect
+
+Applied the addressing mode modification prefix instruction, IND, to the 
+Read-Only and Write-Only Absolute Address Mode instructions:
+
+    ORA/AND/EOR/ADC abs,Y   => ORA/AND/EOR/ADC (abs),Y  : Added post-indexed absolute indirect
+    STA/LDA/CMP/SBC abs,Y   => STA/LDA/CMP/SBC (abs),Y  : Added post-indexed absolute indirect
+    ORA/AND/EOR/ADC abs     => ORA/AND/EOR/ADC (abs)    : Added absolute indirect
+    STA/LDA/CMP/SBC abs     => STA/LDA/CMP/SBC (abs)    : Added absolute indirect
+    STY/LDY/CPY abs         => STY/LDY/CPY (abs)        : Added absolute indirect
+    STX/LDX/CPX abs         => STX/LDX/CPX (abs)        : Added absolute indirect
+    LDY abs,X               => LDY (abs,X)              : Added pre-indexed absolute indirect
+    LDX abs,Y               => LDY (abs),Y              : Added psot-indexed absolute indirect
+    STZ abs                 => STZ (abs)                : Added absolute indirect
+    STZ abs,X               => STZ (abs,X)              : Added pre-indexed absolute indirect

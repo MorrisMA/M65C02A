@@ -1,6 +1,6 @@
 header
 Project: M65C02A_uP_ROM
-File Revision: 0007
+File Revision: 0008
 Author(s): Michael A. Morris
 Description: M65C02A Microprogram
 endh
@@ -94,6 +94,13 @@ endh
 --  0007    14H23   mam     Updating uP_Cntl field with mnemonics and updating
 --                          comment fields.
 --
+--  0008    14I01   mam     Added support for IND prefix instruction to all
+--                          instructions which can support the indirect address-
+--                          ing mode. Support is added using a modification to
+--                          Micro-Program Controller (MPC) to provide a multi-
+--                          way branch branch based on the T[3] input.
+
+--
 --------------------------------------------------------------------------------
 --  Comments
 --------------------------------------------------------------------------------
@@ -180,19 +187,20 @@ endh
 --  ly a second decode ROM/RAM that provides the fixed portion of each instruc-
 --  tions operation. That is, the 256-way instruction decoder built into
 --  the microprogram ROM is the decoder for the variable microprogram, and the
---  second ROM is the decoder for the fixed microword. The variable micropro-
---  gram implements the control sequences necessary for an instruction from the
---  perspective of the addressing mode of the instruction, and the fixed micro-
---  program word defines the ALU operation to be performed when all operands are
---  available. The fixed microword is applied to the ALU under control of the
---  microprogram. Altogether, the number of bits required is 32 for the variable
---  microwords, and 24 for the fixed microword, or 56 bits total. (An additional
---  8 bits are included in the fixed microword, but they are simply reserved for
---  future use should that be required.) For debugging purposes, the opcode is
---  also loaded into the Instruction Register (IR), but it's not required.
+--  second ROM is the decoder for the fixed portion of the microword. The vari-
+--  able microprogram implements the control sequences necessary for an instruc-
+--  tion from the perspective of the addressing mode of the instruction, and the
+--  fixed microprogram word defines the ALU operation to be performed when all
+--  operands are available. The fixed microword is applied to the ALU under
+--  control of the microprogram. Altogether, the number of bits required is 36
+--  for the variable microwords, and 36 for the fixed microword, or 72 bits
+--  total. (An additional 8 bits are included in the fixed microword, but they
+--  are simply reserved for future use should that be required.) For debugging
+--  purposes, the opcode is also loaded into the Instruction Register (IR), but
+--  it's not required.
 --
---  Following the initial word at address 0, there are 31 microwords reserved
---  for future use. The intended use of these 31 locations is as a microprogram
+--  Following the initial word at address 0, there are 20 microwords reserved
+--  for future use. The intended use of these 20 locations is as a microprogram
 --  bootloader for the remainder of the microprogram microstore, and for the
 --  fixed instruction decoder ROM. Thus, at some future date, it may be possible
 --  to update the microprogram ROMs dynamically from external memory or a serial
@@ -258,51 +266,6 @@ endh
 --  The test program used for diagnostics and proofing of the implementation is
 --  averaging 1.88 clock cycles per instruction. This is an improvement of more
 --  than 40% over a standard implementation of the 6502 instruction set.
---
---------------------------------------------------------------------------------
---------------------------------------------------------------------------------
---  Forked from M65C02_uPgm_V3
---------------------------------------------------------------------------------
---------------------------------------------------------------------------------
---
---  No changes were implemented to the structure of the microwords in the basic
---  microprogram to accomodated the new M65C02_MPCv3 microprogram controller.
---  Instead, external changes to the M65C02_Core module allowed several of the
---  original fields to be redefined. In redefining the fields, the widths were
---  not changed and neither were their location in the microword. The single bit
---  Wait field, bit 18, was redefined as the ZP field. The single bit SC and
---  Done fields, bit 17 and 16, respectively, were redefined as the uLen[1:0]
---  field. In the previous implementation, SC and Done were used as a two bit
---  field, so replacing them with the uLen field is direct drop-in replacement.
---
---  Version three of the MPC uses dynamic microcycle length control to stretch
---  the microcycle of the M65C02 core. Microcycle length extension is required
---  when a BCD mode ADC/SBC is performed. Microcycle length extension may also
---  be required to access various types of memory.
---
---  The new MemTyp[1:0] field is expected to be used to let external logic know
---  the type of memory cycle that is being performed: program memory fetch, zero
---  page access, stack page access, or data memory access. The intent is for the
---  microprogram to let a memory controller external to the core know what the
---  next memory cycle will so that the memory controller can select between LUT
---  RAM (zero page), block RAM (stack page and internal program/data memory), or
---  external memory. Alternatively, this field can be reconfigured to directly
---  control the length of the next microcycle.
---
---  In general, it is expected that the MemTyp[1:0] field will directly connect
---  to a memory controller external to the MPC. That memory controller will set
---  the uLen[1:0] input of the core to control the microcycle controller of the
---  MPC. The current architecture of the address generator in the core makes it
---  difficult to use AO to determine whether the memory is internal or external.
---  However, the microprogram does "know" what memory type is being addressed
---  next. Thus, the microprogram can inform an external memory controller
---  whether page 0, page 1, or program/data memory is to be accessed next. Since
---  this data is only available to the microprogram, the MemTyp field can be
---  used by an memory controller outside of the core to implement address detec-
---  tion in a later state of the memory access cycle to dynamically change from
---  1 cycle distributed RAM (page 0), to 2 cycle block RAM memory with 0 wait
---  states (page 1 and internal program/data memory), or 4 cycle memory with
---  external wait state insertion (external program/data memory).
 --
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
@@ -470,6 +433,7 @@ _Rst:
 --  this space reserved for future use - boot loader for the microprogram ROMs
 --
 --------------------------------------------------------------------------------
+
 --------------------------------------------------------------------------------
 --  STP - Wait for Interrupt
 --------------------------------------------------------------------------------
@@ -689,118 +653,165 @@ _WO_DPIY:
     BMW     _Nxt,, LDAY, WR, ALU, WE_R              -- Write to (DP), Y
 
 --------------------------------------------------------------------------------
+
+    BRV0    0,                                      -- Fill: Reset
+
+--------------------------------------------------------------------------------
 --  Memory Read-Only Absolute - xxx Abs
 --------------------------------------------------------------------------------
 
 _RO_Abs:
-    FTCH    $,, Inc, IF, OP2                        -- Read Mem Ptr Hi
+    BMW3    _RO_ABS1,, Inc, IF, OP2                 -- Read Mem Ptr Hi
+_RO_Abs1:
     BMW     _Nxt,, LDA, RD, OP1                     -- Read Operand
+_RO_AbsI:
+    FTCH    $,, LDA, RD, OP1
+    BRV0    _RO_Abs1,, Nxt, RD, OP2
 
 --------------------------------------------------------------------------------
 --  Memory Read-Only Pre-Indexed Absolute - xxx Abs, X
 --------------------------------------------------------------------------------
 
 _RO_AbsX:
-    FTCH    $,, Inc, IF, OP2                        -- Read Mem Ptr Hi
+    BMW3    _RO_AbsX1,, Inc, IF, OP2                -- Read Mem Ptr Hi
+_RO_AbsX1:
     BMW     _Nxt,, LDAX, RD, OP1                    -- Read Operand Abs,X
+_RO_AbsXI:
+    FTCH    $,, LDAX, RD, OP1
+    FTCH    $,, Nxt, RD, OP1
+    BMW     _Nxt,, LDA, RD, OP1
+
+--------------------------------------------------------------------------------
+
+    BRV0    0,                                      -- Fill: Reset
 
 --------------------------------------------------------------------------------
 --  Memory Read-Only Post-Indexed Absolute - xxx Abs, Y
 --------------------------------------------------------------------------------
 
 _RO_AbsY:
-    FTCH    $,, Inc, IF, OP2                        -- Read Mem Ptr Hi
+    BMW3    _RO_AbsY1,, Inc, IF, OP2                -- Read Mem Ptr Hi
+_RO_AbsY1:
     BMW     _Nxt,, LDAY, RD, OP1                    -- Read Operand Abs,Y
+_RO_AbsIY:
+    FTCH    $,, LDA, RD, OP1
+    FTCH    $,, Nxt, RD, OP2
+    BMW     _Nxt,, LDAY, RD, OP1
+
+--------------------------------------------------------------------------------
+
+    BRV0    0,                                      -- Fill: Reset
 
 --------------------------------------------------------------------------------
 --  Memory Write-Only Absolute - xxx Abs
 --------------------------------------------------------------------------------
 
 _WO_Abs:
-    FTCH    $,, Inc, IF, OP2                        -- Read Mem Ptr Hi
+    BMW3    _WO_Abs1,, Inc, IF, OP2                 -- Read Mem Ptr Hi
+_WO_Abs1:
     BMW     _Nxt,, LDA, WR, ALU, WE_R               -- Write to Abs
+_WO_AbsI:
+    FTCH    $,, LDA, RD, OP1
+    BRV0    _WO_Abs1,, Nxt, RD, OP2
 
 --------------------------------------------------------------------------------
 --  Memory Write-Only Pre-Indexed Absolute - xxx Abs, X
 --------------------------------------------------------------------------------
 
 _WO_AbsX:
-    FTCH    $,, Inc, IF, OP2                        -- Read Mem Ptr Hi
+    BMW3    _WO_AbsX1,, Inc, IF, OP2                -- Read Mem Ptr Hi
+_WO_AbsX1:
     BMW     _Nxt,, LDAX, WR, ALU, WE_R              -- Write to Abs,X
+_WO_AbsXI:
+    FTCH    $,, LDAX, RD, OP1
+    FTCH    $,, Nxt, RD, OP2
+    BMW     _Nxt, LDA, WR, ALU, WE_R
+
+--------------------------------------------------------------------------------
+
+    BRV0    0,                                      -- Fill: Reset
 
 --------------------------------------------------------------------------------
 --  Memory Write-Only Post-Indexed Absolute - xxx Abs, Y
 --------------------------------------------------------------------------------
 
 _WO_AbsY:
-    FTCH    $,, Inc, IF, OP2                        -- Read Mem Ptr Hi
-    BMW     _Nxt,, LDAY, WR, ALU, WE_R              -- Write to Abs,Y
+    BMW3    _WO_AbsY1,, Inc, IF, OP2                -- Read Mem Ptr Hi
+_WO_AbsY1:
+    BMW     _Nxt,, LDAY, WR, ALU, WE_R              -- Write to Abs,Y or (Abs),Y
+_WO_AbsIY:
+    FTCH    $,, LDA, RD, OP1
+    BRV0    _WO_AbsY1,, Nxt, RD, OP2
 
 --------------------------------------------------------------------------------
 --  2-way Read-Modify-Write Instruction/Interrupt Jump Table
 --------------------------------------------------------------------------------
 
-_RMW:       .org    92
+_RMW:       .org    116
     BRV1    _RMW,, Inc, IF, IR                      -- Instruction Fetch/Execute
     BRV2    _Brk,SP, Psh, WR, DMH                   -- Push PCH, capture Vector
 
+--------------------------------------------------------------------------------
+
+    BRV0    0,                                      -- Fill: Reset
+    
 --------------------------------------------------------------------------------
 --  Memory Read-Modify-Write Data Page Direct - xxx DP
 --------------------------------------------------------------------------------
 
 _RMW_DP:
-    FTCH    $,ZP, DPN, RD, OP1                      -- Read from DP
-    BMW     _RMW,, MAR, WR, ALU, WE_R               -- Write to DP
+    BMW3    _RMW_Wr,ZP, DPN, RD, OP1                -- Rd Op/Op Ptr Hi from DP
+_RMW_Wr:
+    BMW     _RMW,, MAR, WR, ALU, WE_R               -- Wr Result to Memory
+_RMW_DPI:
+    FTCH    $,ZP, Nxt, RD, OP2                      -- Rd Op Ptr Lo
+    BRV0    _RMW_Wr,, LDA, RD, OP1                  -- Rd Op from (DP)
 
 --------------------------------------------------------------------------------
 --  Memory Read-Modify-Write Pre-Indexed Data Page Direct - xxx DP, X
 --------------------------------------------------------------------------------
 
 _RMW_DPX:
-    FTCH    $,ZP, DPX, RD, OP1                      -- Read from DP,X
-    BMW     _RMW,, MAR, WR, ALU, WE_R               -- Write to DP,X
-
---------------------------------------------------------------------------------
---  Memory Read-Modify-Write Post-Indexed Data Page Direct - xxx DP, Y
---------------------------------------------------------------------------------
-
-_RMW_DPY:
-    FTCH    $,ZP, DPY, RD, OP1                      -- Read from DP,Y
-    BMW     _RMW,, MAR, WR, ALU, WE_R               -- Write to DP,Y
+    BMW3    _RMW_Wr,ZP, DPX, RD, OP1                -- Rd Op/Op Ptr Lo from DP,X
 
 --------------------------------------------------------------------------------
 --  Memory Read-Modify-Write Absolute - xxx Abs
 --------------------------------------------------------------------------------
 
 _RMW_Abs:
-    FTCH    $,, Inc, IF, OP2                        -- Read Mem Ptr Hi
-    FTCH    $,, LDA, RD, OP1                        -- Read from Abs
-    BMW     _RMW,, MAR, WR, ALU, WE_R               -- Write to Abs
-
+    FTCH    $,, Inc, IF, OP2                        -- Rd Mem Ptr Hi
+    BMW3    _RMW_Wr1,, LDA, RD, OP1                 -- Rd Op/Op Ptr Lo from Abs
+_RMW_Wr1:
+    BMW     _RMW,, MAR, WR, ALU, WE_R               -- Wr Result to Memory
+_RMW_AbsI:
+    FTCH    $,, Nxt, RD, OP2                        -- Rd Op Ptr Hi
+    BRV0    _RMW_Wr1,, LDA, RD, OP1                 -- Rd Op from (Abs)
+    
 --------------------------------------------------------------------------------
 --  Memory Read-Modify-Write Pre-Indexed Absolute - xxx Abs, X
 --------------------------------------------------------------------------------
 
 _RMW_AbsX:
-    FTCH    $,, Inc, IF, OP2                        -- Read Mem Ptr Hi
-    FTCH    $,, LDAX, RD, OP1                       -- Read from Abs,X
-    BMW     _RMW,, MAR, WR, ALU, WE_R               -- Write to Abs,X
+    FTCH    $,, Inc, IF, OP2                        -- Rd Mem Ptr Hi
+    BMW3    _RMW_Wr1,, LDAX, RD, OP1                -- Rd Op/Op Ptr Lo frm Abs,X
 
 --------------------------------------------------------------------------------
---  Memory Read-Modify-Write Post-Indexed Absolute - xxx Abs, Y
---------------------------------------------------------------------------------
 
-_RMW_AbsY:
-    FTCH    $,, Inc, IF, OP2                        -- Read Mem Ptr Hi
-    FTCH    $,, LDAY, RD, OP1                       -- Read from Abs,Y
-    BMW     _RMW,, MAR, WR, ALU, WE_R               -- Write to Abs,Y
+    BRV0    0,                                      -- Fill: Reset
 
 --------------------------------------------------------------------------------
 --  Rockwell BBRx/BBSx dp,rel instructions
 --------------------------------------------------------------------------------
 
 _BByx_dp_rel:
-    FTCH    $,ZP, DPN, RD, OP1                      -- Read from DP
+    BRV0    _BByx_dp_rel1,ZP, DPN, RD, OP1          -- Read from DP
+
+_BByx_dpI_rel:
+    FTCH    $,ZP, DPN, RD, OP1                      -- Read Op Ptr Lo
+    FTCH    $,ZP, Nxt, RD, OP2                      -- Read Op Ptr Hi
+    FTCH    $,, LDA, RD, OP1                        -- Read Op from  (DP)
+    
+_BByx_dp_rel1:
     FTCH    $,, Inc, IF, SGN, WE_R                  -- Read rel value
 --
     BRV1    $,, Bra, IF, IR                         -- Execute BByx
@@ -1178,13 +1189,13 @@ _SBC_spiY:
 --  I   BA, uP, NA, IO, DI, Reg_WE, ISR
 --------------------------------------------------------------------------------
 _TSB_dp:
-    BMW3    _RMW_DP,, Inc, IF, OP1                  -- Read ZP Pointer
+    BRV0    _RMW_DP,, Inc, IF, OP1                  -- Read ZP Pointer
 _TRB_dp:
-    BMW3    _RMW_DP,, Inc, IF, OP1                  -- Read ZP Pointer
+    BRV0    _RMW_DP,, Inc, IF, OP1                  -- Read ZP Pointer
 _BIT_dp:
-    BMW3    _RO_DP,, Inc, IF, OP1                   -- Read ZP Pointer
+    BRV0    _RO_DP,, Inc, IF, OP1                   -- Read ZP Pointer
 _BIT_dpX:
-    BMW3    _RO_DPX,, Inc, IF, OP1                  -- Read ZP Pointer
+    BRV0    _RO_DPX,, Inc, IF, OP1                  -- Read ZP Pointer
 _NOP_44:
     BRV3    0,, Inc, IF, IR                         -- Skip Invalid Instruction
 _NOP_54:
@@ -1574,37 +1585,37 @@ _INC_absX:
 --  I   BA, uP, NA, IO, DI, Reg_WE, ISR
 --------------------------------------------------------------------------------
 _BBR0_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBR1_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBR2_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBR3_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBR4_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBR5_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBR6_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBR7_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBS0_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBS1_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBS2_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBS3_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBS4_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBS5_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBS6_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 _BBS7_dp_rel:
-    BRV0    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
+    BMW3    _BByx_dp_rel,, Inc, IF, OP1             -- Read ZP Pointer
 --------------------------------------------------------------------------------
 --  End of Instruction Decode Table
 --------------------------------------------------------------------------------
