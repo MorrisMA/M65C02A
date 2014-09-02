@@ -237,6 +237,8 @@ RMW instructions:
     ASL/ROL/LSR/ROR zp,X    => STA/LDA/CMP/SBC (sp,X)   : Added pre-indexed zero page indirect
     DEC/INC zp              => DEC/INC (zp)             : Added zero page indirect
     DEC/INC zp,X            => DEC/INC (zp,X)           : Added pre-indexed zero page indirect
+    RMBx/SMBx zp            => RMBx/SMBx (zp)           : Added zero page indirect
+    BBRx/BBSx zp,rel        => BBRx/BBSx (zp),rel       : Added zero page indirect
     TSB/TRB/BIT abs         => TSB/TRB/BIT (abs)        : Added absolute indirect
     BIT abs,X               => BIT (abs,X)              : Added pre-indexed absolute indirect
     ASL/ROL/LSR/ROR abs     => ASL/ROL/LSR/ROR (abs)    : Added absolute indirect
