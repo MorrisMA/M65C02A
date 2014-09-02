@@ -214,17 +214,17 @@ The microprogram and the microprogram has been modified to support the IND
 prefix instruction for the following instructions:
 
     JSR abs                 => JSR (abs)                : Added absolute indirect mode
-    PLW zp                  => PLW (dp)                 : Added zero page indirect
+    PLW zp                  => PLW (zp)                 : Added zero page indirect
     PLW abs                 => PLW (abs)                : Added absolute indirect
     ORA/AND/EOR/ADC sp,S    => ORA/AND/EOR/ADC (sp,S)   : Added stack relative indirect
     STA/LDA/CMP/SBC sp,S    => STA/LDA/CMP/SBC (sp,S)   : Added stack relative indirect
     PHW zp                  => PHW (zp)                 : Added zero page indirect
     PHW abs                 => PHW (abs)                : Added zero page indirect
-    STZ/STX/STY dp          => STZ/STX/STY (dp)         : Added zero page indirect
-    LDX/LDY dp              => LDX/LDY (dp)             : Added zero page indirect
-    CPX/CPY dp              => CPX/CPY (dp)             : Added zero page indirect
-    STZ/STY dp,X            => STZ/STY (dp,X)           : Added pre-indexed zero page indirect
-    STX dp,Y                => STX (dp),Y               : Added post-indexed zero page indirect
+    STZ/STX/STY zp          => STZ/STX/STY (zp)         : Added zero page indirect
+    LDX/LDY zp              => LDX/LDY (zp)             : Added zero page indirect
+    CPX/CPY zp              => CPX/CPY (zp)             : Added zero page indirect
+    STZ/STY zp,X            => STZ/STY (zp,X)           : Added pre-indexed zero page indirect
+    STX zp,Y                => STX (zp),Y               : Added post-indexed zero page indirect
 
 ###Release 2.2.4
 
