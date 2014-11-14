@@ -118,6 +118,9 @@
 //
 //  1.00    14G19   MAM     Last Version before Kernel/User Mode added.
 //
+//  1.01    14K14   MAM     Adjusted default uPgm and IDec filenames to synch
+//                          up with the final tested configuration.
+//
 // Additional Comments:
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -182,8 +185,8 @@ module M65C02A #(
     parameter pRAM_AddrWidth  = 8'd14,      // Internal RAM Address Width: 16 kB
     parameter pRAM_File       = "Pgms/65C02_ft.txt",
                                                                         
-    parameter pM65C02_uPgm    = "Pgms/M65C02_uPgm_V4.coe",      // SEQ   :  2 kB
-    parameter pM65C02_IDec    = "Pgms/M65C02_IDecode_ROM.coe"   // DEC   :  2 kB
+    parameter pM65C02_uPgm    = "Pgms/M65C02_uPgm_V4a.coe",     // SEQ   :  2 kB
+    parameter pM65C02_IDec    = "Pgms/M65C02_IDecode_ROMa.coe"  // DEC   :  2 kB
 )(                                                              // Total : 32 kB
     input   nRst,               // System Reset Input
     input   Clk,                // System Clk Input (Phi2 Input)

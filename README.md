@@ -257,3 +257,9 @@ Read-Only and Write-Only Absolute Address Mode instructions:
     LDX abs,Y               => LDX (abs),Y              : Added post-indexed absolute indirect
     STZ abs                 => STZ (abs)                : Added absolute indirect
     STZ abs,X               => STZ (abs,X)              : Added pre-indexed absolute indirect
+
+###Release 2.2.3a
+
+Changed the default microprogram filenames to reflect last tested 
+configuration. No other changes made.
+

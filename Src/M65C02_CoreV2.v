@@ -105,7 +105,10 @@
 //
 //  2.10    14H16   MAM     Added an additional qualifier to the CE_IR signal so
 //                          that the IR is not loaded unless the Sel_BA is also
-//                          asserted. 
+//                          asserted.
+//
+//  2.11    14K14   MAM     Adjusted default uPgm and IDec files to correspond
+//                          to last tested configuration.
 // 
 // Additional Comments:
 //
@@ -117,8 +120,8 @@ module M65C02_CoreV2 #(
     parameter pRst_Addrs   = 0,     // MPC Reset Address
         
     parameter pInt_Hndlr   = 0,     // _Int microroutine address, Reset default
-    parameter pM65C02_uPgm = "Pgms/M65C02_uPgm_V4.coe",
-    parameter pM65C02_IDec = "Pgms/M65C02_IDecode_ROM.coe",
+    parameter pM65C02_uPgm = "Pgms/M65C02_uPgm_V4a.coe",
+    parameter pM65C02_IDec = "Pgms/M65C02_IDecode_ROMa.coe",
 
     parameter pStkPtr_Rst  = 2      // Stk Ptr Value after Reset
 )(
