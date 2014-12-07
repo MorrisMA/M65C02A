@@ -67,6 +67,14 @@
 //  1.10    14F28   MAM     Adjusted comments to reflect changes made during
 //                          integration: (1) corrected the uP driven write
 //                          enable logic to select PSW when writing A, X, or Y.
+//
+//  1.20    14I02   MAM     Modified to support OAX and OAY prefix instructions.
+//
+//  1.30    14L06   MAM     Completed modifications to incorporate OAX, OAY, 
+//                          and OSY prefix instructions: OAX switches A and X;
+//                          OAY switches A and Y; and OSY switches Y with S for
+//                          stack operations, and Y and S in the Y-specific
+//                          instructions.
 //  
 // Additional Comments: 
 //
@@ -75,6 +83,10 @@
 module M65C02_WrSel(
     input   Rst,
     input   Clk,
+    
+    input   OAX,            // Register Override: swap A and X
+    input   OAY,            // Register Override: swap A and Y
+    input   OSY,            // Register Override: swap Y and S, Y is SP
     
     input   [2:0] Reg_WE,
     input   [2:0] WSel,
@@ -101,14 +113,14 @@ wire    WE;
 always @(*)
 begin
     case(Reg_WE)
-        3'b000 : {uP_A, uP_X, uP_Y, uP_P, uP_S} <= #1 5'b000_0_0;
-        3'b001 : {uP_A, uP_X, uP_Y, uP_P, uP_S} <= #1 5'b100_1_0;
-        3'b010 : {uP_A, uP_X, uP_Y, uP_P, uP_S} <= #1 5'b010_1_0;
-        3'b011 : {uP_A, uP_X, uP_Y, uP_P, uP_S} <= #1 5'b001_1_0;
-        3'b100 : {uP_A, uP_X, uP_Y, uP_P, uP_S} <= #1 5'b000_0_0;
-        3'b101 : {uP_A, uP_X, uP_Y, uP_P, uP_S} <= #1 5'b000_0_1;
-        3'b110 : {uP_A, uP_X, uP_Y, uP_P, uP_S} <= #1 5'b000_1_0;
-        3'b111 : {uP_A, uP_X, uP_Y, uP_P, uP_S} <= #1 5'b000_0_0;
+        3'b000 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b000_0_0;
+        3'b001 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b100_1_0;
+        3'b010 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b010_1_0;
+        3'b011 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b001_1_0;
+        3'b100 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b000_0_0;
+        3'b101 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b000_0_1;
+        3'b110 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b000_1_0;
+        3'b111 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b000_0_0;
     endcase
 end
 
@@ -117,22 +129,22 @@ assign WE = (Reg_WE == 3'b100);
 always @(*)
 begin
     case({WE, WSel})
-        4'b0000 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b0001 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b0010 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b0011 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b0100 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b0101 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b0110 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b0111 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b1000 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b1001 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b100_1_0;
-        4'b1010 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b010_1_0;
-        4'b1011 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b001_1_0;
-        4'b1100 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b1101 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b000_0_1;
-        4'b1110 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b000_1_0;
-        4'b1111 : {iD_A, iD_X, iD_Y, iD_P, iD_S} <= #1 5'b000_1_0;
+        4'b0000 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
+        4'b0001 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
+        4'b0010 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
+        4'b0011 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
+        4'b0100 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
+        4'b0101 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
+        4'b0110 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
+        4'b0111 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
+        4'b1000 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
+        4'b1001 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b100_1_0;
+        4'b1010 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b010_1_0;
+        4'b1011 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b001_1_0;
+        4'b1100 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
+        4'b1101 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_1;
+        4'b1110 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_1_0;
+        4'b1111 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_1_0;
     endcase
 end
 
@@ -141,13 +153,21 @@ begin
     if(Rst)
         {SelA, SelX, SelY, SelP, SelS} <= #1 0;
     else begin
-        SelA <= #1 (uP_A | iD_A);
-        SelX <= #1 (uP_X | iD_X);
-        SelY <= #1 (uP_Y | iD_Y);
+        SelA <= #1 (  ((uP_X | iD_X) &   OAX)
+                    | ((uP_Y | iD_Y) &   OAY)
+                    | ((uP_A | iD_A) & ~(OAX | OAY)));
+        //
+        SelX <= #1 (  ((uP_A | iD_A) &  OAX)
+                    | ((uP_X | iD_X) & ~OAX));
+        //
+        SelY <= #1 (  ((uP_A | iD_A) &   OAY)
+                    | ((uP_S | iD_S) &   OSY)
+                    | ((uP_Y | iD_Y) & ~(OAY | OSY)));
         //
         SelP <= #1 (uP_P | iD_P);
-        //
-        SelS <= #1 (uP_S | iD_S);
+        // 
+        SelS <= #1 (  ((uP_Y | iD_Y) &  OSY)
+                    | ((uP_S | iD_S) & ~OSY));
     end
 end
 

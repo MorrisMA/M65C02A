@@ -93,6 +93,34 @@
 //                          plement stack relative addressing, and changed name
 //                          of StkRel signal to Stk_Rel.
 //
+//  2.02    14K15   MAM     Removed commented out code.
+//
+//  2.10    14K29   MAM     Modified the logic for % 256 operations. Now the
+//                          operation is performed using the upper 8 bits of the
+//                          left operand input. This sets up the module to sup-
+//                          port extending all of the registers to 16 bits, and
+//                          placing the data/page and stack pages anywhere in 
+//                          the address space.
+//
+//  2.20    14K30   MAM     Modified the stack pointer input/output to use dedi-
+//                          cated input/output busses. This allows the implemen-
+//                          tation of two stack pointers: S and Y. The direct
+//                          input reduces the number of multiplexers needed to
+//                          support the register override prefix instructions.
+//
+//  2.20    14L06   MAM     Completed modifications to incorporate OAX, OAY, 
+//                          and OSY prefix instructions: OAX switches A and X;
+//                          OAY switches A and Y; and OSY switches Y with S for
+//                          stack operations, and Y and S in the Y-specific
+//                          instructions. The Accumulator replaces X as an index
+//                          register when OAX asserted, ans replaces Y as an
+//                          index register when OAY asserted. Y replaces S when
+//                          OSY is asserted. With OSY asserted, stack pointer
+//                          operations are performed by the stack pointer logic
+//                          of the ALU's Y register, otherwise, the stack poin-
+//                          ter logic of S in this module performs the opera-
+//                          tions required.
+//
 // Additional Comments: 
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -104,11 +132,14 @@ module M65C02_AddrGenV2 #(
     input   Clk,                    // System Clock
 
     input   [15:0] Vector,          // Interrupt/Trap Vector
+    
+    input   [10:0] NA_Op,           // Address Generator Operation Select
 
-    input   [11:0] NA_Op,           // Address Generator Operation Select
-
+    input   OAX,                    // Override: Swap A and X
+    input   OAY,                    // Override: Swap A and Y
+    input   OSY,                    // Override: Swap S and Y, and S and A
+    
     input   Mod256,                 // Mod 256 Control - wrap address to page
-    input   Page,                   // Address wrap page select
     
     input   CC,                     // Conditional Branch Input Flag
     input   BRV3,                   // Interrupt or Next Instruction Select
@@ -122,11 +153,14 @@ module M65C02_AddrGenV2 #(
     
     input   [7:0] X,                // X Index Register Input
     input   [7:0] Y,                // Y Index Register Input
+    input   [7:0] A,                // A Index Register Input
 
     output  reg [15:0] AO,          // Address Output
 
     input   SelS,                   // Stack Pointer Select
-    output  [7:0] S,                // Stack Pointer Register
+    input   [1:0] Stk_Op,           // Stack Pointer Operation Select
+    input   [7:0] SDI,              // Stack Pointer Data Input
+    output  [7:0] SDO,              // Stack Pointer Data Output
 
     output  reg [15:0] MAR,         // Program Counter
     output  reg [15:0] PC           // Program Counter
@@ -137,12 +171,12 @@ module M65C02_AddrGenV2 #(
 //  Module Declarations
 //
 
+wire    [ 7:0] S;               // Stack Pointer Register
+
 wor     [15:0] AL, AR;          // Wired-OR busses for address operands
 wire    [15:0] NA;              // Next Address (w/o application of % 256)
 
 wire    CE_MAR;                 // Memory Address Register Clock Enable
-
-//reg     dMod256, dPage;         // Delay Registers to Support % 256 addressing
 
 wire    [15:0] Rel;             // Branch Address Sign-Extended Offset
 wire    CE_PC;                  // Program Counter Clock Enable
@@ -156,46 +190,47 @@ wire    CE_PC;                  // Program Counter Clock Enable
 
 //  Decode Next Address Operation Field
 
-//           LLO PSZAM XYR C
-//           ddf CtPbA   e i
-//           MPf  k sR   l  
-// Vec:  12'b110_00010_000_0; // NA <= {OP2,OP1}           + 0; PC <= NA
-// Jmp:  12'b110_00010_000_0; // NA <= {OP2,OP1}           + 0; PC <= NA
-// JmpY: 12'b110_00010_010_0; // NA <= {OP2,OP1} + {0,  Y} + 0; PC <= NA
-// Rtn:  12'b110_00010_000_1; // NA <= {OP2,OP1}           + 1; PC <= NA
-// PC:   12'b110_10000_000_0; // NA <= PC                  + 0; PC <= NA
-// Inc:  12'b110_10000_000_1; // NA <= PC                  + 1; PC <= NA
-// Bra:  12'b110_10000_001_0; // NA <= PC        + Rel     + 1; PC <= NA
-// Rel:  12'b100_10000_001_0; // NA <= PC        + Rel     + 1;
-// Psh:  12'b000_01000_000_0; // NA <= {  1, SP}           + 0;
-// Pop:  12'b000_01000_000_1; // NA <= {  1, SP}           + 1;
-// SPN:  12'b001_01000_000_0; // NA <= {  1, SP} + {0,OP1} + 1;
-// DPN:  12'b100_00100_000_0; // NA <= {  0,OP1}           + 0;
-// DPX:  12'b100_00100_100_0; // NA <= {  0,OP1} + {0,  X} + 0;
-// DPY:  12'b100_00100_010_0; // NA <= {  0,OP1} + {0,  Y} + 0;
-// LDA:  12'b100_00010_000_0; // NA <= {OP2,OP1}           + 0;
-// LDAX: 12'b100_00010_100_0; // NA <= {OP2,OP1} + {0,  X} + 0;
-// LDAY: 12'b100_00010_010_0; // NA <= {OP2,OP1} + {0,  Y} + 0;
-// Nxt:  12'b100_00001_000_0; // NA <= MAR                 + 1;
-// MAR:  12'b100_00001_000_1; // NA <= MAR                 + 0;                         
-//
+//           LO PSZAM XYR C
+//           df CtPbA   e i
+//           Pf  k sR   l  
+// Vec:  11'b10_00010_000_0; // NA <= {OP2,OP1}           + 0; PC <= NA
+// Jmp:  11'b10_00010_000_0; // NA <= {OP2,OP1}           + 0; PC <= NA
+// JmpX: 11'b10_00010_100_0; // NA <= {OP2,OP1} + {0,  X} + 0; PC <= NA
+// JmpY: 11'b10_00010_010_0; // NA <= {OP2,OP1} + {0,  Y} + 0; PC <= NA
+// Rtn:  11'b10_00010_000_1; // NA <= {OP2,OP1}           + 1; PC <= NA
+// PC:   11'b10_10000_000_0; // NA <= PC                  + 0; PC <= NA
+// Inc:  11'b10_10000_000_1; // NA <= PC                  + 1; PC <= NA
+// Bra:  11'b10_10000_001_0; // NA <= PC        + Rel     + 1; PC <= NA
+// Rel:  11'b00_10000_001_0; // NA <= PC        + Rel     + 1;
+// Psh:  11'b00_01000_000_0; // NA <= {  1, SP}           + 0;
+// Pop:  11'b00_01000_000_1; // NA <= {  1, SP}           + 1;
+// SPN:  11'b01_01000_000_1; // NA <= {  1, SP} + {0,OP1} + 1;
+// DPN:  11'b00_00100_000_0; // NA <= {  0,OP1}           + 0;
+// DPX:  11'b00_00100_100_0; // NA <= {  0,OP1} + {0,  X} + 0;
+// DPY:  11'b00_00100_010_0; // NA <= {  0,OP1} + {0,  Y} + 0;
+// LDA:  11'b00_00010_000_0; // NA <= {OP2,OP1}           + 0;
+// LDAX: 11'b00_00010_100_0; // NA <= {OP2,OP1} + {0,  X} + 0;
+// LDAY: 11'b00_00010_010_0; // NA <= {OP2,OP1} + {0,  Y} + 0;
+// MAR:  11'b00_00001_000_0; // NA <= MAR                 + 0;                         
+// Nxt:  11'b00_00001_000_1; // NA <= MAR                 + 1;
 
-assign Ld_PC   = NA_Op[10];
-assign Stk_Rel = NA_Op[ 9];
+assign Ld_PC   =  NA_Op[10];
+assign Stk_Rel =  NA_Op[ 9];
 //
-assign Sel_PC  = NA_Op[ 8];
-assign Sel_SP  = NA_Op[ 7];
-assign Sel_ZP  = NA_Op[ 6];
-assign Sel_Abs = NA_Op[ 5];
-assign Sel_MAR = NA_Op[ 4];
+assign Sel_PC  =  NA_Op[8];
+assign Sel_SP  =  NA_Op[7] & ~OSY;  // When ~OSY use S for stack operations
+assign Sel_SPY =  NA_Op[7] &  OSY;  // When  OSY use Y for stack operations
+assign Sel_ZP  =  NA_Op[6];
+assign Sel_Abs =  NA_Op[5];
+assign Sel_MAR =  NA_Op[4];
 //
-assign Sel_X   = NA_Op[ 3];
-assign Sel_Y   = NA_Op[ 2];
-assign Sel_Rel = NA_Op[ 1];
+assign Sel_X   =  NA_Op[3];
+assign Sel_Y   =  NA_Op[2];
+assign Sel_Rel =  NA_Op[1];
 //
-assign Ci      = NA_Op[ 0];
+assign Ci      = NA_Op[0];
 //
-assign Ld_MAR  = ~(Sel_SP & ~Stk_Rel);
+assign Ld_MAR  = ~(NA_Op[7] & ~Stk_Rel);    // NA_Op[11]: not needed any longer
 
 //  Generate Relative Address
 
@@ -205,35 +240,34 @@ assign Rel = ((CC) ? {OP2, OP1} : 0);
 
 assign AL = ((Sel_PC ) ? PC           : 0);
 assign AL = ((Sel_SP ) ? {8'h01, S  } : 0);
+//
+assign AL = ((Sel_SPY) ? {8'h00, Y  } : 0);
+//
 assign AL = ((Sel_ZP ) ? {8'h00, OP1} : 0);
 assign AL = ((Sel_Abs) ? {OP2  , OP1} : 0);
 assign AL = ((Sel_MAR) ? MAR          : 0);
 
 //  Generate Right Address Operand
 
-assign AR = ((Sel_X  ) ? {8'h00,   X} : 0);
-assign AR = ((Sel_Y  ) ? {8'h00,   Y} : 0);
-assign AR = ((Sel_Rel) ? Rel          : 0);
-assign AR = ((Stk_Rel) ? {8'h00, OP1} : 0);
+assign AR = ((Sel_X  ) ? {8'h00, ((OAX) ? A : X)} : 0);
+assign AR = ((Sel_Y  ) ? {8'h00, ((OAY) ? A : Y)} : 0);
+assign AR = ((Sel_Rel) ? Rel                      : 0);
+//
+assign AR = ((Stk_Rel) ? {8'h00, OP1}             : 0);
 
 //  Compute Next Address
 
 assign NA = (AL + AR + Ci);
 
-////  Compute {Mod256, Page} and implement delay registers
-//
-//assign Mod256 = ((Sel_SP | Sel_ZP) ? 1'b1   : ((Sel_MAR) ? dMod256 : 1'b0));
-//assign Page   = ((Sel_SP | Sel_ZP) ? Sel_SP : ((Sel_MAR) ? dPage   : 1'b0));
-
 //  Generate Address Output - Truncate Next Address when Mod256 asserted
-//      When Mod256 is asserted, the memory page is determined by Page
+//      When Mod256 is asserted, the memory page is determined AL[15:8]
 
 always @(*)
 begin
     if(Rst)
         AO <= Vector;
     else
-        AO <= ((Mod256) ? {{{7{1'b0}}, Page}, NA[7:0]} : NA);
+        AO <= ((Mod256) ? {AL[15:8], NA[7:0]} : NA);
 end
 
 //  Memory Address Register
@@ -245,14 +279,6 @@ begin
     if(CE_MAR)
         MAR <= #1 AO;
 end
-
-//always @(posedge Clk)
-//begin
-//    if(Rst)
-//        {dMod256, dPage} <= #1 0;
-//    else if(CE_Mar)
-//        {dMod256, dPage} <= #1 {Mod256, Page};
-//end
 
 //  Program Counter
 
@@ -275,11 +301,13 @@ M65C02_StkPtr   #(
                     .Rdy(Rdy), 
                     .Valid(Valid),
                     
-                    .SelS(SelS), 
-                    .Stk_Op({Sel_SP & ~Stk_Rel, Ci}), 
-                    .X(X),
+                    .Sel(SelS), 
+                    .Stk_Op(((OSY) ? 2'b0 : Stk_Op)), 
+                    .D(SDI),
                     
-                    .S(S)
+                    .Q(SDO)
                 );
+                
+assign S = SDO;
 
 endmodule

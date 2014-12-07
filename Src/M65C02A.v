@@ -54,12 +54,12 @@
 //  enhancements to the MOS6502 microprocessor. Two new addressing modes were
 //  added, several existing instructions were rounded out using the new address-
 //  ing modes, and some additional instructions were added to fill in holes pre-
-//  in the instruction set of the MOS6502. Rockwell second sourced the W65C02, 
-//  and in the process added 4 bit-oriented instructions using 32 opcodes. WDC
-//  released the W65816/W65802 16-bit enhancements to the W65C02. Two of the new
-//  instructions in these processors, WAI and STP, were combined with the four
-//  Rockwell instructions, RMBx/SMBx and BBRx/BBSx, along with the original
-//  W65C02's instruction set to realize the W65C02S.
+//  sent in the instruction set of the MOS6502. Rockwell second sourced the
+//  W65C02, and in the process added 4 bit-oriented instructions using 32 op-
+//  codes. WDC released the W65816/W65802 16-bit enhancements to the W65C02. Two
+//  of the new instructions in these processors, WAI and STP, were combined with
+//  the four Rockwell instructions, RMBx/SMBx and BBRx/BBSx, along with the ori-
+//  ginal W65C02's instruction set to realize the W65C02S.
 //
 //  The M65C02A core is a realization of the W65C02S instruction set. It is not
 //  a cycle accurate implementation, and it does not attempt to match the idio-
@@ -67,48 +67,50 @@
 //  codes. In the M65C02A core, all unused opcodes are realized as single byte,
 //  single cycle NOPs.
 //
-//  This module demonstrates how to incorporate the M65C02_CoreV2.v logic module
-//  into an application-specific implementation. The core logic incorporates
-//  most of the logic required for a microprocessor implementation: ALU, regis-
-//  ters, address generator, and instruction decode and sequencing. Not included
-//  in the core logic are the memory interface, the interrupt handler, the clock
-//  generator, and any peripherals.
+//  This module demonstrates how to incorporate the M65C02_CoreV2.v processor
+//  core module into an application-specific implementation. The core logic in-
+//  corporates most of the logic required for a microprocessor implementation:
+//  ALU, registers, address generator, and instruction decode and sequencing.
+//  Not included in the core logic are the memory interface, the interrupt hand-
+//  ler, the clock generator, and any peripherals.
 //
 //  This module integrates the M65C02_CoreV2.v module, a simple vectored inter-
-//  rupt controller, a simple MMU, and 28kB of internal Block RAM memory. The
-//  objective is a module that allows the 6502_functional_test code to be exe-
-//  cuted at speed from internal BRAM to verify that the new core architecture
-//  and microprogram implement the 65C02 instruction set architecture (ISA). 
+//  rupt controller, a simple MMU, and 28kB of internal Block RAM memory. One
+//  objective is a module that allows Klaus Dormann's 6502_functional_test code
+//  to be executed at speed from internal BRAM to verify that the new core
+//  architecture and microprogram implement the 65C02 ISA. 
 //
-// Dependencies:    M65C02A.v
-//                      M65C02_CoreV2.v
-//                          M65C02_MPCv5.v
-//                              M65C02_uPgm_V4.coe      (M65C02_uPgm_V4.txt)
-//                              M65C02_IDecode_ROM.coe  (M65C02_IDecode_ROM.txt)
-//                          M65C02_AddrGenV2.v
-//                              M65C02_StkPtr.v 
-//                          M65C02_ALUv2.v
-//                              M65C02_LST.v
-//                              M65C02_LU.v 
-//                              M65C02_SU.v 
-//                              M65C02_Add.v 
-//                              M65C02_WrSel.v 
-//                              M65C02_PSWv2.v
-//                      M65C02_IntHndlrV2.v     (Interrupt Handler)
-//                      M65C02_MMU.v            (Memory Management Unit)
-//                      M65C02_SPIxIF.v         (SPI Master I/F)
-//                          DPSFmnCE.v          (Transmit & Receive FIFOs)
-//                          SPIxIF.v            (Configurable SPI Master)
-//                          fedet.v             (falling edge detector)
-//                          redet.v             (rising edge detector)
-//                      UART.v                  (COM0/COM1 Asynch. Serial Ports)
-//                          DPSFmnCS.v          (Transmit & Receive FIFOs)
-//                          UART_BRG.v          (UART Baud Rate Generator)
-//                          UART_TXSM.v         (UART Transmit SM/Shifter)
-//                          UART_RXSM.v         (UART Receive SM/Shifter)
-//                          UART_INT.v          (UART Interrupt Generator)
-//                              fedet.v         (falling edge detector)
-//                              redet.v         (rising edge detector)
+// Dependencies:
+//      M65C02A.v                           (M65C02 Microcomputer: RAM/ROM/IO)
+//          M65C02_CoreV2.v                 (M65C02 Processor Core)
+//              M65C02_MPCv5.v              (M65C02 Microprogram Controller)
+//                  M65C02_uPgm_V4a.coe     (M65C02_uPgm_V4a.txt)
+//                  M65C02_IDecode_ROMa.coe (M65C02_IDecode_ROMa.txt)
+//              M65C02_AddrGenV2.v          (M65C02 Address Generator)
+//                  M65C02_StkPtr.v         (M65C02 Stack Pointer)
+//              M65C02_ALUv2.v              (M65C02 ALU)
+//                  M65C02_LST.v            (M65C02 ALU Load/Store/Transfer Mux)
+//                  M65C02_LU.v             (M65C02 ALU Logic Unit) 
+//                  M65C02_SU.v             (M65C02 ALU Shift/Rotate Unit)
+//                  M65C02_Add.v            (M65C02 ALU Dual Mode Adder Unit) 
+//                  M65C02_WrSel.v          (M65C02 ALU Register Write Decoder)
+//                  M65C02_StkPtr.v         (M65C02 ALU Alternate Stack Pointer)
+//                  M65C02_PSWv2.v          (M65C02 ALU Processor Status Word)
+//          M65C02_IntHndlrV2.v             (Interrupt Handler)
+//          M65C02_MMU.v                    (Memory Management Unit)
+//          M65C02_SPIxIF.v                 (SPI Master I/F)
+//              DPSFmnCE.v                  (Transmit & Receive FIFOs)
+//              SPIxIF.v                    (Configurable SPI Master)
+//                  fedet.v                 (falling edge detector)
+//                  redet.v                 (rising edge detector)
+//          UART.v                          (COM0/COM1 Asynch. Serial Ports)
+//              DPSFmnCS.v                  (Transmit & Receive FIFOs)
+//              UART_BRG.v                  (UART Baud Rate Generator)
+//              UART_TXSM.v                 (UART Transmit SM/Shifter)
+//              UART_RXSM.v                 (UART Receive SM/Shifter)
+//              UART_INT.v                  (UART Interrupt Generator)
+//                  fedet.v                 (falling edge detector)
+//                  redet.v                 (rising edge detector)
 //
 // Revision: 
 //
@@ -120,6 +122,17 @@
 //
 //  1.01    14K14   MAM     Adjusted default uPgm and IDec filenames to synch
 //                          up with the final tested configuration.
+//
+//  1.02    14K15   MAM     Updated comments
+//
+//  1.10    14K27   MAM     Incorporated changes to support the defined prefix
+//                          instructions. Modified the IO Page memory map, and
+//                          changed the ALU, Address Generator, and MMU. The ALU
+//                          and Address Generator were changed to support the
+//                          prefix instructions. The MMU was changed to map the
+//                          registers such the VA can be used instead of special
+//                          instructions. Also changed the mapping in the IO
+//                          page decoding for the peripherals.
 //
 // Additional Comments:
 //
@@ -153,9 +166,9 @@ module M65C02A #(
     parameter pINV            = 3'b001,     // INValid instructions
     parameter pCOP            = 3'b010,     // CO-Processor instruction
     parameter pBRK            = 3'b011,     // BRK instruction
-    parameter pPFX            = 3'b100,     // PreFiX instructions (IND/SIZ)
-    parameter pPHR            = 3'b101,     // PHR instruction
-    parameter pPHW            = 3'b110,     // PHR instruction
+    parameter pFTH            = 3'b100,     // FORTH VM instructions
+    parameter pPFX            = 3'b101,     // PreFiX instructions
+    parameter pSPC            = 3'b110,     // Special instructions
     parameter pWAI            = 3'b111,     // WAI instruction
 
     parameter pNOP            = 8'hEA,      // M65C02 Core NOP instruction
@@ -245,7 +258,6 @@ module M65C02A #(
     input   COM1_nCTS,
     
     output  COM1_DE
-
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -279,7 +291,7 @@ wire    [15:0] VA;              // M65C02 Core Address Output
 wor     [ 7:0] CPU_DI;          // M65C02 Core Data Input
 wire    [ 7:0] CPU_DO;          // M65C02 Core Data Output
 
-wire    [ 7:0] Y, P;            // M65C02 Core Processor Registers 
+wire    [ 7:0] P;               // M65C02 Core Processor Status Word Register 
 wire    Kernel;                 // M65C02 Core Operating Mode
 
 wire    WE, RE;                 // M65C02 Core Decoded IO Operations
@@ -343,18 +355,18 @@ end
 
 //  Process nSO
 
-fedet   FE1 (
+fedet   FE1 (                   //  Detect falling edge of external nSO pin
             .rst(Rst), 
             .clk(Clk),
             .din(nSO),
-            .pls(Set_SO)
+            .pls(Set_SO)        // Generate pulse on falling edge of nSO
         );
         
-always @(posedge Clk)
+always @(posedge Clk)           // Set and hold SO signal until core ACKs.
 begin
-    if(Rst | Clr_SO)
+    if(Rst | Clr_SO)            // Clear SO on reset or when core ACKs
         SO <= #1 Set_SO;
-    else if(Set_SO)
+    else if(Set_SO)             // Set SO on falling edge of nSO pin
         SO <= #1 1;
 end
 
@@ -362,7 +374,7 @@ end
 //  Process External NMI and maskable IRQ Interrupts
 //
 
-always @(posedge Clk)
+always @(posedge Clk)           // Synchronize external inputs to core's clock
 begin
     NMI <= #1 ~nNMI;
     IRQ <= #1 ~nIRQ;
@@ -394,7 +406,7 @@ M65C02_IntHndlrV2   IntHndlr (
 
 //  Instantiate M65C02 Core
 
-assign Wait = Int_Wait | Ext_Wait;
+assign Wait = Int_Wait | Ext_Wait;          // Combine int and ext Wait signals
 
 M65C02_CoreV2   #(
                     .pStkPtr_Rst(pKernel_SP_Rst),   // M65C02A Reset Value for S
@@ -429,9 +441,10 @@ M65C02_CoreV2   #(
                     .DI(CPU_DI),            // M65C02A Core Data Input Bus
                     .DO(CPU_DO),            // M65C02A Core Data Output Bus
                     
-                    .A(),                   // M65C02A Core Accumulator Register 
                     .X(),                   // M65C02A Core X Index Register
-                    .Y(Y),                  // M65C02A Core Y Index Register
+                    .Y(),                   // M65C02A Core Y Index Register
+                    .A(),                   // M65C02A Core Accumulator Register
+                    
                     .P(P),                  // M65C02A Core P Register
                     
                     .OP1(),                 // M65C02A Core Operand Register 1
@@ -441,21 +454,22 @@ M65C02_CoreV2   #(
                     .IND(),                 // M65C02A Core Address Override
                     .SIZ(),                 // M65C02A Core Size Override
                     .OAX(),                 // M65C02A Core Op(A) <=> Op(X)
-                    .OAY()                  // M65C92A Core Op(A) <=> Op(Y)
+                    .OAY(),                 // M65C02A Core Op(A) <=> Op(Y)
+                    .OSY()                  // M65C02A Core Op(S) <=> Op(Y)              
                 );
 
 //  Decode Core Control Signals
 
-assign WE  = IO_Op[0];
+assign WE  = IO_Op[0];              // For speed, converted IO_OP to one-hot
 assign RE  = IO_Op[1];
 
-assign INV = (Mode == pINV);
-assign COP = (Mode == pCOP);
-assign BRK = (Mode == pBRK);
-assign PFX = (Mode == pPFX);
-assign PHR = (Mode == pPHR);
-assign PHW = (Mode == pPHW);
-assign WAI = (Mode == pWAI);
+assign INV = (Mode == pINV);        // Invalid instruction decoded
+assign COP = (Mode == pCOP);        // Co-Processor instruction decoded
+assign BRK = (Mode == pBRK);        // BRK instruction decoded
+assign FTH = (Mode == pFTH);        // FORTH VM instruction decoded
+assign PFX = (Mode == pPFX);        // Prefix instructions decoded
+assign SPC = (Mode == pSPC);        // Special instructions decoded
+assign WAI = (Mode == pWAI);        // WAit for Interrupt instruction decoded
 
 //  MMU - Maps Virtual Addresses to Physical Addresses using 16 4kB pages
 //
@@ -467,47 +481,48 @@ assign WAI = (Mode == pWAI);
 //  Internal ROM space includes the I/O page. The I/O page is 0xFF00:FFFF;
 //  The nWP input disable writes in the range 0xF000:FEFF. Writes in the I/O
 //  page are not inhibited by the nWP input. The result is that the top 32
-//  location of the ROM BRAMs contains the interrupt/trap vector table.
+//  location of the ROM BRAMs contains the interrupt/trap vector table, and it
+//  may be modified by the programmer.
 //
 //  The following is the I/O page decode map:
 //
 //  Sel_VEC     - VecTbl    : BRAM(MON) - 0xFFE0:FFFF   (32 Bytes)
-//  Sel_COM1    - COM1 (Hi) : LUTs/FFs  - 0xFFD8:FFDF   ( 8 Bytes)
-//  Sel_COM0    - COM0 (Lo) : LUTs/FFs  - 0xFFD0:FFD7   ( 8 Bytes)
-//  Sel_SPI0    - SPI0 (Hi) : LUTs/FFs  - 0xFFC8:FFCF   ( 8 Bytes)
-//  Sel_MMU     - MMU  (Lo) : LUTs/FFs  - 0xFFC0:FFC7   ( 8 Bytes)
-//  Sel_MAP     - MAP       : LUTs/FFs  - 0xFF80:FFBF   (64 Bytes)
+//  Sel_MAP     - MAP       : LUTs/FFs  - 0xFFA0:FFDF   (64 Bytes)
+//  Sel_MMU     - MMU  (Hi) : LUTs/FFs  - 0xFF98:FF9F   ( 8 Bytes)
+//  Sel_SPI0    - SPI0 (Lo) : LUTs/FFs  - 0xFF90:FF97   ( 8 Bytes)
+//  Sel_COM1    - COM1 (Hi) : LUTs/FFs  - 0xFF88:FF8F   ( 8 Bytes)
+//  Sel_COM0    - COM0 (Lo) : LUTs/FFs  - 0xFF80:FF87   ( 8 Bytes)
 //
 
 //  Implement I/O Decode for Internal Functions
 
 assign Kernel   = P[5];      // IO Page only mapped to Kernel mode 0xFF00:FFFF
-assign IO_Page  = Kernel & (&VA[15:7]);                         // 0xFF80:FFFF
+assign IO_Page  = Kernel & (&VA[15:8]);                         // 0xFF00:FFFF
 
 always @(*)
 begin
-    case({IO_Page, VA[6:3]})
-        5'b10000 : IO_Sel <= 6'b1_0000_0;       // MAP  :   0xFF80:FFBF
-        5'b10001 : IO_Sel <= 6'b1_0000_0;       // MAP
-        5'b10010 : IO_Sel <= 6'b1_0000_0;       // MAP
-        5'b10011 : IO_Sel <= 6'b1_0000_0;       // MAP
-        5'b10100 : IO_Sel <= 6'b1_0000_0;       // MAP
-        5'b10101 : IO_Sel <= 6'b1_0000_0;       // MAP
-        5'b10110 : IO_Sel <= 6'b1_0000_0;       // MAP
-        5'b10111 : IO_Sel <= 6'b1_0000_0;       // MAP
-        5'b11000 : IO_Sel <= 6'b0_1000_0;       // MMU  :   0xFFC0:FFC7
-        5'b11001 : IO_Sel <= 6'b0_0100_0;       // SPI0 :   0xFFC8:FFCF
-        5'b11010 : IO_Sel <= 6'b0_0010_0;       // COM0 :   0xFFD0:FFD7
-        5'b11011 : IO_Sel <= 6'b0_0001_0;       // COM1 :   0xFFD8:FFDF
-        5'b11100 : IO_Sel <= 6'b0_0000_1;       // VEC  :   0xFFE0:FFFF
-        5'b11101 : IO_Sel <= 6'b0_0000_1;       // VEC
-        5'b11110 : IO_Sel <= 6'b0_0000_1;       // VEC
-        5'b11111 : IO_Sel <= 6'b0_0000_1;       // VEC
-        default  : IO_Sel <= 6'b0_0000_0;
+    case({IO_Page, VA[7:3]})
+        6'b110000 : IO_Sel <= 6'b0_0001_0;  // COM0 : 0xFF80:FF87
+        6'b110001 : IO_Sel <= 6'b0_0010_0;  // COM1 : 0xFF88:FF8F
+        6'b110010 : IO_Sel <= 6'b0_0100_0;  // SPI0 : 0xFF90:FF97
+        6'b110011 : IO_Sel <= 6'b0_1000_0;  // MMU  : 0xFF98:FF9F
+        6'b110100 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFA0:FFA7 Usr[ 3: 0]
+        6'b110101 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFA8:FFAF Usr[ 7: 4]
+        6'b110110 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFB0:FFB7 Usr[11: 8]
+        6'b110111 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFB8:FFBF Usr[15:12]
+        6'b111000 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFC0:FFC7 Krn[ 3: 0]
+        6'b111001 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFC8:FFCF Krn[ 7: 4]
+        6'b111010 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFD0:FFD7 Krn[11: 8]
+        6'b111011 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFD8:FFDF Krn[15:12]
+        6'b111100 : IO_Sel <= 6'b0_0000_1;  // VEC  : 0xFFE0:FFE7
+        6'b111101 : IO_Sel <= 6'b0_0000_1;  // VEC  : 0xFFE8:FFEF
+        6'b111110 : IO_Sel <= 6'b0_0000_1;  // VEC  : 0xFFF0:FFF7
+        6'b111111 : IO_Sel <= 6'b0_0000_1;  // VEC  : 0xFFF8:FFFF
+        default   : IO_Sel <= 6'b0_0000_0;
     endcase
 end
 
-assign {Sel_MAP, Sel_MMU, Sel_SPI0, Sel_COM0, Sel_COM1, Sel_VEC} = IO_Sel;
+assign {Sel_MAP, Sel_MMU, Sel_SPI0, Sel_COM1, Sel_COM0, Sel_VEC} = IO_Sel;
 
 //  Instantiate Memory Management Module
 
@@ -521,13 +536,12 @@ M65C02_MMU  MAP (
                 .Sync(Done),
                 .IO_Op(IO_Op),
 
-                .VA(VA),
+                .VA(VA),                // Virtual Address and Register Select
                 
                 .Sel_MAP(Sel_MAP),
                 .Sel_MMU(Sel_MMU),
                 .WE(WE),
                 .RE(RE),
-                .Sel(Y[4:0]),
                 .MMU_DI(CPU_DO),
                 .MMU_DO(MMU_DO),
 
@@ -557,11 +571,11 @@ assign Int_Wait = Int_WS & |WSGen;
 
 //  Generate Selects for Internal BRAMs
 
-assign Sel_MON = CE[15] & ~IO_Page | Sel_VEC;
+assign Sel_MON = CE[15] & ~IO_Page | Sel_VEC;   // Create IO_Page hole
 assign Sel_ROM = CE[13];
 assign Sel_RAM = CE[ 8];
 
-//  MON - 0xF000-FF7F (Monitor), 0xFFE0-FFFF (Vector Table) ( 4 kB)
+//  MON - 0xF000-FEFF (Monitor), 0xFFE0-FFFF (Vector Table) ( 4 kB)
 
 BRAM_SP_mn  #(
                 .pBRAM_AddrWidth(pMON_AddrWidth),
@@ -623,7 +637,7 @@ assign CPU_DI = ((Sel_RAM) ? RAM_DO : 0);
 //  Internal I/O devices: 1 SPI Master (Buffered), 2 UARTs (Buffered)
 //
 
-//  Core 0 - SPI Master Peripheral
+//  SPI0 - SPI Master Peripheral (0xFF90-FF97)
         
 M65C02_SPIxIF   #(
                     .pDefault_CR(pSPI_CR),
@@ -652,49 +666,7 @@ assign CPU_DI = ((Sel_SPI0) ? SPI0_DO : 0);
 
 assign nSSel = ~SSel;      
 
-//  Core 0 - UART Peripheral
-
-UART    #(
-            .pFrequency(pFrequency),
-            .pDefault_LCR(pUART_LCR),
-            .pDefault_IER(pUART_IER),
-            .pBaudrate(pUART_BRG),
-            .pRTOChrDlyCnt(pUART_RTO),
-            .pTF_Depth(pUART_TF_Depth),
-            .pRF_Depth(pUART_RF_Depth),
-            .pTF_Init(pUART_TF_Init),
-            .pRF_Init(pUART_RF_Init)
-        ) COM0 (
-            .Rst(Rst), 
-            .Clk(Clk),
-            
-            .IRQ(COM0_IRQ),
-            
-            .Sel(Sel_COM0), 
-            .Reg(PA[1:0]), 
-            .RE(RE), 
-            .WE(RE), 
-            .DI(CPU_DO), 
-            .DO(COM0_DO),
-            
-            .TxD(COM0_TxD), 
-            .RxD(COM0_RxD), 
-            .xRTS(COM0_RTS), 
-            .xCTS(COM0_CTS),
-            .xDE(COM0_DE),
-            
-            .Mode(),
-
-            .TxIdle(), 
-            .RxIdle()
-        );
-        
-assign CPU_DI   = ((Sel_COM0) ? COM0_DO  : 0);       
-
-assign COM0_nRTS = ~COM0_RTS;
-assign COM0_CTS  = ~COM0_nCTS;
-
-//  Core 1 - UART Peripheral
+//  COM1 - UART Peripheral (0xFF88-FF8F)
 
 UART    #(
             .pFrequency(pFrequency),
@@ -735,6 +707,48 @@ assign CPU_DI = ((Sel_COM1) ? COM1_DO  : 0);
 
 assign COM1_nRTS = ~COM1_RTS;
 assign COM1_CTS  = ~COM1_nCTS;
+
+//  COM0 - UART Peripheral (0xFF80-FF87)
+
+UART    #(
+            .pFrequency(pFrequency),
+            .pDefault_LCR(pUART_LCR),
+            .pDefault_IER(pUART_IER),
+            .pBaudrate(pUART_BRG),
+            .pRTOChrDlyCnt(pUART_RTO),
+            .pTF_Depth(pUART_TF_Depth),
+            .pRF_Depth(pUART_RF_Depth),
+            .pTF_Init(pUART_TF_Init),
+            .pRF_Init(pUART_RF_Init)
+        ) COM0 (
+            .Rst(Rst), 
+            .Clk(Clk),
+            
+            .IRQ(COM0_IRQ),
+            
+            .Sel(Sel_COM0), 
+            .Reg(PA[1:0]), 
+            .RE(RE), 
+            .WE(RE), 
+            .DI(CPU_DO), 
+            .DO(COM0_DO),
+            
+            .TxD(COM0_TxD), 
+            .RxD(COM0_RxD), 
+            .xRTS(COM0_RTS), 
+            .xCTS(COM0_CTS),
+            .xDE(COM0_DE),
+            
+            .Mode(),
+
+            .TxIdle(), 
+            .RxIdle()
+        );
+        
+assign CPU_DI   = ((Sel_COM0) ? COM0_DO  : 0);       
+
+assign COM0_nRTS = ~COM0_RTS;
+assign COM0_CTS  = ~COM0_nCTS;
 
 ////////////////////////////////////////////////////////////////////////////////
 //

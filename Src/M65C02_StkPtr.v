@@ -62,7 +62,11 @@
 //  1.10    14F28   MAM     Adjusted comments to reflect changes implemented 
 //                          to integration: (1) changed default for stack poin-
 //                          ter to support the core's new reset behavior; and 
-//                          (2) corrected typos in the names of the controls. 
+//                          (2) corrected typos in the names of the controls.
+//
+//  1.20    14K30   MAM     Modified the port names to make the module generic.
+//                          The module is now used in both the Address Generator
+//                          and the ALU modules.
 //
 // Additional Comments: 
 //
@@ -102,11 +106,11 @@ module M65C02_StkPtr #(
     input   Rdy,
     input   Valid,
     
-    input   SelS,
+    input   Sel,
     input   [1:0] Stk_Op,
-    input   [7:0] X,
+    input   [7:0] D,
     
-    output  reg [7:0] S
+    output  reg [7:0] Q
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -116,18 +120,18 @@ module M65C02_StkPtr #(
 
 //  Stack Pointer
 
-assign Ld_S = Rdy & (SelS & Valid);
-assign CE_S = Rdy & Stk_Op[1];
+assign Ld = Rdy & (Sel & Valid);
+assign CE = Rdy & Stk_Op[1];
 
 always @(posedge Clk)
 begin
     if(Rst)
-        S <= #1 pStkPtr_Rst;
-    else if(Ld_S)
-        S <= #1 X;                          // TXS
-    else if(CE_S)
-        S <= #1 ((Stk_Op[0]) ? (S + 1)      // Pop
-                             : (S - 1));    // Push
+        Q <= #1 pStkPtr_Rst;
+    else if(Ld)
+        Q <= #1 D;                          // TXS
+    else if(CE)
+        Q <= #1 ((Stk_Op[0]) ? (Q + 1)      // Pop
+                             : (Q - 1));    // Push
 end
 
 endmodule

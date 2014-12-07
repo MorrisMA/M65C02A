@@ -109,15 +109,15 @@
 //  desired operation. The Op input selects the operation to be performed by LU,
 //  SU, and AU functional units.
 //
-//      LST: LST = {M, S, P, T, Y, X, A, 0}
-//      LU : LU  = {P, K, A, M}, R = {P, K, A, M}; Ci = {1, 0, Q[7], C}
-//      SU : SU  = {Y, X, A, M},                   Ci = {1, 0, Q[7], C} 
-//      AU : Q   = {Y, X, A, M}, R = {P, K, A, M}; Ci = {1, 0, Q[7], C}
+//      LST: LST = {M, S, P, T, A, Y, X, 0}
+//      LU :   L = {A, P, K, M}, R = {A, P, K, M}; Ci = {Q[7], 1, 0, C}
+//      SU :   Q = {A, Y, X, M},                   Ci = {Q[7], 1, 0, C} 
+//      AU :   Q = {A, Y, X, M}, R = {A, P, K, M}; Ci = {Q[7], 1, 0, C}
 //  
 //   FU_Sel  Op  Mnemonic     Operation           Condition Code
 //
 //  11_00_00 00    XFR    ALU <= {OSel=(7..0): M, S, P, T, Y, X, A, 0}
-//
+//                                L : R
 //  10_10_00 01    AND    ALU <=  A & M;     N <= ALU[7]; Z <= ~|ALU;
 //  10_10_00 10    ORA    ALU <=  A | M;     N <= ALU[7]; Z <= ~|ALU;
 //  10_10_00 11    EOR    ALU <=  A ^ M;     N <= ALU[7]; Z <= ~|ALU;
@@ -125,7 +125,7 @@
 //  10_10_00 01    BIT    ALU <=  A & M;     N <= M[7];   Z <= ~|(A & M);
 //                                           V <= M[6];
 //  10_10_00 00    TRB    ALU <= ~A & M;                  Z <= ~|(A & M);
-//  10_10_00 10    TSB    ALU <=  A | M;                  Z <= ~|(A & M);
+//  10_10_00 10    TSB    ALU <=  A & M;                  Z <= ~|(A & M);
 //
 //  10_10_00 00    RMBx   ALU <= ~K & M;     K <= (1 << IR[6:4]);
 //  10_10_00 10    SMBx   ALU <=  K | M;     K <= (1 << IR[6:4]);
@@ -140,16 +140,13 @@
 //  10_10_00 10    SED    ALU <=  K | P;     K <= 8;    P <= ALU
 //  10_10_00 00    CLV    ALU <= ~K & P;     K <= 64;   P <= ALU
 //
-//  10_10_00 00    REP    ALU <= ~M & P;                P <= ALU
-//  10_10_00 00    SEP    ALU <=  M | P;                P <= ALU
-//  
-//  10_01_00 00    ASL    ALU <= {R[6:0],Ci} N <= ALU[7]; Z <= ~|ALU; C <= R[7];
+//  10_01_00 00    ASL    ALU <= {Q[6:0],Ci} N <= ALU[7]; Z <= ~|ALU; C <= Q[7];
 //                                           Ci <= 0; (V <= R[7] ^ R[6];) 
-//  10_01_00 00    ROL    ALU <= {R[6:0],Ci} N <= ALU[7]; Z <= ~|ALU; C <= R[7];
+//  10_01_00 00    ROL    ALU <= {Q[6:0],Ci} N <= ALU[7]; Z <= ~|ALU; C <= Q[7];
 //                                           Ci <= C; (V <= R[7] ^ R[6];)
-//  10_01_00 01    LSR    ALU <= {Ci,R[7:1]} N <= ALU[7]; Z <= ~|ALU; C <= R[0];
+//  10_01_00 01    LSR    ALU <= {Ci,Q[7:1]} N <= ALU[7]; Z <= ~|ALU; C <= Q[0];
 //                                           Ci <= 0; (Ci <= R[7])
-//  10_01_00 01    ROR    ALU <= {Ci,R[7:1]} N <= ALU[7]; Z <= ~|ALU; C <= R[0];
+//  10_01_00 01    ROR    ALU <= {Ci,Q[7:1]} N <= ALU[7]; Z <= ~|ALU; C <= Q[0];
 //                                           Ci <= C; 
 //
 //  10_00_10 00    ADC    ALU <= Q +  M + C; N <= ALU[7]; Z <= ~|ALU;
@@ -197,17 +194,17 @@
 //      QSel    RSel    QSel    CSel    QSel    RSel    CSel   
 //      LU-L    LU-R    SU-L    SU-Ci   AU-L    AU-R    AU-Ci
 //  00    M       M       M       C       M       M       C
-//  01    A       A       A      Q[7]     A       A      Q[7]
-//  10    K       K       X       0       X       K       0
-//  11    P       P       Y       1       Y       P       1
+//  01    K       K       X       0       X       K       0
+//  10    P       P       Y       1       Y       P       1
+//  11    A       A       A      Q[7]     A       A      Q[7]
 //
 //  The coding for the WSel and OSel fields follows:
 //        3     3
 //  Sel  WSel  OSel
 //  000   -     0
-//  001   A     A
-//  010   X     X
-//  011   Y     Y
+//  001   X     X
+//  010   Y     Y
+//  011   A     A
 //  100   -     Tmp
 //  101   S     S
 //  110   P     P
@@ -302,6 +299,21 @@
 //
 //  1.31    14G04   MAM     Exposed the Accumulator as a module port.
 //
+//  1.40    14I02   MAM     Modified the encoding of the various multiplexers to
+//                          allow the application of the OAX and OAY to change
+//                          the selected registers for an ALU operation.
+//
+//  1.50    14L06   MAM     Completed modifications to incorporate OAX, OAY, 
+//                          and OSY prefix instructions: OAX switches A and X;
+//                          OAY switches A and Y; and OSY switches Y with S for
+//                          stack operations, and Y and S in the Y-specific
+//                          instructions. Modifications to LST are required to
+//                          swap the registers as source registers, and to WrSel
+//                          to swap the registers as destination registers. Two
+//                          multiplexers, one on a A bus and the other on the Y
+//                          bus, required in this module to provide the correct
+//                          source registers to LU/SU/AU modules.
+//
 // Additional Comments:
 //
 //  Revision 1.10 of the module incorporates all those features required to pro-
@@ -375,11 +387,20 @@ module M65C02_ALUv2 (
     
     input   SO,             // Set Overflow status bit Command
     output  Clr_SO,         // Acknowledge for SO Command
-
+    
+    //  Instruction Prefix Inputs and Supporting Controls
+    
+    input   SIZ,            // Extend 8-bit operation into 16-bit operation
+    input   OAX,            // Override: Swap A and X registers
+    input   OAY,            // Override: Swap A and Y registers
+    input   OSY,            // Override: Swap S and Y and S and A
+    
     //  Address Generator (Stack Pointer) Interface
     
     output  SelS,           // Stack Pointer Select
     input   [7:0] S,        // Stack Pointer input from Address Generator
+    
+    input   [1:0] Stk_Op,   // Stack Pointer Operation: NOP, POP, PUSH
     
     //  ALU Ports
     
@@ -402,11 +423,11 @@ module M65C02_ALUv2 (
 
     //  Internal Processor Registers
     
-    output  reg [7:0] A,    // Accumulator Register
     output  reg [7:0] X,    // X Index Register
-    output  reg [7:0] Y,    // Y Index Register
+    output      [7:0] Y,    // Y Index Register
+    output  reg [7:0] A,    // Accumulator Register
     
-    output  [7:0] P         // Processor Status Word
+    output      [7:0] P     // Processor Status Word
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -414,10 +435,7 @@ module M65C02_ALUv2 (
 //  Local Parameter Decalarations
 //
 
-//  {FU_Sel, Op} Encodings
-
 //  FU_Sel  Op   Mnemonic     Operation            Condition Code
-
 //  1_00_00 00     XFR    ALU <= {OSel: M, P, S, Tmp, Y, X, A, 0}
 //
 //  0_10_00 01     AND    ALU <=  A & M;     N <= ALU[7]; Z <= ~|ALU;
@@ -442,13 +460,10 @@ module M65C02_ALUv2 (
 //  0_10_00 10     SED    ALU <=  K | P;     D <= 1;
 //  0_10_00 00     CLV    ALU <= ~K & P;     V <= 0;
 //
-//  0_10_00 00     REP    ALU <= ~M & P;     P <= ALU;
-//  0_10_00 10     SEP    ALU <=  M | P;     P <= ALU;
-//
-//  0_01_00 00     ASL    ALU <= {R[6:0],Ci} N <= ALU[7]; Z <= ~|ALU; C <= R[7];
-//  0_01_00 00     ROL    ALU <= {R[6:0],Ci} N <= ALU[7]; Z <= ~|ALU; C <= R[7];
-//  0_01_00 01     LSR    ALU <= {Ci,R[7:1]} N <= ALU[7]; Z <= ~|ALU; C <= R[0];
-//  0_01_00 01     ROR    ALU <= {Ci,R[7:1]} N <= ALU[7]; Z <= ~|ALU; C <= R[0];
+//  0_01_00 00     ASL    ALU <= {Q[6:0],Ci} N <= ALU[7]; Z <= ~|ALU; C <= Q[7];
+//  0_01_00 00     ROL    ALU <= {Q[6:0],Ci} N <= ALU[7]; Z <= ~|ALU; C <= Q[7];
+//  0_01_00 01     LSR    ALU <= {Ci,Q[7:1]} N <= ALU[7]; Z <= ~|ALU; C <= Q[0];
+//  0_01_00 01     ROR    ALU <= {Ci,Q[7:1]} N <= ALU[7]; Z <= ~|ALU; C <= Q[0];
 //
 //  0_00_01 00     INC    ALU <= Q +  K + 1; N <= ALU[7]; Z <= ~|ALU;
 //  0_00_01 00     DEC    ALU <= Q + ~K + 0; N <= ALU[7]; Z <= ~|ALU;
@@ -496,6 +511,9 @@ wire    En_DU;                  // Decimal (BCD) Unit Enable
 
 //  ALU Busses
 
+wire    [7:0] B;                // A bus multiplexer for src reg overrides
+wire    [7:0] T;                // Y bus multiplexer for src reg overrides
+
 wire    [7:0] G, H, L;          // LU Input Busses
 wire    [7:0] W, U, Q;          // Adder Left Operand Input Busses (SU <= W)
 wire    [7:0] E, F, R;          // Adder Right Operand Input Busses
@@ -534,28 +552,36 @@ assign En_DU  = En &  (FU_Sel[1] &  D);               // Decimal Adder
 
 assign Valid = ~|FU_Sel;
 
-//  LU (Left Operand) Multiplexer
-//      00: L = M; 01: L = A;
-//      10: L = K; 11: L = P;
+//  Accumulator Multiplexer - Used to implement ALU Source Register Overrides
 
-assign G = ((QSel[0]) ? A : M);     // ? A : M;
-assign H = ((QSel[0]) ? P : K);     // ? P : K; 
+assign B = ((OAX) ? X : ((OAY) ? Y : A));
+
+//  Y Multiplexer - Used to implement ALU Source Register Overrides
+
+assign T = ((OSY) ? S : Y);
+
+//  LU (Left Operand) Multiplexer
+//      00: L = M; 01: L = K;
+//      10: L = P; 11: L = A;
+
+assign G = ((QSel[0]) ? K : M);     // ? K : M;
+assign H = ((QSel[0]) ? B : P);     // ? A : P; 
 assign L = ((QSel[1]) ? H : G);
 
 //  AU/SU (Left Operand) Multiplexer
-//      00: Q = M; 01: Q = A;
-//      10: Q = X; 11: Q = Y;
+//      00: Q = M; 01: Q = X;
+//      10: Q = Y; 11: Q = A;
 
-assign W = ((QSel[0]) ? A : M);     // ? A : M; INC/DEC/CMP/ADC/SBC
-assign U = ((QSel[0]) ? Y : X);     // ? Y : X; INY/DEY/CPY, INX/DEX/CPX 
+assign W = ((QSel[0]) ? X : M);     // ? X : M; INX/DEX/CPX, INC/DEC/CMP/ADC/SBC
+assign U = ((QSel[0]) ? B : T);     // ? A : Y; INC/DEC/CMP/ADC/SBC, INY/DEY/CPY 
 assign Q = ((QSel[1]) ? U : W);
 
 //  LU/AU (Right Operand) Multiplexer
-//      00: R = M; 01: R = A;
-//      10: R = 0; 11: R = P;
+//      00: R = M; 01: R = K;
+//      10: R = P; 11: R = A;
 
-assign E = ((RSel[0]) ? A : M);     // ? A : M; ADC/SBC/CMP
-assign F = ((RSel[0]) ? P : K);     // ? P : K; INC/DEC, CLC/.../CLV, REP/SEP
+assign E = ((RSel[0]) ? K : M);     // ? K : M; INC/DEC, ADC/SBC/CMP
+assign F = ((RSel[0]) ? B : P);     // ? A : P; INC/DEC, CLC/.../CLV
 assign R = ((RSel[1]) ? F : E);
 
 // Carry In Multiplexer
@@ -564,24 +590,29 @@ always @(*)
 begin
     case(CSel)
         2'b00 : Ci <= C;            // ADC/SBC/ROL/ROR
-        2'b01 : Ci <= Q[7];         // ASR (Reserved for future use)
-        2'b10 : Ci <= 0;            // DEC/ASL/LSR
-        2'b11 : Ci <= 1;            // INC/CMP         
+        2'b01 : Ci <= 0;            // DEC/ASL/LSR
+        2'b10 : Ci <= 1;            // INC/CMP         
+        2'b11 : Ci <= Q[7];         // ASR (Reserved for future use)
     endcase
 end
 
 //  Load/Store/Transfer Multiplexer Instantiation
 //  0   -   : STZ
-//  1   A   : STA/TAX/TAY/PHA/TAS
-//  2   X   : STX/TXA/TXS/PHX/SAX/TXY
-//  3   Y   : STY/TYA/PHY/SAY/TYX
-//  4   Tmp : PEA/PEI (lo byte held in Tmp, Tmp pushed to stack after hi byte)
-//  5   S   : TSX/TSA
+//  1   X   : STX/TXA/TXS/PHX
+//  2   Y   : STY/TYA/PHY
+//  3   A   : STA/TAX/TAY/PHA
+//  4   Tmp : PHW/PHR (lo byte held in Tmp, Tmp pushed to stack after hi byte)
+//  5   S   : TSX
 //  6   P   : PHP
 //  7   M   : LDA/PLA/LDX/PLX/LDY/PLY/PLP
 
 M65C02_LST  LST (
                 .En(En_LST), 
+
+                .OAX(OAX),          // Override: Swap A and X
+                .OAY(OAY),          // Override: Swap A and Y
+                .OSY(OSY),          // Override: Swap Y and S, and use Y as SP
+                
                 .OSel(OSel),
                 
                 .A(A),
@@ -600,7 +631,6 @@ M65C02_LST  LST (
 //      AND/ORA/EOR/BIT/TRB/TSB
 //      RMBx/SMBx/BBRx/BBSx
 //      SEC/CLC/SEI/CLI/SED/CLD/CLV
-//      REP/SEP
 
 M65C02_LU   LU (
                 .En(En_LU),
@@ -688,6 +718,10 @@ M65C02_WrSel    WrSel (
                     .Rst(Rst),
                     .Clk(Clk),
                     
+                    .OAX(OAX),
+                    .OAY(OAY),
+                    .OSY(OSY),
+                    
                     .Reg_WE(Reg_WE), 
                     .WSel(WSel),
                     
@@ -732,17 +766,23 @@ end
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  Y - Post-Index Register
-//
+//      - Construct as the auxiliary stack pointer
 
-assign WE_Y = SelY & Valid & Rdy;
-
-always @(posedge Clk)
-begin
-    if(Rst)
-        Y <= #1 0;
-    else if(WE_Y)
-        Y <= #1 Out;
-end
+M65C02_StkPtr   #(
+                    .pStkPtr_Rst(0)
+                ) RegY (
+                    .Rst(Rst), 
+                    .Clk(Clk),
+                    
+                    .Rdy(Rdy), 
+                    .Valid(Valid),
+                    
+                    .Sel(SelY), 
+                    .Stk_Op(((OSY) ? Stk_Op : 2'b0)), 
+                    .D(Out[7:0]),
+                    
+                    .Q(Y)
+                );
 
 ////////////////////////////////////////////////////////////////////////////////
 //

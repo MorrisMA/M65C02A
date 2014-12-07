@@ -1,0 +1,354 @@
+This document provides a design description of the FORTH VM support being
+included in the M65C02A soft-core processor. The M65C02A soft-core processor
+is an extended version of the 65C02 microprocessor originally developed by
+Western Design Center (WDC).
+
+The purpose of this document is to document the design decisions made with
+respect custom instructions added to the basic M65C02A instruction set in
+order to provide better support for a FORTH VM than a standard 65C02-
+compatible processor. It is an objective of this effort to add as small a
+number of instructions to the M65C02A instruction as necessary to provide an
+efficient FORTH VM implementation. It is not an objective to build the FORTH
+VM in the existing M65C02A soft-core processor. Instead, it is desired to
+include a small number of custom instructions, from the available set of
+unimplemented opcodes, so that a significantly faster FORTH VM can be
+implemented as a combination of custom and standard M65C02A instructions.
+
+The instruction set of the M65C02A is already extended beyond that of a
+standard 65C02 microprocessor. The M65C02A implements all of the standard
+65C02 instructions and addressing modes originally introduced by WDC, but it
+also includes the four bit-oriented instructions added by Rockwell and the WAI
+and STP instructions included by WDC in its extended 65C02 implementation, the
+W65C02S. In addition to those 6 instructions, which require a total of 34
+opcodes, the M65C02A adds the stack-relative, and post-indexed stack-relative
+indirect addressing modes found in the WDC W65C816 8/16-bit microprocessor.
+
+Further, the M65C02A includes the W65C816's three 16-bit push instructions and
+its 16-bit relative branch instruction. But the M65C02A adds an additional 16-
+bit push instruction, several 16-bit pop/pull instructions, post-indexed
+stack-relative indirect jumps and subroutine calls, and a 16-bit relative
+subroutine call instruction. The M65C02A also includes two additional trap
+instructions for supporting co-processors, and several instruction prefix
+instructions. The IND prefix instruction provides the programmer with the
+ability to add indirection to many instructions which do not include an
+indirect addressing mode. The SIZ and the OAX/OAX prefix instructions,
+although not fully realized at this time, provide the programmer the means to
+increase the operand and ALU operation size, and to override the default
+destination register of an instruction.
+
+The FORTH VM can generally be thought to be constructed from a minimum of two
+stacks: (1) the operand/data stack, and (2) the return stack. The operand
+stack is intended to hold all operands/data used within a program/function,
+and the return stack generally holds the return addresses of FORTH program
+words. In addition to holding FORTH program word return addresses, the return
+stack is sometimes used to hold operand addresses, although the operand/data
+stack can always be used to hold operand/data addresses.
+
+These stacks are generally implemented within the memory of whatever
+microprocessor is implementing the FORTH VM. Thus, the FORTH VM generally
+includes two stack pointers: (1) operand/data stack pointer, and (2) return
+stack pointer. The support an efficient implementation of the FORTH VM, any
+specific FORTH implementation should provide hardware assisted stack pointers
+whenever possible.
+
+The M65C02A sof-core processor is an implementation that provides a faithful
+reimplementation of the 65C02 processor in a synthesizable manner. Although it
+provides all of the registers and executes all of the standard instructions,
+its implementation attempts to provide the best performance possible. As a
+result, the M65C02A reimplementation of the 65C02 is not instruction cycle
+length compatible with the 65C02 or the W65C02S which the M65C02A specifically
+tries to emulate.
+
+In all other respects it is functionally a 65C02 microprocessor. That means
+that it only has one 8-bit arithmetic accumulator (A), an 8-bit processor
+flags registers (P), two 8-bit index registers (X, Y), and a single 8-bit
+general stack pointer (S). Except for S, the general purpose accumulator (A)
+and the index registers (X, Y) do not provide any hardware support for stacks.
+
+Further degradation in the performance of a FORTH VM executing on a 65C02-
+compatible processor comes from the fact that all of the registers are 8-bits 
+in length. Support is provided in the architecture and instruction set for 
+multi-precision addition and subtraction, but any operations greater than 8 
+bits in length will entail several loads and stores. All of the additional 
+steps necessary to implement a 16-bit or 32-bit FORTH VM opreations reduces 
+the performance a native 65C02 FORTH VM can deliver.
+
+Brad Rodriguez identifies the following registers as being the "classic" FORTH
+VM registers:
+
+    W   - Work Register             : general work register
+    IP  - Interpreter Pointer       : address of the next FORTH word to execute
+    PSP - Parameter Stack Pointer   : points to the top of parameter/data stack
+    RSP - Return Stack Pointer      : points to the return address
+    UP  - User Pointer              : points to User space of a multi-task FORTH
+    X   - eXtra register            : temporary register for next address
+
+There are several generally accepted methods for implementing the FORTH VM.
+The classic FORTH VM is implemented using a technique known as Indirect
+Threaded Code (ITC). The next most common approach is a technique known as
+Direct Threaded Code (DTC). Another approach is a technique known as
+Subroutine Threaded Code (STC). The final approach is a technique known as
+Token Thread Code (TTC).
+
+A TTC FORTH VM uses tokens that are smaller than the basic address pointer to
+refer to FORTH words. The smaller size of the tokens allows a FORTH program to
+be compressed into a smaller image. The additional indirection required to
+locate the memory address of the FORTH word referenced by a particular token
+makes TTC FORTH VM implementations the slowest of the FORTH VM techniques. The
+pre-indexed indirect addressing modes of the 6502/65C02 can be used to
+implement a token threaded VM using the M65C02A. Thus, the basic M65C02A
+instructions provide the necessary support to implement a TTC FORTH VM.
+
+For an STC FORTH VM, each word is called using a native processor call
+instruction. Thus, there is no need for an IP register, and there is no inner
+interpreter. The FORTH program simply chains together the various FORTH words
+using native processor calls. There are two penalties for this simplicity: (1)
+subroutine calls are generally larger than simple address pointers; and (2)
+requires pushing and popping the return stack on entry to and exit from each
+FORTH word. Thus, STC FORTH programs may be larger, and the additional
+push/pop operations performed by the native subrouting calling instructions
+may not deliver the performance improvements expected. Since an STC FORTH VM
+relies on the basic instructions of the processor, and the M65C02A provides
+those instructions, no additional instructions are needed in the M65C02A's
+instruction set to support an STC FORTH.
+
+ITC FORTH and DTC FORTH VMs both require an inner interpreter. Thus, if the 
+instruction set of a processor allows the implementation of the inner 
+interpreter with a minimum number of instructions, then a FORTH VM on that 
+processor would be "faster" than a FORTH VM on a processor without that 
+support. This is the prime motivating factor for adding custom instructions to 
+the M65C02A to support FORTH VMs.
+
+A TTC/DTC/ITC FORTH VM is composed of two interpreters: (1) an outer
+interpreter, and (2) an inner intepreter. The outer interpreter is written in
+FORTH, i.e. it is composed of FORTH words. The inner interpreter, on the other
+hand, "executes" FORTH words. Therefore, a TTC/DTC/ITC FORTH VM spends the
+majority of its processing time in its inner interpreter. Thus, any decrease
+in the number of clock cycles required to "execute" a FORTH word will result
+in a clear increase in the performance of a FORTH program all other things
+being equal.
+
+The basic structure of a 16-bit FORTH word is provided by the following C-like
+structure:
+
+    struct FORTH_word_t {
+        uint8_t     Len;
+        uint8_t     [Max_Name_Len] Name;
+        uint16_t    *Link;
+        uint8_t     [2] Code_Fld;
+        uint8_t     [Code_Len] Param_Fld;
+    }
+
+There are other forms, but the preceding structure defines all of the
+necessary components of the FORTH word, and succintly conveys the required
+elements of a FORTH word.
+
+The first three fields provide the "dictionary" header of FORTH words in a 
+FORTH program. The first field defines the length of the name of the FORTH 
+word. This is used to distinguish two or more FORTH words in a FORTH program 
+whose names share the same initial letters but which differ in length. The 
+second field defines the significant elements of the name of the FORTH word. 
+The total lengths of these two fields will determine the amount of memory that 
+is required just for the dictionary of a FORTH program. These two fields are 
+generally limited in size in order to conserve memory. If the immediate mode 
+of the FORTH compiler is not supported or included in the distribution of a 
+FORTH program, then the fields supporting the "dictionary" can be removed to 
+recover their memory for use by the application.
+
+The fields, Code_Fld and Param_Fld, represent the "executable" portion of a
+FORTH word. There are two types of FORTH words: (1) secondaries, and (2)
+primitives. Secondaries are the predominant type of words in a FORTH program.
+Their Param_Fld doesn't contain any native machine code. The Param_Fld of
+FORTH secondaries is simply a list of the Code_Fld of other FORTH words.
+Primitives are the FORTH words that perform the actual work of any FORTH
+program. The Code_Fld of a primitive is a link to their Param_Fld, which
+contains the machine code that performs the work the primitive FORTH word is
+expected to provide.
+
+In FORTH, the outer interpreter is used to perform immediate operations, and
+construct, define, or compile other FORTH words. As already stated above, the
+FORTH VM's outer interpreter is generally composed of secondary FORTH words.
+After all of the FORTH words associated with a FORTH program have been
+compiled, the outer interpreter simply transfers control to the inner
+interpreter to "execute" the top-most FORTH word of the program.
+
+The FORTH VM's inner interpreter "executes" FORTH words. Since the outer
+interpreter is mostly composed of secondary FORTH words, the inner interpreter
+must move through each word until a FORTH primitive is found, and then
+transfer temporary control to the machine code. The machine code of the
+primitive FORTH word must return control to the inner interpreter once it
+completes its task.
+
+The inner interpreter "executes" the FORTH word that its IP points to. It must
+advance the IP through the Param_Fld of a secondary FORTH word, and jump to
+the machine code pointed to by the Code_Fld of a FORTH primitive. The Code_Fld
+of a secondary does not point to the Param_Fld of the word. Instead it points
+to an inner interpreter function that "enters" the Param_Fld. The Code_Fld of
+a primitive does point to the Param_Fld, and the inner interpreter simply
+jumps to the machine code stored in the Param_Fld of the word.
+
+Thus, there are three fundamental operations that the inner interpreter of a
+DTC/ITC FORTH VM must perform:
+
+    (1) NEXT    : fetch the FORTH word addressed by IP; advance IP.
+    (2) ENTER   : save IP; load IP with the Code_Fld value; perform NEXT.
+
+Each primitive FORTH word must transfer control back to the inner interpreter
+so that the next FORTH word can be "executed". This action may be described as:
+
+    (3) EXIT    : restore IP; perform NEXT.
+
+These three fundamental operations are very similar to the operations that the
+target processor performs in executing its machine code. NEXT corresponds
+directly to the normal instruction fetch/execute cycle of any processor. ENTER
+corresponds directly to the subroutine call of any processor. Similarly, EXIT
+corresponds directly to the subroutine return of any processor.
+
+As previously discussed, FORTH uses two stacks: parameter/data stack and 
+return stack. Thus, ENTER and EXIT save and restore the IP from the return 
+stack. Most processors implement a single hardware stack into which return 
+addresses and data are placed. FORTH maintains strict separation between the 
+parameter/data stack and the return stack because it uses a stack-based 
+arithmetic architecture. Mixing return addresses and parameters/data on a 
+single stack would complicate the passing of parameters and their processing.
+
+Table 6.3.1 in Koopman's "Stack Computers", provides a summary the relative
+frequency of the most frequently used FORTH words for several FORTH
+applications:
+
+Name            FRAC     LIFE     MATH   COMPILE     AVE
+CALL           11.16%   12.73%   12.59%   12.36%   12.21%
+EXIT           11.07%   12.72%   12.55%   10.60%   11.74%
+VARIABLE        7.63%   10.30%    2.26%    1.65%    5.46%
+@               7.49%    2.05%    0.96%   11.09%    5.40%
+0BRANCH         3.39%    6.38%    3.23%    6.11%    4.78%
+LIT             3.94%    5.22%    4.92%    4.09%    4.54%
++               3.41%   10.45%    0.60%    2.26%    4.18%
+SWAP            4.43%    2.99%    7.00%    1.17%    3.90%
+R>              2.05%    0.00%   11.28%    2.23%    3.89%
+>R              2.05%    0.00%   11.28%    2.16%    3.87%
+CONSTANT        3.92%    3.50%    2.78%    4.50%    3.68%
+DUP             4.08%    0.45%    1.88%    5.78%    3.05%
+ROT             4.05%    0.00%    4.61%    0.48%    2.29%
+USER            0.07%    0.00%    0.06%    8.59%    2.18%
+C@              0.00%    7.52%    0.01%    0.36%    1.97%
+I               0.58%    6.66%    0.01%    0.23%    1.87%
+=               0.33%    4.48%    0.01%    1.87%    1.67%
+AND             0.17%    3.12%    3.14%    0.04%    1.61%
+BRANCH          1.61%    1.57%    0.72%    2.26%    1.54%
+EXECUTE         0.14%    0.00%    0.02%    2.45%    0.65%
+
+In table above, CALL corresponds to ENTER. As can be seen, the remaining
+common FORTH words are a combination of parameter stack operations (DUP, ROT,
+SWAP), parameter stack loads and stores (VARIABLE, LIT, CONSTANT, @, C@),
+parameter stack arithmetic and logic operations (+, =, AND), parameter stack
+branching and looping (0BRANCH, BRANCH, I), and parameter and return stack
+operations (R>, >R), and special operations (USER, EXECUTE).
+
+With the previous discussion and the FORTH word frequency data in the 
+preceding table it is easy to assert that the M65C02A instruction set should 
+contain custom instructions for at least NEXT, ENTER, and EXIT. The question 
+then becomes to what extent should these operations be supported? In other 
+words, should they be supported by a single instruction each and should they 
+be supported for both ITC and DTC FORTH VMs?
+
+The following pseudo code define the operations for these three operations in 
+terms of the ITC and the DTC models:
+
+             ITC                                     DTC
+================================================================================
+NEXT:   W      <= (IP++) -- Ld *Code_Fld     ; W      <= (IP++) -- Ld *Code_Fld
+        PC     <= (W)    -- Jump Dbl Indirect; PC     <= W      -- Jump Indirect
+================================================================================
+ENTER: (RSP--) <= IP     -- Push IP on RS    ;(RSP--) <= IP     -- Push IP on RS
+        IP     <= W + 2  -- => Param_Fld     ; IP     <= W + 2  -- => Param_Fld
+;NEXT
+        W      <= (IP++) -- Ld *Code_Fld     ; W      <= (IP++) -- Ld *Code_Fld
+        PC     <= (W)    -- Jump Dbl Indirect; PC     <= W      -- Jump Dbl Ind
+================================================================================
+EXIT:
+        IP    <= (++RSP) -- Pop IP frm RS    ; IP     <= (++RSP)-- Pop IP frm RS
+;NEXT
+        W      <= (IP++) -- Ld *Code_Fld     ; W      <= (IP++) -- Ld *Code_Fld
+        PC     <= (W)    -- Jump Dbl Indirect; PC     <= W      -- Jump Dbl Ind
+================================================================================
+
+There are several key takeaways from the previous side-by-side comparison 
+provided above of the NEXT, ENTER, and EXIT operations. First, ENTER and EXIT 
+are the same for ITC and DTC FORTH VMs. Second, both ENTER and EXIT terminate 
+with the same code as NEXT; the only difference is whether an extra 
+indirection is required or not. Third, except for the extra indirection needed 
+for ITC, NEXT is the same for ITC and DTC FORTH VMs. Fourth, providing a 
+second stack pointer for the RSP is important and will greatly improve the 
+performance of these three critical inner interpreter operations. Fifth, if W 
+is left pointing to the Code_Fld of the word being executed, the Param_Fld of 
+a FORTH word being ENTered can be found because it is the value of W.
+
+The preceding analysis and discussions set the stage for the critical design 
+decisions: (1) mapping the FORTH VM registers onto the M65C02A registers, and 
+(2) determining how to modify the M65C02A to support the FORTH VM inner 
+interpreter operations. The following discussions will determine the mapping 
+of each of the generally accepted FORTH VM registers as defined by Brad 
+Rodriguez in "MOVING FORTH Part 1: Design Decisions in the Forth Kernel", 
+which can be found at http://www.bradrodriguez.com/papers/moving1.htm.
+
+The IP register is strictly used as the instruction pointer of the inner 
+interpreter. It cannot be assigned to the target processor's program counter, 
+but it does operate as such for the inner interpreter. An easy means for 
+including IP is to place it in zero page memory. The best solution is to add a 
+16-bit register within the core. This allows IP to be used with the existing 
+mechanisms, i.e. JMP, JSR, and RTS. Alternatively, IP may be accessed with 
+whatever custom instructions are added to the M65C02A instruction set to 
+support NEXT, ENTER, and EXIT. In addition to load and store operations, 
+support should be provided to increment the IP by 2.
+
+Similarly, the W register is used strictly as a pointer for indirect access to 
+a FORTH word by the inner interpreter. It is only loaded from indirectly from 
+IP. Like the IP register, it can easily be implemented in zero page memory, 
+but the best way is to include it in the processor core itself.  Also, for it 
+to be effectively utilized, support should be provided to increment the W 
+register by 2. 
+
+The parameter/data stack is used more often than the return stack. Thus, it 
+makes more sense, from a speed perspective, to use the native M65C02A stack 
+for the parameter/data stack. The return stack is not used as often as the 
+parameter/data stack so it can be implemented using zero page or with one of 
+the two index registers. Using a zero page location for the RSP will slow the 
+push and pop operations significantly. Therefore, a better solution would be 
+to use one of the index registers as the RSP, and place the RS in zero page 
+memory.
+
+Since pre-indexed zero page addressing is readily available, the X index 
+register is the natural choice. However, the Y index register is not as 
+heavily used in the instruction set of the 6502/65C02, so using Y as the RSP 
+is an option that makes more effective use of an under utilized index 
+register. However, to use Y as the RSP will require changing the index 
+register for stack pointer relative and post-indexed stack pointer relative 
+indirect addressing. Since it is relatively simple matter of changing the 
+register for the two stack pointer relative addressing modes and they are 
+specific to the M65C02A soft-core, i.e. not present in any other current 
+65C02- compatible processors, replacing the Y index register with the X index 
+register for these addressing modes will not affect the compatibility of the 
+M65C02A to existing 6502/65C02 tools. 
+
+Making the Y register will be modified to support stack pointer operations as 
+the RSP in zero page memory, and a register override prefix instruction will 
+be added in order to utilize the Y register as a hardware-assisted stack 
+pointer with existing stack instructions. In addition, two instructions will 
+be added to support pushing and pulling the IP from the return stack addressed 
+by Y, and instruction will be added to increment the IP by 2. Finally, by 
+overloading the IND prefix instruction, it is possible to use the IP push/pop 
+and increment instructions to perform the same operations with the internal W 
+register.
+
+Thus, the FORTH VM supported by the M65C02A will provide the following mapping 
+of the various FORTH VM registers:
+
+    IP  - Internal dedicated 16-bit register
+    W   - Internal dedicated 16-bit register
+    PSP - System Stack Pointer (S), allocated in page 1
+    RSP - Auxiliary Stack Pointer (Y), allocated in page 0
+    UP  - Zero Page
+    X   - Not needed, {OP2, OP1} or MAR can provide temporary storage required
+    
+This concludes the FORTH VM trade study for the M65C02A soft-core processor.

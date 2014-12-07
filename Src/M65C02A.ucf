@@ -3,12 +3,18 @@ CONFIG VCCAUX=3.3;
 NET "Clk" TNM_NET = Clk;
 #TIMESPEC TS_Clk = PERIOD "Clk" 40.000 ns HIGH 50%;
 #TIMESPEC TS_Clk = PERIOD "Clk" 33.908 ns HIGH 50%;
-TIMESPEC TS_Clk = PERIOD "Clk" 33.333 ns HIGH 50%;
+#TIMESPEC TS_Clk = PERIOD "Clk" 33.333 ns HIGH 50%;
 #TIMESPEC TS_Clk = PERIOD "Clk" 33.000 ns HIGH 50%;
+#TIMESPEC TS_Clk = PERIOD "Clk" 32.875 ns HIGH 50%;
+#TIMESPEC TS_Clk = PERIOD "Clk" 32.750 ns HIGH 50%;
+#TIMESPEC TS_Clk = PERIOD "Clk" 32.000 ns HIGH 50%;
+TIMESPEC TS_Clk = PERIOD "Clk" 31.250 ns HIGH 50%;
 #
 ################################################################################
 #
-
+#   UCF for 1040-0001rA Board
+#
+################################################################################
 #
 #INST "uP" AREA_GROUP=uP;
 #AREA_GROUP uP RANGE=SLICE_X4Y32:SLICE_X19Y47;
@@ -48,8 +54,6 @@ TIMESPEC TS_Clk = PERIOD "Clk" 33.333 ns HIGH 50%;
 #INST "SPI0" AREA_GROUP=SPI0;
 #AREA_GROUP SPI0 RANGE=SLICE_X24Y8:SLICE_X27Y27;
 ##
-################################################################################
-#
 NET "DB<0>"  LOC = "P52" | IOSTANDARD = "LVCMOS33" | SLEW = "FAST";
 NET "DB<1>"  LOC = "P50" | IOSTANDARD = "LVCMOS33" | SLEW = "FAST";
 NET "DB<2>"  LOC = "P49" | IOSTANDARD = "LVCMOS33" | SLEW = "FAST";

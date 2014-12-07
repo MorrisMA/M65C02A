@@ -1,6 +1,6 @@
 header
-Project: M65C02A_IDecode_ROM
-File Revision: 0008
+Project: M65C02A_IDecode_ROMa
+File Revision: 0011
 Author(s): Michael A. Morris
 Description: M65C02A Instruction Decoder ROM
 endh
@@ -127,18 +127,54 @@ endh
 --
 --  0008    14H23   mam     Changed project description to M65C02Axxx.
 --
+--  0009    14I02   mam     Changed multiplexer encoding to provided support for
+--                          OAX and OAY prefix instructions.
+--
+--  0010    14K17   mam     Modified JSR (s,S),Y and JMP (s,S),Y instructions to
+--                          use X instead of Y for the index register. This is
+--                          done in order to free Y to be used as the return
+--                          stack pointer (RSP) in a FORTH VM. Also modified the
+--                          ORA/AND/EOR/ADC/STA/LDA/CMP/SBC (s,S),Y to use X for 
+--                          the same reason. These modifications retain the use
+--                          of post-indexing for these instructions instead of
+--                          the customary pre-indexing used with X. Modified 
+--                          Mode field decoding: SPeCial opcodes use Opcode fld
+--                          for one-hot decoding of special control signals:
+--                          {PHW, PHR, 6'b0}. PreFiX opcodes use Opcode field
+--                          for one-hot decoding of special control signals:
+--                          {3'b0, iOSY, iOAY, iOAX, iSIZ, iIND}. (See below.)
+--
+--  0011    14L06   mam     Wrapped the implementation of OAX, OAY, and OSY.
+--
 --------------------------------------------------------------------------------
 -- Mode Field
 --------------------------------------------------------------------------------
 
 VAL     .asm    0   -- Valid Instruction (not otherwise decoded)
 INV     .asm    1   -- Invalid/Unused Instructions
-COP     .asm    2   -- COP Instruction  (CO-Processor trap, software trap)
-BRK     .asm    3   -- BRK Instruction  (BReaK execution, software trap  )
-PFX     .asm    4   -- PFX Instructions (SIZe and INDirect Overrides     )
-PHR     .asm    5   -- PHR Instruction  (PHR rel16                       )
-PHW     .asm    6   -- PHW Instructions (PHW #imm16, PHW dp, PHW abs     )
-WAI     .asm    7   -- WAI Instruction  (WAit for Interrupt              )
+COP     .asm    2   -- COP Instruction  (CO-Processor trap, software trap   )
+BRK     .asm    3   -- BRK Instruction  (BReaK execution, software trap     )
+FTH     .asm    4   -- FORTH VM Instructions (Reserved for Future Use       )   
+SPC     .asm    5   -- Special Instructions  (See table below               ) 
+PFX     .asm    6   -- Prefix Instructions   (See table below               ) 
+WAI     .asm    7   -- WAI Instruction  (WAit for Interrupt                 )
+--
+--  One-hot encoding of the Opcode field for SPC mode instructions
+--
+--  {WOP, AOP, 6'b0}
+--
+--  WOP - PHW Instructions          (PHW dp/abs/#imm16; PLW dp/abs          )
+--  AOP - PHR Instruction           (PHR rel16                              )
+--
+--  One-hot encoding of the Opcode field for PFX mode instructions
+--
+--  {3'b0, iOSY, iOAY, iOAX, iSIZ, iIND}
+--
+--  iOSY - OSY Instruction          (OVerride S with Y                      )
+--  iOAY - OAY Instruction          (OVerride A with Y                      )
+--  iOAX - OAX Instruction          (OVerride A with X                      )
+--  iSIZ - SIZ | ISZ Instructions   (Override Operand size: 8 => 16         )
+--  iIND - IND | ISZ Instructions   (Direct address => indirect address     )
 
 --------------------------------------------------------------------------------
 -- ROM ( output ) Field definitions
@@ -206,9 +242,6 @@ CLD     .equ    0   -- ALU <= ~K & P;   D <= 0; (K <= 0x08)
 SED     .equ    2   -- ALU <=  K | P;   D <= 1; (K <= 0x08)
 CLV     .equ    0   -- ALU <= ~K & P;   V <= 0; (K <= 0x40)
 
---REP     .equ    0   -- ALU <= ~M & P;   P <= ALU   
---SEP     .equ    2   -- ALU <=  M | P;   P <= ALU
-
 --  Shift Unit Operations (Note: for ASL/LSR, Ci <= 0; for ROL/ROR, Ci <= C)
 
 ASL     .equ    0   -- ALU <= {R[6:0],Ci};N <= ALU[7]; Z <= ~|ALU; C <= R[7]
@@ -232,40 +265,40 @@ CMP     .equ    1   -- ALU <= Q + ~M + 1; N <= ALU[7]; Z <= ~|ALU;
 --------------------------------------------------------------------------------
 
 L_M     .equ    0   -- L <= M (default)
-L_A     .equ    1   -- L <= A
-L_K     .equ    2   -- L <= K
-L_P     .equ    3   -- L <= P
+L_K     .equ    1   -- L <= K
+L_P     .equ    2   -- L <= P
+L_A     .equ    3   -- L <= A
 
 Q_M     .equ    0   -- Q <= M (default)
-Q_A     .equ    1   -- Q <= A
-Q_X     .equ    2   -- Q <= X
-Q_Y     .equ    3   -- Q <= Y
+Q_X     .equ    1   -- Q <= X
+Q_Y     .equ    2   -- Q <= Y
+Q_A     .equ    3   -- Q <= A
 
 --------------------------------------------------------------------------------
 --  ALU Right (R) Operand Select
 --------------------------------------------------------------------------------
 
 R_M     .equ    0   -- R <= M (default)
-R_A     .equ    1   -- R <= A
-R_K     .equ    2   -- R <= K
-R_P     .equ    3   -- R <= P
+R_K     .equ    1   -- R <= K
+R_P     .equ    2   -- R <= P
+R_A     .equ    3   -- R <= A
 
 --------------------------------------------------------------------------------
 --  ALU Carry Input Multiplexer Select
 --------------------------------------------------------------------------------
 
 Ci_C    .equ    0   -- Ci <= C (default)
-Ci_S    .equ    1   -- Ci <= Q[7]
-Ci_0    .equ    2   -- Ci <= 0
-Ci_1    .equ    3   -- Ci <= 1
+Ci_0    .equ    1   -- Ci <= 0
+Ci_1    .equ    2   -- Ci <= 1
+Ci_S    .equ    3   -- Ci <= Q[7]
 
 --------------------------------------------------------------------------------
 --  ALU Register Write Select Definitions
 --------------------------------------------------------------------------------
 
-WS_A    .equ    1   -- Write Accumulator (Binary)
-WS_X    .equ    2   -- Write X (Pre-Index Register)
-WS_Y    .equ    3   -- Write Y (Post-Index Register)
+WS_X    .equ    1   -- Write X (Pre-Index Register)
+WS_Y    .equ    2   -- Write Y (Post-Index Register)
+WS_A    .equ    3   -- Write Accumulator (Binary)
 WS_R    .equ    4   -- Write Registers
 WS_S    .equ    5   -- Write S (Stack Pointer)
 WS_P    .equ    6   -- Write P (Processor Status Word)
@@ -275,9 +308,9 @@ WS_M    .equ    7   -- Write M (ALU Output)
 --  ALU Register Output Select Definitions
 --------------------------------------------------------------------------------
 
-OS_A    .equ    1   -- ALU <= A
-OS_X    .equ    2   -- ALU <= X
-OS_Y    .equ    3   -- ALU <= Y
+OS_X    .equ    1   -- ALU <= X
+OS_Y    .equ    2   -- ALU <= Y
+OS_A    .equ    3   -- ALU <= A
 OS_T    .equ    4   -- ALU <= Tmp (Operand Register 2)
 OS_S    .equ    5   -- ALU <= S   (Stack Pointer)
 OS_P    .equ    6   -- ALU <= P   (Processor Status Word)
@@ -340,24 +373,22 @@ K_N     .equ    128 -- Mask for P.N (Negative Flag)
 --  In the right hand margin comments, opcodes that were added by these two
 --  processors to the base MOS6502 instruction set are marked with an asterisk.
 --  
---  Also placed in parentheses the instructions added by the Rockwell R65C02,
---  and marked those instructions with an addition symbol (+). WDC also added
---  two instructions from the W65C816/W65C802 processor instruction set, and
---  they are marked with an ampersand (&).
+--  Marked the Rockwell R65C02 instructions with an addition symbol (+). Marked
+--  the two WDC W65C816/W65C802 processor instructions with an ampersand (&).
 --
 --  The instruction set of the M65C02 starts from the instruction set of G65SC02
 --  and adds the Rockwell (+), and the W65C816/W65C802 (&) instructions. The 
 --  resulting instruction set is equivalent to the instruction set of the WDC
 --  W65C02S microprocessor.
 --
---  There are additional instructions marked by the octothorpe (#) which will be 
+--  There are additional instructions marked by the octothorpe (#) which were 
 --  added to the M65C02 instruction set to form the M65C02A's instruction set. 
 --  The new instructions for the M65C02A are generally taken from the W65C816
 --  instruction set. There are a few unique M65C02A instructions, but generally,
 --  the new instructions add the W65C816's stack relative addresssing mode in-
 --  structions.
 --
---  The additional instructions discussed above can be included without any
+--  The instructions discussed above can be included or removed without any
 --  modifications to the core logic; only updates to the microcode ROMs are re-
 --  quired. 
 --
@@ -406,41 +437,41 @@ _User:      .org    0                                   -- User Mode
 
 --------------------------------------------------------------------------------
  
-    COP     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0x02  -- 02:#COP dp
+    COP     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0x02  -- 02:#COP #imm
     VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x12  -- 12:*ORA (dp)
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x22  -- 22:#JSR (sp,S),Y
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x22  -- 22:#JSR (sp,S),X
     VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x32  -- 32:*AND (dp)
-    COP     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0x42  -- 42:#COP #imm
+    INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x42  -- 42: Reserved 
     VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x52  -- 52:*EOR (dp)
-    PHR     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x62  -- 62:#PHR rel16
+    SPC     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x40  -- 62:#PHR rel16
     VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x72  -- 72:*ADC (dp)
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x82  -- 82:#JMP (sp,S),Y
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x82  -- 82:#JMP (sp,S),X
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x92  -- 92:*STA (dp)
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xA2  -- A2: LDX #imm
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xB2  -- B2:*LDA (dp)
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0xC2  -- C2:#PLW dp
+    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x80  -- C2:#PLW dp
     VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xD2  -- D2:*CMP (dp)
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0xE2  -- E2:#PLW abs
+    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x80  -- E2:#PLW abs
     VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xF2  -- F2:*SBC (dp)
 
 --------------------------------------------------------------------------------
 
     VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x03  -- 03:#ORA sp,S
-    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x13  -- 13:#ORA (sp,S),Y
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x13  -- 13:#ORA (sp,S),X
     VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x23  -- 23:#AND sp,S
-    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x33  -- 33:#AND (sp,S),Y
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x33  -- 33:#AND (sp,S),X
     VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x43  -- 43:#EOR sp,S
-    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x53  -- 53:#EOR (sp,S),Y
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x53  -- 53:#EOR (sp,S),X
     VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x63  -- 63:#ADC sp,S
-    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x73  -- 73:#ADC (sp,S),Y
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x73  -- 73:#ADC (sp,S),X
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x83  -- 83:#STA sp,S
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x93  -- 93:#STA (sp,S),Y
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x93  -- 93:#STA (sp,S),X
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xA3  -- A3:#LDA sp,S
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xB3  -- B3:#LDA (sp,S),Y
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xB3  -- B3:#LDA (sp,S),X
     VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xC3  -- C3:#CMP sp,S
-    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xD3  -- D3:#CMP (sp,S),Y
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xD3  -- D3:#CMP (sp,S),X
     VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xE3  -- E3:#SBC sp,S
-    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xF3  -- F3:#SBC (sp,S),Y
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xF3  -- F3:#SBC (sp,S),X
 
 --------------------------------------------------------------------------------
 
@@ -448,8 +479,8 @@ _User:      .org    0                                   -- User Mode
     VAL     1,LU ,TRB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x14  -- 14:*TRB dp
     VAL     0,LU ,BIT,L_A,R_M,Ci_C,WS_P,    ,NVZ ,0x24  -- 24: BIT dp
     VAL     0,LU ,BIT,L_A,R_M,Ci_C,WS_P,    ,NVZ ,0x34  -- 34:*BIT dp,X
-    INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x44  -- 44:#NOP (MWT dp,(Y))
-    INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x54  -- 54:#NOP (MWF dp,(Y))
+    INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x44  -- 44:#NOP 
+    INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x54  -- 54:#NOP 
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x64  -- 64:*STZ dp
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x74  -- 74:*STZ dp,X
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_Y,    ,0x84  -- 84: STY dp
@@ -457,9 +488,9 @@ _User:      .org    0                                   -- User Mode
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0xA4  -- A4: LDY dp
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0xB4  -- B4: LDY dp,X
     VAL     0,IDC,CMP,Q_Y,R_M,Ci_1,WS_P,    ,NZC ,0xC4  -- C4: CPY dp
-    PHW     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xD4  -- D4:#PHW dp
+    SPC     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x80  -- D4:#PHW dp
     VAL     0,IDC,CMP,Q_X,R_M,Ci_1,WS_P,    ,NZC ,0xE4  -- E4: CPX dp
-    PHW     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xF4  -- F4:#PHW #imm16
+    SPC     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x80  -- F4:#PHW #imm16
 
 --------------------------------------------------------------------------------
 
@@ -585,14 +616,14 @@ _User:      .org    0                                   -- User Mode
     INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x5B  -- 5B: NOP
     INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x6B  -- 6B: NOP
     INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x7B  -- 7B: NOP
-    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x8B  -- 8B:#IND  -- Indirect
-    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x9B  -- 9B:#OAX  -- A<=>X
-    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xAB  -- AB:#OAY  -- A<=>Y
-    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xBB  -- BB:#SIZ  -- Size OVR
-    WAI     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xCB  -- CB:&WAI
-    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xDB  -- DB:&STP
-    INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xEB  -- EB: NOP
-    INV     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xFB  -- FB: NOP
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x10  -- 8B:#OSY  -- S<=>Y
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x01  -- 9B:#IND  -- Indirect
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x02  -- AB:#SIZ  -- Size OVR
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x03  -- BB:#ISZ  -- IND + SIZ
+    WAI     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x80  -- CB:&WAI
+    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x40  -- DB:&STP
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x04  -- EB:#OAX  -- A<=>X
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x08  -- FB:#OAY  -- A<=>Y
 
 --------------------------------------------------------------------------------
 
@@ -611,7 +642,7 @@ _User:      .org    0                                   -- User Mode
     VAL     0,IDC,CMP,Q_Y,R_M,Ci_1,WS_P,    ,NZC ,0xCC  -- CC: CPY abs
     VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xDC  -- DC:#BSR rel16
     VAL     0,IDC,CMP,Q_X,R_M,Ci_1,WS_P,    ,NZC ,0xEC  -- EC: CPX abs
-    PHW     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xFC  -- FC:#PHW abs
+    SPC     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x80  -- FC:#PHW abs
 
 --------------------------------------------------------------------------------
 

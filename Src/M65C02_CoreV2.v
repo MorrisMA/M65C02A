@@ -43,7 +43,7 @@
 // Create Date:     07:12:56 09/17/2013 
 // Design Name:     WDC W65C02 Microprocessor Re-Implementation
 // Module Name:     M65C02_CoreV2.v
-// Project Name:    C:\XProjects\ISE10.1i\M65C02 
+// Project Name:    C:\XProjects\ISE10.1i\M65C02A 
 // Target Devices:  Generic SRAM-based FPGA 
 // Tool versions:   Xilinx ISE10.1i SP3
 //
@@ -109,6 +109,18 @@
 //
 //  2.11    14K14   MAM     Adjusted default uPgm and IDec files to correspond
 //                          to last tested configuration.
+//
+//  2.20    14K18   MAM     Modified the definitions of the prefix instructions.
+//                          IND and SIZ may now be specified independently or
+//                          simultaneously using three opcodes. OAX and OAY are
+//                          now specified using two other opcodes. A total of
+//                          five opcodes are needed to specify the prefixes.
+//
+//  2.30    14L06   MAM     Completed the incorporation of the register override
+//                          prefix instructions. OAX, OAY, and OSY are now fully
+//                          supported by the M65C02A. Also, prepared the module
+//                          for the incoporation of the register stack support
+//                          instructions and the the Forth VM instructions.
 // 
 // Additional Comments:
 //
@@ -161,10 +173,11 @@ module M65C02_CoreV2 #(
     input   [ 7:0] DI,      // External Data In (Registered Data Path)
     output  [ 7:0] DO,      // External Data Out
     
-    output  [ 7:0] A,       // Internal Processor Registers
-    output  [ 7:0] X,
-    output  [ 7:0] Y,
-    output  [ 7:0] P,
+    output  [ 7:0] X,       // Internal Processor Registers - Index Register X
+    output  [ 7:0] Y,       // Internal Processor Registers - Index Register Y
+    output  [ 7:0] A,       // Internal Processor Registers - Accumulator
+
+    output  [ 7:0] P,       // Internal Processor Status Word
     
     output  reg [ 7:0] OP1, // Internal Temporary/Operand Registers
     output  reg [ 7:0] OP2,
@@ -172,8 +185,9 @@ module M65C02_CoreV2 #(
     
     output  reg IND,        // Indirect Addressing Mode Override
     output  reg SIZ,        // Size Override 
-    output  reg OAX,        // Override Op(A | S) with Op(X)
-    output  reg OAY         // Override Op(A | S) with Op(Y)
+    output  reg OAX,        // Override Op(A) with Op(X)
+    output  reg OAY,        // Override Op(A) with Op(Y)
+    output  reg OSY         // Override Op(S) with Op(Y) 
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -214,28 +228,47 @@ localparam  pNOP     = 8'hEA;   // NOP opcode
 
 localparam  pIntMsk  = 2;       // Bit number of Interrupt mask bit in P
 
-localparam  pMd_WAI  = 7;       // Fixed Microcode Mode Field Decode
-localparam  pMd_PHW  = 6;
-localparam  pMd_PHR  = 5;
-localparam  pMd_PFX  = 4;
-localparam  pMd_BRK  = 3;
-localparam  pMd_COP  = 2;
-localparam  pMd_INV  = 1;
-localparam  pMd_VAL  = 0;
+//  Fixed Microcode Mode Field Decode
+
+localparam  pMd_WAI  = 7;       // WAI Instruction
+localparam  pMd_PFX  = 6;       // Prefix Operations
+localparam  pMd_SPC  = 5;       // Special Operations: PHW xxx, and PHR rel16
+localparam  pMd_FTH  = 4;       // FORTH VM Operations
+localparam  pMd_BRK  = 3;       // BRK Instruction
+localparam  pMd_COP  = 2;       // COP Instruction
+localparam  pMd_INV  = 1;       // Invalid Instructions
+localparam  pMd_VAL  = 0;       // Valid Instructions
 
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Local Signal Declarations
 //
 
-wire    WAI;                            // Instruction Mode Decode for WAI
-wire    PHW;                            // Instruction Mode Decode for PHW
-wire    PHR;                            // Instruction Mode Decode for PHR
-wire    PFX;                            // Instruction Mode Decode for PFX
-wire    BRK;                            // Instruction Mode Decode for BRK
-wire    COP;                            // Instruction Mode Decode for COP
-wire    INV;                            // Instruction Mode Decode for INV
-wire    VAL;                            // Instruction Mode Decode for VAL
+wire    WAI;                    // Instruction Mode Decode for WAIt
+wire    PFX;                    // Instruction Mode Decode for PReFix
+wire    SPC;                    // Instruction Mode Decode for SPeCial
+//wire    FTH;                    // Instruction Mode Decode for ForTH
+wire    BRK;                    // Instruction Mode Decode for BReaK
+wire    COP;                    // Instruction Mode Decode for CO-Processor
+wire    INV;                    // Instruction Mode Decode for INValid
+wire    VAL;                    // Instruction Mode Decode for VALid
+
+wire    WOP;                    // Instruction Mode Decode for PHW/PLW
+wire    AOP;                    // Instruction Mode Decode for PHR
+
+//wire    NXT;                    // Instruction Mode Decode for NXT
+//wire    ENT;                    // Instruction Mode Decode for ENT
+//wire    PHI;                    // Instruction Mode Decode for PHI
+//wire    INI;                    // Instruction Mode Decode for INI
+
+//wire    DUP;                    // Instruction Mode decode for DUP
+//wire    SWP;                    // Instruction Mode decode for SWP
+//wire    ROT;                    // Instruction Mode decode for ROT
+wire    iOSY;                   // Instruction Mode Decode for OSY/OAS
+wire    iOAY;                   // Instruction Mode Decode for OAY
+wire    iOAX;                   // Instruction Mode Decode for OAX
+wire    iSIZ;                   // Instruction Mode Decode for SIZ | ISZ
+wire    iIND;                   // Instruction Mode Decode for IND | ISZ
 
 wire    BRV1;                           // MPC BRV1 Instruction Decode
 wire    BRV3;                           // MPC BRV3 Instruction Decode
@@ -252,8 +285,8 @@ wire    [1:0] Via;                      // MPC Via Mux Control Output
 reg     [(pROM_Width - 1)    :0] uPL;   // MPC uP ROM Pipeline Register
 wire    [(pROM_AddrWidth - 2):0] uP_BA; // uP Branch Address Field
 
-wire    [ 1:0] uPCntl;                  // Microprogram Control Field
-wire    [11:0] NA_Op;                   // Memory Address Register Control Fld
+wire    [ 2:0] uPCntl;                  // Microprogram Control Field
+wire    [10:0] NA_Op;                   // Memory Address Register Control Fld
 wire    [ 3:0] DI_Op;                   // Memory Data Input Control Field
 wire    [ 3:0] DO_Op;                   // Memory Data Output Control Field
 wire    [ 2:0] Reg_WE;                  // Register Write Enable Control Field
@@ -261,6 +294,8 @@ wire    [ 2:0] Reg_WE;                  // Register Write Enable Control Field
 wire    En;                             // ALU Enable Control Field
 
 wire    CE_IR, CE_OP1, CE_OP2;          // Clock Enables: IR, OP1
+
+wire    [1:0] Stk_Op;                   // Stack Pointer Op: NOP, POP, PSH
 
 //  Instruction Decoder ROM
 
@@ -399,7 +434,7 @@ end
 assign I      = uPL[35:32];     // MPC Instruction Field (4)
 assign uP_BA  = uPL[31:24];     // MPC Branch Address Field (8)
 assign uPCntl = uPL[23:22];     // Microprogram Control Field (2)
-assign NA_Op  = uPL[21:10];     // Next Address Operation (12)
+assign NA_Op  = uPL[21:10];     // Next Address Operation (12) (uPL[21]: Rsvd)
 assign IO_Op  = uPL[9:8];       // IO Operation Control (2)
 assign DI_Op  = uPL[7:4];       // DI Demultiplexer Control (4)
 assign DO_Op  = uPL[7:4];       // DO Multiplexer Control (4) (same as DI_Op)
@@ -408,15 +443,19 @@ assign ISR    = uPL[0];         // Set to clear D and set I on interrupts (1)
 
 //  Decode uPCntl Field
 
-assign Mod256 = uPCntl[1];      // Explicit control to wrap address in page
-assign Page   = uPCntl[0];      // Explicit page select for address wrap ops.
+//  Stack Operation Select
+
+assign Stk_Op = {NA_Op[7] & ~NA_Op[9], NA_Op[0]};   // 0x: nop; 10: Psh; 11: Pop
+
+// Mod256: Page 0 == 3'b010; Page 1 = 3'b011
+
+assign Mod256 = (uPCntl == 2);  // Explicit control address wrap in page
+assign Sel_BA = (uPCntl == 1);  // Explicit control of IR source
 
 //  Decode DI_Op Control Field
 
 assign Ld_OP1 = IO_Op[1] &  DI_Op[2];
 assign Ld_OP2 = IO_Op[1] &  DI_Op[1];
-
-assign Sel_BA = (uPCntl == 2'b01);
 
 //  Operand Register Data Input Bus
 
@@ -448,6 +487,7 @@ begin
 end
 
 //  Instruction Register
+//       Load IR from DI | uP_BA 
 
 assign CE_IR  = (BRV1 | (BRV3 & ~Int) | (Sel_BA & DI_Op[3])) & Rdy;
 assign IDEC_A = ((Sel_BA) ? {uP_BA[3:0], uP_BA[7:4]} : {DI[3:0], DI[7:4]}); 
@@ -460,25 +500,7 @@ begin
         IR <= #1 ((Sel_BA) ? uP_BA : DI);
 end
 
-//  Implement Prefix Registers
-//      IND - Address mode override maps zp => (zp) and abs => (abs)
-//      SIZ - Operation Size override remaps operation from 8 to 16 bits
-//      OAX - Destination register override remaps instruction dest. regs
-
-always @(posedge Clk)
-begin
-    if(Rst)
-        {OAY, OAX, SIZ, IND} <= #1 0;
-    else if(CE_IR) begin
-        IND <= #1 ((PFX) ?  IR[5] &  IR[4] | IND : 0);  // IR == 8'hBB
-        SIZ <= #1 ((PFX) ?  IR[5] & ~IR[4] | SIZ : 0);  // IR == 8'hAB
-        OAX <= #1 ((PFX) ? ~IR[5] &  IR[4]       : 0);  // IR == 8'h9B
-        OAY <= #1 ((PFX) ? ~IR[5] & ~IR[4]       : 0);  // IR == 8'h8B
-    end
-end
-
 //  Infer Instruction Decode ROM and initialize with file created by SMRTool
-//       Load IR from DI | uP_BA
 
 initial
     $readmemb(pM65C02_IDec, ID_ROM, 0, (pDEC_Depth - 1));
@@ -505,16 +527,49 @@ assign  OSel   = IDEC[14:12];       // M65C02 ALU Register Output Select Field
 assign  CCSel  = IDEC[11: 8];       // M65C02 ALU Condition Code Control Field
 assign  Opcode = IDEC[ 7: 0];       // M65C02 Valid Opcode Control Field
 
-// Decode Mode for internal signals
+//// Decode Mode for internal control signals
 
-assign WAI = &Mode;                 // Current Instruction is WAI
-assign PHW = (Mode == pMd_PHW);     // Current Instruction is PHW
-assign PHR = (Mode == pMd_PHR);     // Current Instruction is PHR
-assign PFX = (Mode == pMd_PFX);     // Current Instruction is IND/SIZ
-assign BRK = (Mode == pMd_BRK);     // Current Instruction is BRK
-assign COP = (Mode == pMd_COP);     // Current Instruction is COP
-assign INV = (Mode == pMd_INV);     // Current Instruction is Invalid
-assign VAL = (Mode == pMd_VAL);     // Current Instruction is Valid
+assign WAI  = (Mode == pMd_WAI);    // Instruction is WAI
+//
+assign PFX  = (Mode == pMd_PFX);    // Prefix Instructions
+//assign DUP  = (PFX) & Opcode[7];    // Accumulator Stack DUPlicate
+//assign SWP  = (PFX) & Opcode[6];    // Accumulator Stack SWaP
+//assign ROT  = (PFX) & Opcode[5];    // Accumulator Stack ROTate
+assign iOSY = (PFX) & Opcode[4];    // Instruction is OAY
+assign iOAY = (PFX) & Opcode[3];    // Instruction is OAY
+assign iOAX = (PFX) & Opcode[2];    // Instruction is OAX
+assign iSIZ = (PFX) & Opcode[1];    // Instruction is SIZ | ISZ
+assign iIND = (PFX) & Opcode[0];    // Instruction is IND | ISZ
+//
+assign SPC  = (Mode == pMd_SPC);
+assign WOP  = (SPC) & Opcode[7];    // PHW zp/abs/#imm; PLW zp/abs;
+assign AOP  = (SPC) & Opcode[6];    // PHR rel16
+//
+//  (Mode == pMd_FTH) -- Reserved for FORTH VM instructions
+//
+assign BRK  = (Mode == pMd_BRK);        // Current Instruction is BRK
+assign COP  = (Mode == pMd_COP);        // Current Instruction is COP
+assign INV  = (Mode == pMd_INV);        // Current Instruction is Invalid
+assign VAL  = (Mode == pMd_VAL);        // Current Instruction is Valid
+
+//  Implement Prefix Registers
+//      IND     - Address mode override maps zp => (zp) and abs => (abs)
+//      SIZ     - Operation Size override remaps operation from 8 to 16 bits
+//      OAX/OAY - Overrides: OAX - A<=>X; OAY - A<=>Y
+//      OSY     - Override:  OSY - Y<=>S; Y => SP
+
+always @(posedge Clk)
+begin
+    if(Rst)
+        {OSY, OAY, OAX, SIZ, IND} <= #1 0;
+    else if(CE_IR) begin
+        IND <= #1 ((PFX) ? iIND | IND                 : 0); // IR == 0x9B | 0xBB
+        SIZ <= #1 ((PFX) ? iSIZ | SIZ                 : 0); // IR == 0xAB | 0xBB
+        OAX <= #1 ((PFX) ? iOAX | OAX &         ~iOAY : 0); // IR == 0xEB
+        OAY <= #1 ((PFX) ? iOAY | OAY & ~iOSY & ~iOAX : 0); // IR == 0xFB
+        OSY <= #1 ((PFX) ? iOSY | OSY & ~iOAY         : 0); // IR == 0x8B
+    end
+end
 
 //  Next Address Generator
 
@@ -524,12 +579,15 @@ M65C02_AddrGenV2    #(
                         .Rst(Rst), 
                         .Clk(Clk),
                         
-                        .Vector(Vector), 
+                        .Vector(Vector),
 
                         .NA_Op(NA_Op),
 
+                        .OAX(OAX),
+                        .OAY(OAY),
+                        .OSY(OSY),
+
                         .Mod256(Mod256),
-                        .Page(Page),
 
                         .CC(CC), 
                         .BRV3(BRV3), 
@@ -541,13 +599,16 @@ M65C02_AddrGenV2    #(
                         .OP1(OP1),
                         .OP2(OP2),
                         
-                        .X(X), 
-                        .Y(Y), 
+                        .X(X),
+                        .Y(Y),
+                        .A(A),
 
                         .AO(AO), 
 
                         .SelS(SelS),
-                        .S(S),
+                        .Stk_Op(Stk_Op),
+                        .SDI(DO_ALU),
+                        .SDO(S),
                         
                         .MAR(MAR),
                         .PC(PC)
@@ -560,7 +621,7 @@ begin
     if(Rst)
         VP <= #1 0;
     else if(ISR)
-        VP <= #1 uPCntl[0];
+        VP <= #1 Mod256; // Multi-purpose microprogram fld, use care
 end
 
 //  Instantiate the M65C02 ALU Module
@@ -580,8 +641,15 @@ M65C02_ALUv2    ALU (
                     .SO(SO),            // M65C02 ALU Set oVerflow Flag in PSW
                     .Clr_SO(Clr_SO),    // M65C02 ALU Clr SO - Acknowledge
                     
+                    .SIZ(SIZ),          // M65C02 ALU Operation Size Override
+                    .OAX(OAX),          // M65C02 ALU Register Override
+                    .OAY(OAY),          // M65C02 ALU Register Override
+                    .OSY(OSY),          // M65C02 ALU Stack Override
+                    
                     .SelS(SelS),        // M65C02 ALU Stack Pointer Select
                     .S(S),              // M65C02 ALU Stack Pointer
+
+                    .Stk_Op(Stk_Op),    // M65C02 ALU Y Stck Ops
 
                     .FU_Sel(FU_Sel[4:0]),   // M65C02 ALU Functional Unit Select
                     .Op(Op),            // M65C02 ALU Operation Select
@@ -600,9 +668,9 @@ M65C02_ALUv2    ALU (
                     .Val(Valid),        // M65C02 ALU Output Valid Strobe
                     .CC_Out(CC),        // M65C02 ALU Condition Code Mux
 
+                    .X(X),              // M65C02 ALU Index Register
+                    .Y(Y),              // M65C02 ALU Index Register
                     .A(A),              // M65C02 ALU Accumulator Register
-                    .X(X),              // M65C02 ALU Pre-Index Register
-                    .Y(Y),              // M65C02 ALU Post-Index Register
 
                     .P(P)               // M65C02 Processor Status Word Register
                 );
@@ -613,7 +681,7 @@ assign IRQ_Msk = P[pIntMsk];            // Interrupt Mask Bit
 
 //  External Bus Data Output
 
-assign MuxDat = ((PHW) ? {OP2, OP1} : ((PHR) ? MAR : PC));
+assign MuxDat = ((WOP) ? {OP2, OP1} : ((AOP) ? MAR : PC));
 
 assign OutMux = ((DO_Op[0]) ? DO_ALU       : 0);
 assign OutMux = ((DO_Op[1]) ? MuxDat[15:8] : 0);

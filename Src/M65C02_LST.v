@@ -57,12 +57,30 @@
 //                          the parent module, M65C02_ALU.v, and generated a
 //                          standalone module instantiated in the parent.
 //
+//  1.00    14I02   MAM     Modified the OSel field encoding to allow the modi-
+//                          fication of the destination register. Encoding makes
+//                          A = 3, Y = 2, and X = 1. This allows the OAX and OAY
+//                          prefix instructions, which are mutually exclusive,
+//                          to be applied using XOR gates to the OSel field and
+//                          change A into X or A into Y.
+//
+//  1.30    14L06   MAM     Completed modifications to incorporate OAX, OAY, 
+//                          and OSY prefix instructions: OAX switches A and X;
+//                          OAY switches A and Y; and OSY switches Y with S for
+//                          stack operations, and Y and S in the Y-specific
+//                          instructions.
+//
 // Additional Comments: 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 module M65C02_LST(
     input   En,
+    
+    input   OAX,            // Override: swap A and X
+    input   OAY,            // Override: swap A and Y
+    input   OSY,            // Override: swap Y and S, and use Y as SP
+    
     input   [2:0] OSel,
 
     input   [7:0] A,
@@ -83,44 +101,66 @@ module M65C02_LST(
 //
 
 wor     [8:0] Mux;
-reg     [7:1] Sel;
+wire    [7:1] Sel;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  Implementation
 //
 
-always @(*)
-begin
-    casex({En, OSel})
-        4'b0000 : Sel <= 7'h00;
-        4'b0001 : Sel <= 7'h00;
-        4'b0010 : Sel <= 7'h00;
-        4'b0011 : Sel <= 7'h00;
-        4'b0100 : Sel <= 7'h00;
-        4'b0101 : Sel <= 7'h00;
-        4'b0110 : Sel <= 7'h00;
-        4'b0111 : Sel <= 7'h00;
-        4'b1000 : Sel <= 7'h00;
-        4'b1001 : Sel <= 7'h01;
-        4'b1010 : Sel <= 7'h02;
-        4'b1011 : Sel <= 7'h04;
-        4'b1100 : Sel <= 7'h08;
-        4'b1101 : Sel <= 7'h10;
-        4'b1110 : Sel <= 7'h20;
-        4'b1111 : Sel <= 7'h40;
-    endcase
-end
+//  Define the X output select
+//      if(OAX) X => A
+//      else X
+
+assign Sel[1] = En & (  ((OSel == 3) &  OAX)            // X
+                      | ((OSel == 1) & ~OAX));
+
+//  Define the Y output select
+//      if(OAY) Y => A
+//      else if(OSY) Y => S
+//      else Y
+
+assign Sel[2] = En & (  ((OSel == 3) &  OAY)            // Y
+                      | ((OSel == 5) &  OSY)
+                      | ((OSel == 2) & ~(OAY | OSY)));
+                      
+//  Define the A output select
+//      if(OAX) A => X
+//      else if(OAY) A => Y
+//      else A;
+                                  
+assign Sel[3] = En & (  ((OSel == 1) &  OAX)            // A
+                      | ((OSel == 2) &  OAY)
+                      | ((OSel == 3) & ~(OAX | OAY)));
+                      
+//  Define the Tmp (OP1) output select
+
+assign Sel[4] = En & (OSel == 4);                       // T (OP2)
+
+//  Define the S output select
+//      if(OSY) S => Y
+//      else S;
+
+assign Sel[5] = En & (  ((OSel == 2) &  OSY)            // S
+                      | ((OSel == 5) & ~OSY));
+
+//  Define the P (PSW) output select
+
+assign Sel[6] = En & (OSel == 6);                       // P
+
+//  Define the M (OP1) output select
+
+assign Sel[7] = En & (OSel == 7);                       // M (OP1)
 
 //  Load/Store/Transfer Multiplexer
 
 //  Generate wired-OR multiplexer
 
-assign Mux = ((Sel[1]) ? {1'b0, A}   : 0);      // STA/TAX/TAY/TAS/PHA
-assign Mux = ((Sel[2]) ? {1'b0, X}   : 0);      // STX/TXA/TXS/PHX
-assign Mux = ((Sel[3]) ? {1'b0, Y}   : 0);      // STY/TYA/PHY
-assign Mux = ((Sel[4]) ? {1'b0, Tmp} : 0);      // PHW/PHR
-assign Mux = ((Sel[5]) ? {1'b0, S}   : 0);      // TSX/TSA
+assign Mux = ((Sel[1]) ? {1'b0, X}   : 0);      // STX/TXA/TXS/PHX
+assign Mux = ((Sel[2]) ? {1'b0, Y}   : 0);      // STY/TYA/PHY
+assign Mux = ((Sel[3]) ? {1'b0, A}   : 0);      // STA/TAX/TAY/PHA
+assign Mux = ((Sel[4]) ? {1'b0, Tmp} : 0);      // 
+assign Mux = ((Sel[5]) ? {1'b0, S}   : 0);      // TSX
 assign Mux = ((Sel[6]) ? {1'b0, P}   : 0);      // PHP
 assign Mux = ((Sel[7]) ? {1'b0, M}   : 0);      // LDA/PLA/LDX/PLX/LDY/PLY/PLP
 

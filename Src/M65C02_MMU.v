@@ -68,10 +68,10 @@
 //
 //      MMU <= {(Rsvd[2:0], WS, CS[3:0], PA[19:12]}
 //
-//  Rsvd[2:0]   : reserved for future use as access controls for each segment.
-//  WS          : insert a number of internal wait states determined by pWS_Out.
-//  CS[3:0]     : selects the chip select to use for each segment.
-//  PA[19:12]   : most significant 8 bits of the physical address of a segment.
+//  Rsvd[2:0]   : reserved for future use as access controls for each segment
+//  WS          : add constant number of wait states as determined by pWS_Out
+//  CS[3:0]     : selects the chip select to use for each segment
+//  PA[19:12]   : most significant 8 bits of the physical address of a segment
 //
 //  The uppermost three bits are currently not implemented. There are plans to
 //  modify the M65C02 core to support Kernel/User mode and potentially virtual
@@ -93,6 +93,13 @@
 //                          the module to support Kernel/User mode and access
 //                          controls.
 //
+//  1.20    14K15   MAM     Removed external register select. MMU mapping regs
+//                          addressed directly from the virtual address bus. 
+//                          Special instructions (MWT/MWF) conceived for the
+//                          purpose of providing atomic 16-bit read/write ops to
+//                          these registers not required. Can use the PHW/PLW 
+//                          instructions to perform atomic read/write ops.
+//
 // Additional Comments:
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -111,7 +118,7 @@ module M65C02_MMU #(
     input   Sync,                       // M65C02A Instruction Fetch Strobe
     input   [ 1:0] IO_Op,               // M65C02A IO Operation
 
-    input   [15:0] VA,                  // M65C02A Virtual Address
+    input   [15:0] VA,                  // M65C02A Virtual Address/Reg Select
 
     // MAP/MMU/Vec Management Interface
 
@@ -119,7 +126,6 @@ module M65C02_MMU #(
     input   Sel_MMU,                    // MMU Status Register Select
     input   WE,                         // MMU Write Enable
     input   RE,                         // MMU Read Enable
-    input   [4:0] Sel,                  // MMU Register Select
     input   [7:0] MMU_DI,               // MMU Register Data Input
     output  [7:0] MMU_DO,               // MMU Register Data Output
 
@@ -163,10 +169,10 @@ assign MAP_DI = ((VA[0]) ? {MMU_DI, MAP_SPO[7:0]} : {MAP_SPO[15:8], MMU_DI});
 always @(posedge Clk)
 begin
     if(MAP_WE)
-        MAP[Sel] <= #1 MAP_DI;
+        MAP[VA[5:1]] <= #1 MAP_DI;
 end
 
-assign MAP_SPO = MAP[Sel];
+assign MAP_SPO = MAP[VA[5:1]];
 
 //  Provide multiplexer to read out the contents of the selected MMU register
 
