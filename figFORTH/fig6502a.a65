@@ -1,0 +1,3816 @@
+;
+;                        Through the courtesy of
+;
+;                         FORTH INTEREST GROUP
+;                            P.O. BOX  2154
+;                         OAKLAND, CALIFORNIA
+;                                94621
+;
+;
+;                             Release 1.k0010
+;
+;                        with compiler security
+;                                  and
+;                        variable length names
+;
+;    Further distribution need not include this notice.
+;    The FIG installation Manual is required as it contains
+;    the model of FORTH and glossary of the system.
+;    Might be available from FIG at the above address for $95.00 postpaid.
+;
+;    Translated from the FIG model by W.F. Ragsdale with input-
+;    output given for the Rockwell System-65. Transportation to
+;    other systems requires only the alteration of :
+;                 XEMIT, XKEY, XQTER, XCR, AND RSLW
+;
+;    Equates giving memory assignments, machine
+;    registers, and disk parameters.
+;
+SSIZE           =     128               ;sector size in bytes
+NBUF            =     8                 ;number of buffers desired in RAM
+;                             (SSIZE*NBUF >= 1024 bytes)
+SECTR           =     800               ;sector per drive
+;                              forcing high drive to zero
+SECTL           =     1600              ;sector limit for two drives
+;                              of 800 per drive.
+BMAG            =     1056              ;total buffer magnitude, in bytes
+;                              expressed by SSIZE+4*NBUF
+;
+BOS             =     $20               ;bottom of data stack, in zero-page.
+TOS             =     $9F               ;top of data stack, in zero-page.
+N               =     TOS+8             ;scratch workspace.
+IP              =     N+8               ;interpretive pointer.
+W               =     IP+3              ;code field pointer.
+UP              =     W+2               ;user area pointer.
+XSAVE           =     UP+2              ;temporary for X register.
+;
+TIBX            =     $0100             ;terminal input buffer of 84 bytes.
+ORIG            =     $0400             ;origin of FORTH's Dictionary.
+MEM             =     $4000             ;top of assigned memory+1 byte.
+UAREA           =     MEM-128           ;128 bytes of user area
+DAREA           =     UAREA-BMAG        ;disk buffer space.
+;
+;         Monitor calls for terminal support
+;
+cin         =$f818                      ; input one ascii char. to term.
+cout        =$f82d                      ; output one ascii char. to term.
+crout       =$f8a2                      ; terminal return and line feed.
+;
+;    From DAREA downward to the top of the dictionary is free
+;    space where the user's applications are compiled.
+;
+;    Boot up parameters. This area provides jump vectors
+;    to Boot up  code, and parameters describing the system.
+;
+                org   ORIG              ; User cold entry point
+ENTER           nop                     ; Vector to COLD entry
+                jmp   COLD+2            ;
+REENTR          nop                     ; User Warm entry point
+                jmp   WARM              ; Vector to WARM entry
+                dw    $0004             ; 6502 in radix-36
+                dw    $5ED2             ;
+                dw    NTOP              ; Name address of MON
+;                dw    $7F               ;Backspace Character
+                dw    $08               ; Backspace Character
+                dw    UAREA             ; Initial User Area
+                dw    TOS               ; Initial Top of Stack
+                dw    $1FF              ; Initial Top of Return Stack
+                dw    TIBX              ; Initial terminal input buffer
+;
+;
+                dw    31                ; Initial name field width
+                dw    1                 ; 0=nod disk, 1=disk
+                dw    TOP               ; Initial fence address
+                dw    TOP               ; Initial top of dictionary
+                dw    VL0               ; Initial Vocabulary link ptr.
+;
+;
+;    The following offset adjusts all code fields to avoid an
+;    address ending $XXFF. This must be checked and altered on
+;    any alteration , for the indirect jump at W-1 to operate !
+;
+                nop     2                     
+;
+;
+;                                       LIT
+;                                       SCREEN 13 LINE 1
+;
+L22             db    $83,"LI",$D4      ; <--- name field
+                dw    00                ; <----- link field, last marked by zero
+LIT             dw    *+2               ; <----- code address field
+                lda   (IP),y            ; <----- start of parameter field
+                pha                     
+                inc   IP                
+                bne   L30               
+                inc   IP+1              
+L30             lda   (IP),y            
+L31             inc   IP                
+                bne   PUSH              
+                inc   IP+1              
+;
+PUSH            dex                     
+                dex                     
+;
+PUT             sta   1,x               
+                pla                     
+                sta   0,x               
+;
+;    NEXT is the address interpreter that moves from machine
+;    level word to word.
+;
+NEXT            ldy   #1                
+                lda   (IP),y            ;Fetch code field address pointed
+                sta   W+1               ;to by IP.
+                dey                     
+                lda   (IP),y            
+                sta   W                 
+;
+;
+;
+                clc                     ;Increment IP by two.
+                lda   IP                
+                adc   #2                
+                sta   IP                
+                bcc   L54               
+                inc   IP+1              
+L54             jmp   W-1               ;Jump to an indirect jump (W) which
+;                        vectors to code pointed to by a code
+;                        field.
+;
+;    CLIT pushes the next inline byte to data stack
+;
+L35             db    $84,"CLI",$D4     
+                dw    L22               ;Link to LIT
+CLIT            dw    *+2               
+                lda   (IP),y            
+                pha                     
+                tya                     
+                beq   L31               ;a forced branch into LIT
+
+;
+;
+SETUP           asl   a                 
+                sta   N-1               
+L63             lda   0,x               
+                sta   N,y               
+                inx                     
+                iny                     
+                cpy   N-1               
+                bne   L63               
+                ldy   #0                
+                rts                     
+;
+;                                       EXCECUTE
+;                                       SCREEN 14 LINE 11
+;
+L75             db    $87,"EXECUT",$C5  
+                dw    L35               ;link to CLIT
+EXEC            dw    *+2               
+                lda   0,x               
+                sta   W                 
+                lda   1,x               
+                sta   W+1               
+                inx                     
+                inx                     
+                jmp   W-1               ;to JMP (W) in z-page
+;
+;                                       BRANCH
+;                                       SCREEN 15 LINE 11
+;
+L89             db    $86,"BRANC",$C8   
+                dw    L75               ;link to EXCECUTE
+BRAN            dw    *+2               
+                clc                     
+                lda   (IP),y            
+                adc   IP                
+                pha                     
+                iny                     
+                lda   (IP),y            
+                adc   IP+1              
+                sta   IP+1              
+                pla                     
+                sta   IP                
+                jmp   NEXT+2           
+;
+;                                       0BRANCH
+;                                       SCREEN 15 LINE 6
+;
+L107            db    $87,"0BRANC",$C8  
+                dw    L89               ;link to BRANCH
+ZBRAN           dw    *+2               
+                inx                     
+                inx                     
+                lda   $FE,x             
+                ora   $FF,x             
+                beq   BRAN+2            
+;
+BUMP            clc                     
+                lda   IP                
+                adc   #2                
+                sta   IP                
+                bcc   L122              
+                inc   IP+1              
+L122            jmp   NEXT              
+;
+;                                       (LOOP)
+;                                       SCREEN 16 LINE 1
+;
+L127            db    $86,"(LOOP",$A9   
+                dw    L107              ;link to 0BRANCH
+PLOOP           dw    L130              
+L130            stx   XSAVE             
+                tsx                     
+                inc   $101,x            
+                bne   PL1               
+                inc   $102,x            
+;
+PL1             clc                     
+                lda   $103,x            
+                sbc   $101,x            
+                lda   $104,x            
+                sbc   $102,x            
+;
+PL2             ldx   XSAVE             
+                asl   a                 
+                bcc   BRAN+2            
+                pla                     
+                pla                     
+                pla                     
+                pla                     
+                jmp   BUMP              
+;
+;                                       (+LOOP)
+;                                       SCREEN 16 LINE 8
+;
+L154            db    $87,"(+LOOP",$A9  
+                dw    L127              ;link to (loop)
+PPLOO           dw    *+2               
+                inx                     
+                inx                     
+                stx   XSAVE             
+                lda   $FF,x             
+                pha                     
+                pha                     
+                lda   $FE,x             
+                tsx                     
+                inx                     
+                inx                     
+                clc                     
+                adc   $101,x            
+                sta   $101,x            
+                pla                     
+                adc   $102,x            
+                sta   $102,x            
+                pla                     
+                bpl   PL1               
+                clc                     
+                lda   $101,x            
+                sbc   $103,x            
+                lda   $102,x            
+                sbc   $104,x            
+                jmp   PL2               
+;
+;                                       (DO)
+;                                       SCREEN 17 LINE 2
+;
+L185            db    $84,"(DO",$A9     
+                dw    L154              ;link to (+LOOP)
+PDO             dw    *+2               
+                lda   3,x               
+                pha                     
+                lda   2,x               
+                pha                     
+                lda   1,x               
+                pha                     
+                lda   0,x               
+                pha                     
+;
+POPTWO          inx                     
+                inx                     
+;
+;
+;
+POP             inx                     
+                inx                     
+                jmp   NEXT              
+;
+;                                       I
+;                                       SCREEN 17 LINE 9
+;
+L207            db    $81,$C9           
+                dw    L185              ;link to (DO)
+I               dw    R+2               ;share the code for R
+;
+;                                       DIGIT
+;                                       SCREEN 18 LINE 1
+;
+L214            db    $85,"DIGI",$D4    
+                dw    L207              ;link to I
+DIGIT           dw    *+2               
+                sec                     
+                lda   2,x               
+                sbc   #$30              
+                bmi   L234              
+                cmp   #$A               
+                bmi   L227              
+                sec                     
+                sbc   #7                
+                cmp   #$A               
+                bmi   L234              
+L227            cmp   0,x               
+                bpl   L234              
+                sta   2,x               
+                lda   #1                
+                pha                     
+                tya                     
+                jmp   PUT               ;exit true with converted value
+L234            tya                     
+                pha                     
+                inx                     
+                inx                     
+                jmp   PUT               ;exit false with bad conversion
+;
+;                                       (FIND)
+;                                       SCREEN 19 LINE 1
+;
+L243            db    $86,"(FIND",$A9   
+                dw    L214              ;Link to DIGIT
+PFIND           dw    *+2               
+                lda   #2                
+                jsr   SETUP             
+                stx   XSAVE             
+L249            ldy   #0                
+                lda   (N),y             
+                eor   (N+2),y           
+;
+;
+                and   #$3F              
+                bne   L281              
+L254            iny                     
+                lda   (N),y             
+                eor   (N+2),y           
+                asl   a                 
+                bne   L280              
+                bcc   L254              
+                ldx   XSAVE             
+                dex                     
+                dex                     
+                dex                     
+                dex                     
+                clc                     
+                tya                     
+                adc   #5                
+                adc   N                 
+                sta   2,x               
+                ldy   #0                
+                tya                     
+                adc   N+1               
+                sta   3,x               
+                sty   1,x               
+                lda   (N),y             
+                sta   0,x               
+                lda   #1                
+                pha                     
+                jmp   PUSH              
+L280            bcs   L284              
+L281            iny                     
+                lda   (N),y             
+                bpl   L281              
+L284            iny                     
+                lda   (N),y             
+                tax                     
+                iny                     
+                lda   (N),y             
+                sta   N+1               
+                stx   N                 
+                ora   N                 
+                bne   L249              
+                ldx   XSAVE             
+                lda   #0                
+                pha                     
+                jmp   PUSH              ;exit false upon reading null link
+;
+;                                       ENCLOSE
+;                                       SCREEN 20 LINE 1
+;
+L301            db    $87,"ENCLOS",$C5  
+                dw    L243              ;link to (FIND)
+ENCL            dw    *+2               
+                lda   #2                
+                jsr   SETUP             
+                txa                     
+                sec                     
+                sbc   #8                
+                tax                     
+                sty   3,x               
+                sty   1,x               
+                dey                     
+L313            iny                     
+                lda   (N+2),y           
+                cmp   N                 
+                beq   L313              
+                sty   4,x               
+L318            lda   (N+2),y           
+                bne   L327              
+                sty   2,x               
+                sty   0,x               
+                tya                     
+                cmp   4,x               
+                bne   L326              
+                inc   2,x               
+L326            jmp   NEXT              
+L327            sty   2,x               
+                iny                     
+                cmp   N                 
+                bne   L318              
+                sty   0,x               
+                jmp   NEXT              
+;
+;                                       EMIT
+;                                       SCREEN 21 LINE 5
+;
+L337            db    $84,"EMI",$D4     
+                dw    L301              ;link to ENCLOSE
+EMIT            dw    XEMIT             ;Vector to code for KEY
+;
+;                                       KEY
+;                                       SCREEN 21 LINE 7
+;
+L344            db    $83,"KE",$D9      
+                dw    L337              ;link to EMIT
+KEY             dw    XKEY              ;Vector to code for KEY
+;
+;                                       ?TERMINAL
+;                                       SCREEN 21 LINE 9
+;
+L351            db    $89,"?TERMINA",$CC
+                dw    L344              ;link to KEY
+QTERM           dw    XQTER             ;Vector to code for ?TERMINAL
+;
+;
+;
+;
+;
+;                                       CR
+;                                       SCREEN 21 LINE 11
+;
+L358            db    $82,"C",$D2       
+                dw    L351              ;link to ?TERMINAL
+CR              dw    XCR               ;Vector to code for CR
+;
+;                                       CMOVE
+;                                       SCREEN 22 LINE 1
+;
+L365            db    $85,"CMOV",$C5    
+                dw    L358              ;link to CR
+CMOVE           dw    *+2               
+                lda   #3                
+                jsr   SETUP             
+L370            cpy   N                 
+                bne   L375              
+                dec   N+1               
+                bpl   L375              
+                jmp   NEXT              
+L375            lda   (N+4),y           
+                sta   (N+2),y           
+                iny                     
+                bne   L370              
+                inc   N+5               
+                inc   N+3               
+                jmp   L370              
+;
+;                                       U*
+;                                       SCREEN 23 LINE 1
+;
+L386            db    $82,"U",$AA       
+                dw    L365              ;link to CMOVE
+USTAR           dw    *+2               
+;          LDA 2,X
+;          STA N
+;          STY 2,X
+;          LDA 3,X
+;          STA N+1
+;          STY 3,X
+;          LDY #16        ; for 16 bits
+;L396      ASL 2,X
+;          ROL 3,X
+;          ROL 0,X
+;          ROL 1,X
+;          BCC L411
+;          CLC
+;          LDA N
+;          ADC 2,X
+;          STA 2,X
+;          LDA N+1
+;          ADC 3,X
+;          STA 3,X
+;          LDA #0        ; bug here as high byte of this high word does not
+;          ADC 0,X       ; get incremented when 0,x rolls over to $00
+;          STA 0,X
+;
+;L411      DEY
+;          BNE L396
+;          JMP NEXT
+
+;
+; replacement code from 6502.org - http://forum.6502.org/viewtopic.php?t=689
+;
+                lda   #0                ;in some implementations TYA can be used since NEXT leaves Y=$00
+                sta   N                 
+                ldy   #16               
+                lsr   3,x               
+                ror   2,x               
+L1              bcc   L2                
+                clc                     
+                sta   N+1               ;PHA
+                lda   N                 
+                adc   0,x               
+                sta   N                 
+                lda   N+1               ;PLA
+                adc   1,x               
+L2              ror   a                 
+                ror   N                 
+                ror   3,x               
+                ror   2,x               
+                dey                     
+                bne   L1                
+                sta   1,x               
+                lda   N                 
+                sta   0,x               
+                jmp   NEXT              
+
+;
+;                                       U/
+;                                       SCREEN 24 LINE 1
+;
+L418            db    $82,"U",$AF       
+                dw    L386              ;link to U*
+USLAS           dw    *+2               
+;          LDA 4,X   ; bugged code replaced - dr
+;          LDY 2,X
+;          STY 4,X
+;          ASL 
+;          STA 2,X
+;          LDA 5,X
+;          LDY 3,X
+;          STY 5,X
+;          ROL
+;          STA 3,X
+;          LDA #16
+;          STA N
+;L433      ROL 4,X
+;          ROL 5,X
+;          SEC
+;          LDA 4,X
+;          SBC 0,X
+;          TAY
+;          LDA 5,X
+;          SBC 1,X
+;          BCC L444
+;          STY 4,X
+;          STA 5,X
+;L444      ROL 2,X
+;          ROL 3,X
+;          DEC N
+;          BNE L433
+;          JMP POP
+
+;
+; updated code from 6502.org  - source code repository 32bit division
+;
+                sec                     ;Modified code - dr
+                lda   2,x               ;Subtract hi cell of dividend by
+                sbc   0,x               ;divisor to see if there's an overflow condition.
+                lda   3,x               
+                sbc   1,x               
+                bcs   oflow             ;Branch if /0 or overflow.
+                lda   #$11              ;Loop 17x.
+                sta   N                 ;Use N for loop counter.
+loopp           rol   4,x               ;Rotate dividend lo cell left one bit.
+                rol   5,x               
+                dec   N                 ;Decrement loop counter.
+                beq   endd              ;If we're done, then branch to end.
+                rol   2,x               ;Otherwise rotate dividend hi cell left one bit.
+                rol   3,x               
+;                stz   N+1 
+                pha 
+                lda #0
+                sta N+1
+                pla
+;
+                rol   N+1               ;Rotate the bit carried out of above into N+1.
+                sec                     
+                lda   2,x               ;Subtract dividend hi cell minus divisor.
+                sbc   0,x               
+                sta   N+2               ;Put result temporarily in N+2 (lo byte)
+                lda   3,x               
+                sbc   1,x               
+                tay                     ;and Y (hi byte).
+                lda   N+1               ;Remember now to bring in the bit carried out above.
+                sbc   #$00              
+                bcc   loopp             
+                lda   N+2               ;If that didn't cause a borrow,
+                sta   2,x               ;make the result from above to
+                sty   3,x               ;be the new dividend hi cell
+                bcs   loopp             ;and then brach up.  (NMOS 6502 can use BCS here.)
+oflow           lda   #$FF              ;If overflow or /0 condition found,
+                sta   2,x               ;just put FFFF in both the remainder
+                sta   3,x               
+                sta   4,x               ;and the quotient.
+                sta   5,x               
+endd            inx                     ;When you're done, show one less cell on data stack,
+                inx                     ;(INX INX is exactly what the Forth word DROP does)
+                jmp   SWAP+2            ;and swap the two top cells to put quotient on top.
+
+;
+;                                       AND
+;                                       SCREEN 25 LINE 2
+;
+L453            db    $83,"AN",$C4      
+                dw    L418              ;link to U/
+ANDD            dw    *+2               
+                lda   0,x               
+                and   2,x               
+                pha                     
+                lda   1,x               
+                and   3,x               
+;
+BINARY          inx                     
+                inx                     
+                jmp   PUT               
+;
+;                                       OR
+;                                       SCREEN 25 LINE 7
+;
+L469            db    $82,"O",$D2       
+                dw    L453              ;link to AND
+OR              dw    *+2               
+                lda   0,x               
+                ora   2,x               
+                pha                     
+                lda   1,x               
+                ora   3,x               
+                inx                     
+                inx                     
+                jmp   PUT               
+;
+;                                       XOR
+;                                       SCREEN 25 LINE 11
+;
+L484            db    $83,"XO",$D2      
+                dw    L469              ;link to OR
+XOR             dw    *+2               
+                lda   0,x               
+                eor   2,x               
+                pha                     
+                lda   1,x               
+                eor   3,x               
+                inx                     
+                inx                     
+                jmp   PUT               
+;
+;                                       SP@
+;                                       SCREEN 26 LINE 1
+;
+L499            db    $83,"SP",$C0      
+                dw    L484              ;link  to XOR
+SPAT            dw    *+2               
+                txa                     
+;
+PUSHOA          pha                     
+                lda   #0                
+                jmp   PUSH              
+;
+;                                       SP!
+;                                       SCREEN 26 LINE 5
+;
+;
+L511            db    $83,"SP",$A1      
+                dw    L499              ;link to SP@
+SPSTO           dw    *+2               
+                ldy   #6                
+                lda   (UP),y            ;load data stack pointer (X reg) from
+                tax                     ;silent user variable S0.
+                jmp   NEXT              
+;
+;                                       RP!
+;                                       SCREEN 26 LINE 8
+;
+L522            db    $83,"RP",$A1      
+                dw    L511              ;link to SP!
+RPSTO           dw    *+2               
+                stx   XSAVE             ;load return stack pointer (machine
+                ldy   #8                ;stack pointer) from silent user
+                lda   (UP),y            ;VARIABLE R0
+                tax                     
+                txs                     
+                ldx   XSAVE             
+                jmp   NEXT              
+;
+;                                       ;S
+;                                       SCREEN 26 LINE 12
+;
+L536            db    $82,"             ;",$D3
+                dw    L522              ;link to RP!
+SEMIS           dw    *+2               
+                pla                     
+                sta   IP                
+                pla                     
+                sta   IP+1              
+                jmp   NEXT              
+;
+;                                       LEAVE
+;                                       SCREEN 27 LINE  1
+;
+L548            db    $85,"LEAV",$C5    
+                dw    L536              ;link to ;S
+LEAVE           dw    *+2               
+                stx   XSAVE             
+                tsx                     
+                lda   $101,x            
+                sta   $103,x            
+                lda   $102,x            
+                sta   $104,x            
+                ldx   XSAVE             
+                jmp   NEXT              
+;
+;                                       >R
+;                                       SCREEN 27 LINE 5
+;
+L563            db    $82,">",$D2       
+                dw    L548              ;link to LEAVE
+TOR             dw    *+2               
+                lda   1,x               ;move high byte
+                pha                     
+                lda   0,x               ;then low byte
+                pha                     ;to return stack
+                inx                     
+                inx                     ;popping off data stack
+                jmp   NEXT              
+;
+;                                       R>
+;                                       SCREEN 27 LINE 8
+;
+L577            db    $82,"R",$BE       
+                dw    L563              ;link to >R
+RFROM           dw    *+2               
+                dex                     ;make room on data stack
+                dex                     
+                pla                     ;high byte
+                sta   0,x               
+                pla                     ;then low byte
+                sta   1,x               ;restored to data stack
+                jmp   NEXT              
+;
+;                                       R
+;                                       SCREEN 27 LINE 11
+;
+L591            db    $81,$D2           
+                dw    L577              ;link to R>
+R               dw    *+2               
+                stx   XSAVE             
+                tsx                     ;address return stack
+                lda   $101,x            ;copy bottom value
+                pha                     ;to data stack
+                lda   $102,x            
+                ldx   XSAVE             
+                jmp   PUSH              
+;
+;                                       0=
+;                                       SCREEN 28 LINE 2
+;
+L605            db    $82,"0",$BD       
+                dw    L591              ;link to R
+ZEQU            dw    *+2               
+                lda   1,x               ;Corrected from FD3/2 p69
+                sty   1,x               
+                ora   0,x               
+                bne   L613              
+                iny                     
+L613            sty   0,x               
+                jmp   NEXT              
+;
+;                                       0<
+;                                       SCREEN 28 LINE 6
+;
+L619            db    $82,"0",$BC       
+                dw    L605              ;link to 0=
+ZLESS           dw    *+2               
+                asl   1,x               
+                tya                     
+                rol   a                 
+                sty   1,x               
+                sta   0,x               
+                jmp   NEXT              
+;
+;                                       +
+;                                       SCREEN 29 LINE 1
+;
+L632            db    $81,$AB           
+                dw    L619              ;link to V-ADJ
+PLUS            dw    *+2               
+                clc                     
+                lda   0,x               
+                adc   2,x               
+                sta   2,x               
+                lda   1,x               
+                adc   3,x               
+                sta   3,x               
+                inx                     
+                inx                     
+                jmp   NEXT              
+;
+;                                       D+
+;                                       SCREEN 29 LINE 4
+;
+L649            db    $82,"D",$AB       
+                dw    L632              ;LINK TO +
+DPLUS           dw    *+2               
+                clc                     
+                lda   2,x               
+                adc   6,x               
+                sta   6,x               
+                lda   3,x               
+                adc   7,x               
+                sta   7,x               
+                lda   0,x               
+                adc   4,x               
+                sta   4,x               
+                lda   1,x               
+                adc   5,x               
+                sta   5,x               
+                jmp   POPTWO            
+;
+;                                       MINUS
+;                                       SCREEN 29 LINE 9
+;
+L670            db    $85,"MINU",$D3    
+                dw    L649              ;link to D+
+MINUS           dw    *+2               
+                sec                     
+                tya                     
+                sbc   0,x               
+                sta   0,x               
+                tya                     
+                sbc   1,x               
+                sta   1,x               
+                jmp   NEXT              
+;
+;                                       DMINUS
+;                                       SCREEN 29 LINE 12
+;
+L685            db    $86,"DMINU",$D3   
+                dw    L670              ;link to  MINUS
+DMINU           dw    *+2               
+                sec                     
+                tya                     
+                sbc   2,x               
+                sta   2,x               
+                tya                     
+                sbc   3,x               
+                sta   3,x               
+                jmp   MINUS+3           
+;
+;                                       OVER
+;                                       SCREEN 30 LINE 1
+;
+L700            db    $84,"OVE",$D2     
+                dw    L685              ;link to DMINUS
+OVER            dw    *+2               
+                lda   2,x               
+                pha                     
+                lda   3,x               
+                jmp   PUSH              
+;
+;                                       DROP
+;                                       SCREEN 30 LINE 4
+;
+L711            db    $84,"DRO",$D0     
+                dw    L700              ;link to OVER
+DROP            dw    POP               
+;
+;                                       SWAP
+;                                       SCREEN 30 LINE 8
+;
+L718            db    $84,"SWA",$D0     
+                dw    L711              ;link to DROP
+SWAP            dw    *+2               
+                lda   2,x               
+                pha                     
+                lda   0,x               
+                sta   2,x               
+                lda   3,x               
+                ldy   1,x               
+                sty   3,x               
+                jmp   PUT               
+;
+;                                       DUP
+;                                       SCREEN 30 LINE 21
+;
+L733            db    $83,"DU",$D0      
+                dw    L718              ;link to SWAP
+DUP             dw    *+2               
+                lda   0,x               
+                pha                     
+                lda   1,x               
+                jmp   PUSH              
+;
+;                                       +!
+;                                       SCREEN 31 LINE 2
+;
+L744            db    $82,"+",$A1       
+                dw    L733              ;link to DUP
+PSTOR           dw    *+2               
+                clc                     
+                lda   (0,x)             ;fetch 16 bit value addressed by
+                adc   2,x               ;bottom of  stack, adding to
+                sta   (0,x)             ;second item on stack, and return
+                inc   0,x               ;to memory
+                bne   L754              
+                inc   1,x               
+L754            lda   (0,x)             
+                adc   3,x               
+                sta   (0,x)             
+                jmp   POPTWO            
+;
+;                                       TOGGLE
+;                                       SCREEN 31 LINE 7
+;
+L762            db    $81,"TOGGL",$C5   
+                dw    L744              ;link to +!
+TOGGL           dw    *+2               
+                lda   (2,x)             ;complement bits in memory address
+                eor   0,x               ;second on stack, by pattern on
+                sta   (2,x)             ;bottom of stack.
+                jmp   POPTWO            
+;
+;                                       @
+;                                       SCREEN 32 LINE 1
+;
+L773            db    $81,$C0           
+                dw    L762              ;link to TOGGLE
+AT              dw    *+2               
+                lda   (0,x)             
+                pha                     
+                inc   0,x               
+                bne   L781              
+                inc   1,x               
+L781            lda   (0,x)             
+                jmp   PUT               
+;
+;                                       C@
+;                                       SCREEN 32 LINE 5
+;
+L787            db    $82,"C",$C0       
+                dw    L773              ;link to @
+CAT             dw    *+2               
+                lda   (0,x)             ;fetch byte addressed by bottom of
+                sta   0,x               ;stack to stack, zeroing the high
+                sty   1,x               ;byte
+                jmp   NEXT              
+;
+;                                       !
+;                                       SCREEN 32 LINE 8
+;
+L798            db    $81,$A1           
+                dw    L787              ;link to C@
+STORE           dw    *+2               
+                lda   2,x               
+                sta   (0,x)             ;store second 16bit value on stack
+                inc   0,x               ;to memory as addressed by bottom
+                bne   L806              ;of stack.
+                inc   1,x               
+L806            lda   3,x               
+                sta   (0,x)             
+                jmp   POPTWO            
+;
+;                                       C!
+;                                       SCREEN 32 LINE 12
+;
+L813            db    $82,"C",$A1       
+                dw    L798              ;link to !
+CSTOR           dw    *+2               
+                lda   2,x               
+                sta   (0,x)             
+                jmp   POPTWO            
+;
+;                                       :
+;                                       SCREEN 33 LINE 2
+;
+L823            db    $C1,$BA           
+                dw    L813              ;link to C!
+COLON           dw    DOCOL             
+                dw    QEXEC             
+                dw    SCSP              
+                dw    CURR              
+                dw    AT                
+                dw    CON               
+                dw    STORE             
+                dw    CREAT             
+                dw    RBRAC             
+                dw    PSCOD             
+;
+DOCOL           lda   IP+1              
+                pha                     
+                lda   IP                
+                pha                     
+                clc                     
+                lda   W                 
+                adc   #2                
+                sta   IP                
+                tya                     
+                adc   W+1               
+                sta   IP+1              
+                jmp   NEXT              
+;
+;                                       ;
+;                                       SCREEN 33 LINE 9
+;
+L853            db    $C1,$BB           
+                dw    L823              ;link to :
+                dw    DOCOL             
+                dw    QCSP              
+                dw    COMP              
+                dw    SEMIS             
+                dw    SMUDG             
+                dw    LBRAC             
+                dw    SEMIS             
+;
+;                                       CONSTANT
+;                                       SCREEN 34 LINE 1
+;
+L867            db    $88,"CONSTAN",$D4 
+                dw    L853              ;link to ;
+CONST           dw    DOCOL             
+                dw    CREAT             
+                dw    SMUDG             
+                dw    COMMA             
+                dw    PSCOD             
+;
+DOCON           ldy   #2                
+                lda   (W),y             
+                pha                     
+                iny                     
+                lda   (W),y             
+                jmp   PUSH              
+;
+;                                       VARIABLE
+;                                       SCREEN 34 LINE 5
+;
+L885            db    $88,"VARIABL",$C5 
+                dw    L867              ;link to CONSTANT
+VAR             dw    DOCOL             
+                dw    CONST             
+                dw    PSCOD             
+;
+DOVAR           clc                     
+                lda   W                 
+                adc   #2                
+                pha                     
+                tya                     
+                adc   W+1               
+                jmp   PUSH              
+;
+;                                       USER
+;                                       SCREEN 34 LINE 10
+;
+L902            db    $84,"USE",$D2     
+                dw    L885              ;link to VARIABLE
+USER            dw    DOCOL             
+                dw    CONST             
+                dw    PSCOD             
+;
+DOUSE           ldy   #2                
+                clc                     
+                lda   (W),y             
+                adc   UP                
+                pha                     
+                lda   #0                
+                adc   UP+1              
+                jmp   PUSH              
+;
+;                                       0
+;                                       SCREEN 35 LINE 2
+;
+L920            db    $81,$B0           
+                dw    L902              ;link to USER
+ZERO            dw    DOCON             
+                dw    0                 
+;
+;                                       1
+;                                       SCREEN 35 LINE 2
+;
+L928            db    $81,$B1           
+                dw    L920              ;link to 0
+ONE             dw    DOCON             
+                dw    1                 
+;
+;                                       2
+;                                       SCREEN 35 LINE 3
+;
+L936            db    $81,$B2           
+                dw    L928              ;link to 1
+TWO             dw    DOCON             
+                dw    2                 
+;
+;                                       3
+;                                       SCREEN 35 LINE 3
+;
+L944            db    $81,$B3           
+                dw    L936              ;link to 2
+THREE           dw    DOCON             
+                dw    3                 
+;
+;                                       BL
+;                                       SCREEN 35 LINE 4
+;
+L952            db    $82,"B",$CC       
+                dw    L944              ;link to 3
+BL              dw    DOCON             
+                dw    $20               
+;
+;                                       C/L
+;                                       SCREEN 35 LINE 5
+;                                       Characters per line
+L960            db    $83,"C/",$CC      
+                dw    L952              ;link to BL
+CSLL            dw    DOCON             
+                dw    64                
+;
+;                                       FIRST
+;                                       SCREEN 35 LINE 7
+;
+L968            db    $85,"FIRS",$D4    
+                dw    L960              ;link to C/L
+FIRST           dw    DOCON             
+                dw    DAREA             ;bottom of disk buffer area
+;
+;                                       LIMIT
+;                                       SCREEN 35 LINE 8
+;
+L976            db    $85,"LIMI",$D4    
+                dw    L968              ;link to FIRST
+LIMIT           dw    DOCON             
+                dw    UAREA             ;buffers end at user area
+;
+;                                       B/BUF
+;                                       SCREEN 35 LINE 9
+;                                       Bytes per Buffer
+;
+L984            db    $85,"B/BU",$C6    
+                dw    L976              ;link to LIMIT
+BBUF            dw    DOCON             
+                dw    SSIZE             ;sector size
+;
+;                                       B/SCR
+;                                       SCREEN 35 LINE 10
+;                                       Blocks per screen
+;
+L992            db    $85,"B/SC",$D2    
+                dw    L984              ;link to B/BUF
+BSCR            dw    DOCON             
+                dw    8                 ;blocks to make one screen
+
+
+
+
+
+;
+;                                       +ORIGIN
+;                                       SCREEN 35 LINE 12
+;
+L1000           db    $87,"+ORIGI",$CE  
+                dw    L992              ;link to B/SCR
+PORIG           dw    DOCOL             
+                dw    LIT,ORIG          
+                dw    PLUS              
+                dw    SEMIS             
+;
+;                                       TIB
+;                                       SCREEN 36 LINE 4
+;
+L1010           db    $83,"TI",$C2      
+                dw    L1000             ;link to +ORIGIN
+TIB             dw    DOUSE             
+                db    $A                
+;
+;                                       WIDTH
+;                                       SCREEN 36 LINE 5
+;
+L1018           db    $85,"WIDT",$C8    
+                dw    L1010             ;link to TIB
+WIDTH           dw    DOUSE             
+                db    $C                
+;
+;                                       WARNING
+;                                       SCREEN 36 LINE 6
+;
+L1026           db    $87,"WARNIN",$C7  
+                dw    L1018             ;link to WIDTH
+WARN            dw    DOUSE             
+                db    $E                
+;
+;                                       FENCE
+;                                       SCREEN 36 LINE 7
+;
+L1034           db    $85,"FENC",$C5    
+                dw    L1026             ;link to WARNING
+FENCE           dw    DOUSE             
+                db    $10               
+;
+;
+;                                       DP
+;                                       SCREEN 36 LINE 8
+;
+L1042           db    $82,"D",$D0       
+                dw    L1034             ;link to FENCE
+DP              dw    DOUSE             
+                db    $12               
+;
+;                                       VOC-LINK
+;                                       SCREEN 36 LINE 9
+;
+L1050           db    $88,"VOC-LIN",$CB 
+                dw    L1042             ;link to DP
+VOCL            dw    DOUSE             
+                db    $14               
+;
+;                                       BLK
+;                                       SCREEN 36 LINE 10
+;
+L1058           db    $83,"BL",$CB      
+                dw    L1050             ;link to VOC-LINK
+BLK             dw    DOUSE             
+                db    $16               
+;
+;                                       IN
+;                                       SCREEN 36 LINE 11
+;
+L1066           db    $82,"I",$CE       
+                dw    L1058             ;link to BLK
+IN              dw    DOUSE             
+                db    $18               
+;
+;                                       OUT
+;                                       SCREEN 36 LINE 12
+;
+L1074           db    $83,"OU",$D4      
+                dw    L1066             ;link to IN
+OUT             dw    DOUSE             
+                db    $1A               
+;
+;                                       SCR
+;                                       SCREEN 36 LINE 13
+;
+L1082           db    $83,"SC",$D2      
+                dw    L1074             ;link to OUT
+SCR             dw    DOUSE             
+                db    $1C               
+;
+;                                       OFFSET
+;                                       SCREEN 37 LINE 1
+;
+L1090           db    $86,"OFFSE",$D4   
+                dw    L1082             ;link to SCR
+OFSET           dw    DOUSE             
+                db    $1E               
+;
+;                                       CONTEXT
+;                                       SCREEN 37 LINE 2
+;
+L1098           db    $87,"CONTEX",$D4  
+                dw    L1090             ;link to OFFSET
+CON             dw    DOUSE             
+                db    $20               
+;
+;                                       CURRENT
+;                                       SCREEN 37 LINE 3
+;
+L1106           db    $87,"CURREN",$D4  
+                dw    L1098             ;link to CONTEXT
+CURR            dw    DOUSE             
+                db    $22               
+;
+;                                       STATE
+;                                       SCREEN 37 LINE 4
+;
+L1114           db    $85,"STAT",$C5    
+                dw    L1106             ;link to CURRENT
+STATE           dw    DOUSE             
+                db    $24               
+;
+;                                       BASE
+;                                       SCREEN 37 LINE 5
+;
+L1122           db    $84,"BAS",$C5     
+                dw    L1114             ;link to STATE
+BASE            dw    DOUSE             
+                db    $26               
+;
+;                                       DPL
+;                                       SCREEN 37 LINE 6
+;
+L1130           db    $83,"DP",$CC      
+                dw    L1122             ;link to BASE
+DPL             dw    DOUSE             
+                db    $28               
+;
+;                                       FLD
+;                                       SCREEN 37 LINE 7
+;
+L1138           db    $83,"FL",$C4      
+                dw    L1130             ;link to DPL
+FLD             dw    DOUSE             
+                db    $2A               
+;
+;
+;
+;                                       CSP
+;                                       SCREEN 37 LINE 8
+;
+L1146           db    $83,"CS",$D0      
+                dw    L1138             ;link to FLD
+CSP             dw    DOUSE             
+                db    $2C               
+;
+;                                       R#
+;                                       SCREEN 37  LINE 9
+;
+L1154           db    $82,"R",$A3       
+                dw    L1146             ;link to CSP
+RNUM            dw    DOUSE             
+                db    $2E               
+;
+;                                       HLD
+;                                       SCREEN 37 LINE 10
+;
+L1162           db    $83,"HL",$C4      
+                dw    L1154             ;link to R#
+HLD             dw    DOUSE             
+                db    $30               
+;
+;                                       1+
+;                                       SCREEN 38 LINE  1
+;
+L1170           db    $82,"1",$AB       
+                dw    L1162             ;link to HLD
+ONEP            dw    DOCOL             
+                dw    ONE               
+                dw    PLUS              
+                dw    SEMIS             
+;
+;                                       2+
+;                                       SCREEN 38 LINE 2
+;
+L1180           db    $82,"2",$AB       
+                dw    L1170             ;link to 1+
+TWOP            dw    DOCOL             
+                dw    TWO               
+                dw    PLUS              
+                dw    SEMIS             
+;
+;                                       HERE
+;                                       SCREEN 38 LINE 3
+;
+L1190           db    $84,"HER",$C5     
+                dw    L1180             ;link to 2+
+HERE            dw    DOCOL             
+                dw    DP                
+                dw    AT                
+                dw    SEMIS             
+;
+;                                       ALLOT
+;                                       SCREEN 38 LINE 4
+;
+L1200           db    $85,"ALLO",$D4    
+                dw    L1190             ;link to HERE
+ALLOT           dw    DOCOL             
+                dw    DP                
+                dw    PSTOR             
+                dw    SEMIS             
+;
+;                                       ,
+;                                       SCREEN 38 LINE 5
+;
+L1210           db    $81,$AC           
+                dw    L1200             ;link to ALLOT
+COMMA           dw    DOCOL             
+                dw    HERE              
+                dw    STORE             
+                dw    TWO               
+                dw    ALLOT             
+                dw    SEMIS             
+;
+;                                       C,
+;                                       SCREEN 38 LINE 6
+;
+L1222           db    $82,"C",$AC       
+                dw    L1210             ;link to ,
+CCOMM           dw    DOCOL             
+                dw    HERE              
+                dw    CSTOR             
+                dw    ONE               
+                dw    ALLOT             
+                dw    SEMIS             
+;
+;                                       -
+;                                       SCREEN 38 LINE 7
+;
+L1234           db    $81,$AD           
+                dw    L1222             ;link to C,
+SUB             dw    DOCOL             
+                dw    MINUS             
+                dw    PLUS              
+                dw    SEMIS             
+;
+;                                       =
+;                                       SCREEN 38 LINE 8
+;
+L1244           db    $81,$BD           
+                dw    L1234             ;link to -
+EQUAL           dw    DOCOL             
+                dw    SUB               
+                dw    ZEQU              
+                dw    SEMIS             
+;
+;                                       U<
+;                                       Unsigned less than
+;
+L1246           db    $82,"U",$BC       
+                dw    L1244             ;link to =
+ULESS           dw    DOCOL             
+                dw    SUB               ;subtract two values
+                dw    ZLESS             ;test sign
+                dw    SEMIS             
+;
+;                                       <
+;                                       Altered from model
+;                                       SCREEN 38 LINE 9
+;
+L1254           db    $81,$BC           
+                dw    L1246             ;link to U<
+LESS            dw    *+2               
+                sec                     
+                lda   2,x               
+                sbc   0,x               ;subtract
+                lda   3,x               
+                sbc   1,x               
+                sty   3,x               ;zero high byte
+                bvc   L1258             
+                eor   #$80              ;correct overflow
+L1258           bpl   L1260             
+                iny                     ;invert boolean
+L1260           sty   2,x               ;leave boolean
+                jmp   POP               
+;
+;                                       >
+;                                       SCREEN 38 LINE 10
+L1264           db    $81,$BE           
+                dw    L1254             ;link to <
+GREAT           dw    DOCOL             
+                dw    SWAP              
+                dw    LESS              
+                dw    SEMIS             
+;
+;                                       ROT
+;                                       SCREEN 38 LINE 11
+;
+L1274           db    $83,"RO",$D4      
+                dw    L1264             ;link to >
+ROT             dw    DOCOL             
+                dw    TOR               
+                dw    SWAP              
+                dw    RFROM             
+                dw    SWAP              
+                dw    SEMIS             
+;
+;                                       SPACE
+;                                       SCREEN 38 LINE 12
+;
+L1286           db    $85,"SPAC",$C5    
+                dw    L1274             ;link to ROT
+SPACE           dw    DOCOL             
+                dw    BL                
+                dw    EMIT              
+                dw    SEMIS             
+;
+;                                       -DUP
+;                                       SCREEN 38 LINE 13
+;
+L1296           db    $84,"-DU",$D0     
+                dw    L1286             ;link to SPACE
+DDUP            dw    DOCOL             
+                dw    DUP               
+                dw    ZBRAN             
+L1301           dw    $4                ;L1303-L1301
+                dw    DUP               
+L1303           dw    SEMIS             
+;
+;                                       TRAVERSE
+;                                       SCREEN 39 LINE 14
+;
+L1308           db    $88,"TRAVERS",$C5 
+                dw    L1296             ;link to -DUP
+TRAV            dw    DOCOL             
+                dw    SWAP              
+L1312           dw    OVER              
+                dw    PLUS              
+                dw    CLIT              
+                db    $7F               
+                dw    OVER              
+                dw    CAT               
+                dw    LESS              
+                dw    ZBRAN             
+L1320           dw    $FFF1             ;L1312-L1320
+                dw    SWAP              
+                dw    DROP              
+                dw    SEMIS             
+;
+;                                       LATEST
+;                                       SCREEN 39 LINE 6
+;
+L1328           db    $86,"LATES",$D4   
+                dw    L1308             ;link to TRAVERSE
+LATES           dw    DOCOL             
+                dw    CURR              
+                dw    AT                
+                dw    AT                
+                dw    SEMIS             
+;
+;
+;                                       LFA
+;                                       SCREEN 39 LINE 11
+;
+L1339           db    $83,"LF",$C1      
+                dw    L1328             ;link to LATEST
+LFA             dw    DOCOL             
+                dw    CLIT              
+                db    4                 
+                dw    SUB               
+                dw    SEMIS             
+;
+;                                       CFA
+;                                       SCREEN 39 LINE 12
+;
+L1350           db    $83,"CF",$C1      
+                dw    L1339             ;link to LFA
+CFA             dw    DOCOL             
+                dw    TWO               
+                dw    SUB               
+                dw    SEMIS             
+;
+;                                       NFA
+;                                       SCREEN 39 LIINE 13
+;
+L1360           db    $83,"NF",$C1      
+                dw    L1350             ;link to CFA
+NFA             dw    DOCOL             
+                dw    CLIT              
+                db    $5                
+                dw    SUB               
+                dw    LIT,$FFFF         
+                dw    TRAV              
+                dw    SEMIS             
+;
+;                                       PFA
+;                                       SCREEN 39 LINE 14
+;
+L1373           db    $83,"PF",$C1      
+                dw    L1360             ;link to NFA
+PFA             dw    DOCOL             
+                dw    ONE               
+                dw    TRAV              
+                dw    CLIT              
+                db    5                 
+                dw    PLUS              
+                dw    SEMIS             
+;
+;                                       !CSP
+;                                       SCREEN 40 LINE 1
+;
+L1386           db    $84,"!CS",$D0     
+                dw    L1373             ;link to PFA
+SCSP            dw    DOCOL             
+                dw    SPAT              
+                dw    CSP               
+                dw    STORE             
+                dw    SEMIS             
+;
+;                                       ?ERROR
+;                                       SCREEN 40 LINE 3
+;
+L1397           db    $86,"?ERRO",$D2   
+                dw    L1386             ;link to !CSP
+QERR            dw    DOCOL             
+                dw    SWAP              
+                dw    ZBRAN             
+L1402           dw    8                 ;L1406-L1402
+                dw    ERROR             
+                dw    BRAN              
+L1405           dw    4                 ;L1407-L1405
+L1406           dw    DROP              
+L1407           dw    SEMIS             
+;
+;                                       ?COMP
+;                                       SCREEN 40 LINE 6
+;
+L1412           db    $85,"?COM",$D0    
+                dw    L1397             ;link to ?ERROR
+QCOMP           dw    DOCOL             
+                dw    STATE             
+                dw    AT                
+                dw    ZEQU              
+                dw    CLIT              
+                db    $11               
+                dw    QERR              
+                dw    SEMIS             
+;
+;                                       ?EXEC
+;                                       SCREEN 40 LINE 8
+;
+L1426           db    $85,"?EXE",$C3    
+                dw    L1412             ;link to ?COMP
+QEXEC           dw    DOCOL             
+                dw    STATE             
+                dw    AT                
+                dw    CLIT              
+                db    $12               
+                dw    QERR              
+                dw    SEMIS             
+;
+;                                       ?PAIRS
+;                                       SCREEN 40 LINE 10
+;
+L1439           db    $86,"?PAIR",$D3   
+                dw    L1426             ;link to ?EXEC
+QPAIR           dw    DOCOL             
+                dw    SUB               
+                dw    CLIT              
+                db    $13               
+                dw    QERR              
+                dw    SEMIS             
+;
+;                                       ?CSP
+;                                       SCREEN 40 LINE 12
+;
+L1451           db    $84,"?CS",$D0     
+                dw    L1439             ;link to ?PAIRS
+QCSP            dw    DOCOL             
+                dw    SPAT              
+                dw    CSP               
+                dw    AT                
+                dw    SUB               
+                dw    CLIT              
+                db    $14               
+                dw    QERR              
+                dw    SEMIS             
+;
+;                                       ?LOADING
+;                                       SCREEN 40 LINE 14
+;
+L1466           db    $88,"?LOADIN",$C7 
+                dw    L1451             ;link to ?CSP
+QLOAD           dw    DOCOL             
+                dw    BLK               
+                dw    AT                
+                dw    ZEQU              
+                dw    CLIT              
+                db    $16               
+                dw    QERR              
+                dw    SEMIS             
+;
+;                                       COMPILE
+;                                       SCREEN 41 LINE 2
+;
+L1480           db    $87,"COMPIL",$C5  
+                dw    L1466             ;link to ?LOADING
+COMP            dw    DOCOL             
+                dw    QCOMP             
+                dw    RFROM             
+                dw    DUP               
+                dw    TWOP              
+                dw    TOR               
+                dw    AT                
+                dw    COMMA             
+                dw    SEMIS             
+;
+;                                       [
+;                                       SCREEN 41 LINE 5
+;
+L1495           db    $C1,$DB           
+                dw    L1480             ;link to COMPILE
+LBRAC           dw    DOCOL             
+                dw    ZERO              
+                dw    STATE             
+                dw    STORE             
+                dw    SEMIS             
+;
+;                                       ]
+;                                       SCREEN 41 LINE 7
+;
+L1507           db    $81,$DD           
+                dw    L1495             ;link to [
+RBRAC           dw    DOCOL             
+                dw    CLIT              
+                db    $C0               
+                dw    STATE             
+                dw    STORE             
+                dw    SEMIS             
+;
+;                                       SMUDGE
+;                                       SCREEN 41 LINE 9
+;
+L1519           db    $86,"SMUDG",$C5   
+                dw    L1507             ;link to ]
+SMUDG           dw    DOCOL             
+                dw    LATES             
+                dw    CLIT              
+                db    $20               
+                dw    TOGGL             
+                dw    SEMIS             
+;
+;                                       HEX
+;                                       SCREEN 41 LINE 11
+;
+L1531           db    $83,"HE",$D8      
+                dw    L1519             ;link to SMUDGE
+HEX             dw    DOCOL             
+                dw    CLIT              
+                db    16                
+                dw    BASE              
+                dw    STORE             
+                dw    SEMIS             
+;
+;                                       DECIMAL
+;                                       SCREEN 41 LINE 13
+;
+L1543           db    $87,"DECIMA",$CC  
+                dw    L1531             ;link to HEX
+DECIM 
+                dw    DOCOL             
+                dw    CLIT              
+                db    10                
+                dw    BASE              
+                dw    STORE             
+                dw    SEMIS    
+;
+;
+;
+;                                       (;CODE)
+;                                       SCREEN 42 LINE 2
+;
+L1555           db    $87,"(            ;CODE",$A9
+                dw    L1543             ;link to DECIMAL
+PSCOD           dw    DOCOL             
+                dw    RFROM             
+                dw    LATES             
+                dw    PFA               
+                dw    CFA               
+                dw    STORE             
+                dw    SEMIS             
+;
+;                                       ;CODE
+;                                       SCREEN 42 LINE 6
+;
+L1568           db    $C5,"             ;COD",$C5
+                dw    L1555             ;link to (;CODE)
+                dw    DOCOL             
+                dw    QCSP              
+                dw    COMP              
+                dw    PSCOD             
+                dw    LBRAC             
+                dw    SMUDG             
+                dw    SEMIS             
+;
+;                                       <BUILDS
+;                                       SCREEN 43 LINE 2
+;
+L1582           db    $87,"<BUILD",$D3  
+                dw    L1568             ;link to ;CODE
+BUILD           dw    DOCOL             
+                dw    ZERO              
+                dw    CONST             
+                dw    SEMIS             
+;
+;                                       DOES>
+;                                       SCREEN 43 LINE 4
+;
+L1592           db    $85,"DOES",$BE    
+                dw    L1582             ;link to <BUILDS
+DOES            dw    DOCOL             
+                dw    RFROM             
+                dw    LATES             
+                dw    PFA               
+                dw    STORE             
+                dw    PSCOD             
+;
+DODOE           lda   IP+1              
+                pha                     
+                lda   IP                
+                pha                     
+                ldy   #2                
+                lda   (W),y             
+                sta   IP                
+                iny                     
+                lda   (W),y             
+                sta   IP+1              
+                clc                     
+                lda   W                 
+                adc   #4                
+                pha                     
+                lda   W+1               
+                adc   #0                
+                jmp   PUSH              
+;
+;                                       COUNT
+;                                       SCREEN 44 LINE 1
+;
+L1622           db    $85,"COUN",$D4    
+                dw    L1592             ;link to DOES>
+COUNT           dw    DOCOL             
+                dw    DUP               
+                dw    ONEP              
+                dw    SWAP              
+                dw    CAT               
+                dw    SEMIS             
+;
+;                                       TYPE
+;                                       SCREEN 44 LINE 2
+;
+L1634           db    $84,"TYP",$C5     
+                dw    L1622             ;link to COUNT
+TYPE            dw    DOCOL             
+                dw    DDUP              
+                dw    ZBRAN             
+L1639           dw    $18               ;L1651-L1639
+                dw    OVER              
+                dw    PLUS              
+                dw    SWAP              
+                dw    PDO               
+L1644           dw    I                 
+                dw    CAT               
+                dw    EMIT              
+                dw    PLOOP             
+L1648           dw    $FFF8             ;L1644-L1648
+                dw    BRAN              
+L1650           dw    $4                ;L1652-L1650
+L1651           dw    DROP              
+L1652           dw    SEMIS             
+;
+;                                       -TRAILING
+;                                       SCREEN 44 LINE 5
+;
+L1657           db    $89,"-TRAILIN",$C7
+                dw    L1634             ;link to TYPE
+DTRAI           dw    DOCOL             
+                dw    DUP               
+                dw    ZERO              
+                dw    PDO               
+L1663           dw    OVER              
+                dw    OVER              
+                dw    PLUS              
+                dw    ONE               
+                dw    SUB               
+                dw    CAT               
+                dw    BL                
+                dw    SUB               
+                dw    ZBRAN             
+L1672           dw    8                 ;L1676-L1672
+                dw    LEAVE             
+                dw    BRAN              
+L1675           dw    6                 ;L1678-L1675
+L1676           dw    ONE               
+                dw    SUB               
+L1678           dw    PLOOP             
+L1679           dw    $FFE0             ;L1663-L1679
+                dw    SEMIS             
+;
+;                                       (.")
+;                                       SCREEN 44 LINE 8
+L1685           db    $84,"(.",$22,$A9  ;$84 (." $A9
+                dw    L1657             ;link to -TRAILING
+PDOTQ           dw    DOCOL             
+                dw    R                 
+                dw    COUNT             
+                dw    DUP               
+                dw    ONEP              
+                dw    RFROM             
+                dw    PLUS              
+                dw    TOR               
+                dw    TYPE              
+                dw    SEMIS             
+;
+;                                       ."
+;                                       SCREEN 44 LINE12
+;
+L1701           db    $C2,".",$A2       
+                dw    L1685             ;link to PDOTQ
+                dw    DOCOL             
+                dw    CLIT              
+                db    $22               
+                dw    STATE             
+                dw    AT                
+                dw    ZBRAN             
+L1709           dw    $14               ;L1719-L1709
+                dw    COMP              
+                dw    PDOTQ             
+                dw    WORD              
+                dw    HERE              
+                dw    CAT               
+                dw    ONEP              
+                dw    ALLOT             
+                dw    BRAN              
+L1718           dw    $A                ;L1723-L1718
+L1719           dw    WORD              
+                dw    HERE              
+                dw    COUNT             
+                dw    TYPE              
+L1723           dw    SEMIS             
+;
+;                                       EXPECT
+;                                       SCREEN 45 LINE 2
+;
+L1729           db    $86,"EXPEC",$D4   
+                dw    L1701             ;link to ."
+EXPEC           dw    DOCOL             
+                dw    OVER              
+                dw    PLUS              
+                dw    OVER              
+                dw    PDO               
+L1736           dw    KEY               
+                dw    DUP               
+                dw    CLIT              
+                db    $E                
+                dw    PORIG             
+                dw    AT                
+                dw    EQUAL             
+                dw    ZBRAN             
+L1744           dw    $1F               ;L1760-L1744
+                dw    DROP              
+                dw    CLIT              
+                db    08                ;Backspace!
+                dw    OVER              
+                dw    I                 
+                dw    EQUAL             
+                dw    DUP               
+                dw    RFROM             
+                dw    TWO               
+                dw    SUB               
+                dw    PLUS              
+                dw    TOR               
+                dw    SUB               
+                dw    BRAN              
+L1759           dw    $27               ;L1779-L1759
+L1760           dw    DUP               
+                dw    CLIT              
+                db    $0D               
+                dw    EQUAL             
+                dw    ZBRAN             
+L1765           dw    $0E               ;L1772-L1765
+                dw    LEAVE             
+                dw    DROP              
+                dw    BL                
+                dw    ZERO              
+                dw    BRAN              
+L1771           dw    04                ;L1773-L1771
+L1772           dw    DUP               
+L1773           dw    I                 
+                dw    CSTOR             
+                dw    ZERO              
+                dw    I                 
+                dw    ONEP              
+                dw    STORE             
+L1779           dw    EMIT              
+                dw    PLOOP             
+L1781           dw    $FFA9             
+                dw    DROP              ;L1736-L1781
+                dw    SEMIS             
+;
+;                                       QUERY
+;                                       SCREEN 45 LINE 9
+;
+L1788           db    $85,"QUER",$D9    
+                dw    L1729             ;link to EXPECT
+QUERY           dw    DOCOL             
+                dw    TIB               
+                dw    AT                
+                dw    CLIT              
+                db    80                ;80 characters from terminal
+                dw    EXPEC             
+                dw    ZERO              
+                dw    IN                
+                dw    STORE             
+                dw    SEMIS             
+;
+;                                       X
+;                                       SCREEN 45 LINE 11
+;                                       Actually Ascii Null
+;
+L1804           db    $C1,$80           
+                dw    L1788             ;link to QUERY
+                dw    DOCOL             
+                dw    BLK               
+                dw    AT                
+                dw    ZBRAN             
+L1810           dw    $2A               ;L1830-l1810
+                dw    ONE               
+                dw    BLK               
+                dw    PSTOR             
+                dw    ZERO              
+                dw    IN                
+                dw    STORE             
+                dw    BLK               
+                dw    AT                
+                dw    ZERO,BSCR         
+                dw    USLAS             
+                dw    DROP              ;fixed from model
+                dw    ZEQU              
+                dw    ZBRAN             
+L1824           dw    8                 ;L1828-L1824
+                dw    QEXEC             
+                dw    RFROM             
+                dw    DROP              
+L1828           dw    BRAN              
+L1829           dw    6                 ;L1832-L1829
+L1830           dw    RFROM             
+                dw    DROP              
+L1832           dw    SEMIS             
+;
+;                                       FILL
+;                                       SCREEN 46 LINE 1
+;
+;
+L1838           db    $84,"FIL",$CC     
+                dw    L1804             ;link to X
+FILL            dw    DOCOL             
+                dw    SWAP              
+                dw    TOR               
+                dw    OVER              
+                dw    CSTOR             
+                dw    DUP               
+                dw    ONEP              
+                dw    RFROM             
+                dw    ONE               
+                dw    SUB               
+                dw    CMOVE             
+                dw    SEMIS             
+;
+;                                       ERASE
+;                                       SCREEN 46 LINE 4
+;
+L1856           db    $85,"ERAS",$C5    
+                dw    L1838             ;link to FILL
+ERASE           dw    DOCOL             
+                dw    ZERO              
+                dw    FILL              
+                dw    SEMIS             
+;
+;                                       BLANKS
+;                                       SCREEN 46 LINE 7
+;
+L1866           db    $86,"BLANK",$D3   
+                dw    L1856             ;link to ERASE
+BLANK           dw    DOCOL             
+                dw    BL                
+                dw    FILL              
+                dw    SEMIS             
+;
+;                                       HOLD
+;                                       SCREEN 46 LINE 10
+;
+L1876           db    $84,"HOL",$C4     
+                dw    L1866             ;link to BLANKS
+HOLD            dw    DOCOL             
+                dw    LIT,$FFFF         
+                dw    HLD               
+                dw    PSTOR             
+                dw    HLD               
+                dw    AT                
+                dw    CSTOR             
+                dw    SEMIS             
+;
+;                                       PAD
+;                                       SCREEN 46 LINE 13
+;
+L1890           db    $83,"PA",$C4      
+                dw    L1876             ;link to HOLD
+PAD             dw    DOCOL             
+                dw    HERE              
+                dw    CLIT              
+                db    68                ;PAD is 68 bytes above here.
+                dw    PLUS              
+                dw    SEMIS             
+;
+;                                       WORD
+;                                       SCREEN 47 LINE 1
+;
+L1902           db    $84,"WOR",$C4     
+                dw    L1890             ;link to PAD
+WORD            dw    DOCOL             
+                dw    BLK               
+                dw    AT                
+                dw    ZBRAN             
+L1908           dw    $C                ;L1914-L1908
+                dw    BLK               
+                dw    AT                
+                dw    BLOCK             
+                dw    BRAN              
+L1913           dw    $6                ;L1916-L1913
+L1914           dw    TIB               
+                dw    AT                
+L1916           dw    IN                
+                dw    AT                
+                dw    PLUS              
+                dw    SWAP              
+                dw    ENCL              
+                dw    HERE              
+                dw    CLIT              
+                db    $22               
+                dw    BLANK             
+                dw    IN                
+                dw    PSTOR             
+                dw    OVER              
+                dw    SUB               
+                dw    TOR               
+                dw    R                 
+                dw    HERE              
+                dw    CSTOR             
+                dw    PLUS              
+                dw    HERE              
+                dw    ONEP              
+                dw    RFROM             
+                dw    CMOVE             
+                dw    SEMIS             
+;
+;                                       UPPER
+;                                       SCREEN 47 LINE 12
+;
+L1943           db    $85,"UPPE",$D2    
+                dw    L1902             ;link to WORD
+UPPER           dw    DOCOL             
+                dw    OVER              ;This routine converts text to U case
+                dw    PLUS              ;It allows interpretation from a term.
+                dw    SWAP              ;without a shift-lock.
+                dw    PDO               
+L1950           dw    I                 
+                dw    CAT               
+                dw    CLIT              
+                db    $5F               
+                dw    GREAT             
+                dw    ZBRAN             
+L1956           dw    09                ;L1961-L1956
+                dw    I                 
+                dw    CLIT              
+                db    $20               
+                dw    TOGGL             
+L1961           dw    PLOOP             
+L1962           dw    $FFEA             ;L1950-L1962
+                dw    SEMIS             
+;
+;                                       (NUMBER)
+;                                       SCREEN 48 LINE 1
+;
+L1968           db    $88,"(NUMBER",$A9 
+                dw    L1943             ;link to UPPER
+PNUMB           dw    DOCOL             
+L1971           dw    ONEP              
+                dw    DUP               
+                dw    TOR               
+                dw    CAT               
+                dw    BASE              
+                dw    AT                
+                dw    DIGIT             
+                dw    ZBRAN             
+L1979           dw    $2C               ;L2001-L1979
+                dw    SWAP              
+                dw    BASE              
+                dw    AT                
+                dw    USTAR             
+                dw    DROP              
+                dw    ROT               
+                dw    BASE              
+                dw    AT                
+                dw    USTAR             
+                dw    DPLUS             
+                dw    DPL               
+                dw    AT                
+                dw    ONEP              
+                dw    ZBRAN             
+L1994           dw    8                 ;L1998-L1994
+                dw    ONE               
+                dw    DPL               
+                dw    PSTOR             
+L1998           dw    RFROM             
+                dw    BRAN              
+L2000           dw    $FFC6             ;L1971-L2000
+L2001           dw    RFROM             
+                dw    SEMIS             
+;
+;                                       NUMBER
+;                                       SCREEN 48 LINE 6
+;
+L2007           db    $86,"NUMBE",$D2   
+                dw    L1968             ;link to (NUMBER)
+NUMBER          dw    DOCOL             
+                dw    ZERO              
+                dw    ZERO              
+                dw    ROT               
+                dw    DUP               
+                dw    ONEP              
+                dw    CAT               
+                dw    CLIT              
+                db    $2D               
+                dw    EQUAL             
+                dw    DUP               
+                dw    TOR               
+                dw    PLUS              
+                dw    LIT,$FFFF         
+L2023           dw    DPL               
+                dw    STORE             
+                dw    PNUMB             
+                dw    DUP               
+                dw    CAT               
+                dw    BL                
+                dw    SUB               
+                dw    ZBRAN             
+L2031           dw    $15               ;L2042-L2031
+                dw    DUP               
+                dw    CAT               
+                dw    CLIT              
+                db    $2E               
+                dw    SUB               
+                dw    ZERO              
+                dw    QERR              
+                dw    ZERO              
+                dw    BRAN              
+L2041           dw    $FFDD             ;L2023-L2041
+L2042           dw    DROP              
+                dw    RFROM             
+                dw    ZBRAN             
+L2045           dw    4                 ;L2047-L2045
+                dw    DMINU             
+L2047           dw    SEMIS             
+;
+;                                       -FIND
+;                                       SCREEN 48 LINE 12
+;
+L2052           db    $85,"-FIN",$C4    
+                dw    L2007             ;link to NUMBER
+DFIND           dw    DOCOL             
+                dw    BL                
+                dw    WORD              
+                dw    HERE              ;)
+                dw    COUNT             ;|- Optional allowing free use of low
+                dw    UPPER             ;)  case from terminal
+                dw    HERE              
+                dw    CON               
+                dw    AT                
+                dw    AT                
+                dw    PFIND             
+                dw    DUP               
+                dw    ZEQU              
+                dw    ZBRAN             
+L2068           dw    $A                ;L2073-L2068
+                dw    DROP              
+                dw    HERE              
+                dw    LATES             
+                dw    PFIND             
+L2073           dw    SEMIS             
+;
+;                                       (ABORT)
+;                                       SCREEN 49 LINE 2
+;
+L2078           db    $87,"(ABORT",$A9  
+                dw    L2052             ;link to -FIND
+PABOR           dw    DOCOL             
+                dw    ABORT             
+                dw    SEMIS             
+;
+;                                       ERROR
+;                                       SCREEN 49 LINE 4
+;
+L2087           db    $85,"ERRO",$D2    
+                dw    L2078             ;link to (ABORT)
+ERROR           dw    DOCOL             
+                dw    WARN              
+                dw    AT                
+                dw    ZLESS             
+                dw    ZBRAN             
+L2094           dw    $4                ;L2096-L2094
+                dw    PABOR             
+L2096           dw    HERE              
+                dw    COUNT             
+                dw    TYPE              
+                dw    PDOTQ             
+                db    4,"  ? "          
+                dw    MESS              
+                dw    SPSTO             
+                dw    DROP,DROP         ;make room for 2 error values
+                dw    IN                
+                dw    AT                
+                dw    BLK               
+                dw    AT                
+                dw    QUIT              
+                dw    SEMIS             
+;
+;                                       ID.
+;                                       SCREEN 49 LINE 9
+;
+L2113           db    $83,"ID",$AE      
+                dw    L2087             ;link to ERROR
+IDDOT           dw    DOCOL             
+                dw    PAD               
+                dw    CLIT              
+                db    $20               
+                dw    CLIT              
+                db    $5F               
+                dw    FILL              
+                dw    DUP               
+                dw    PFA               
+                dw    LFA               
+                dw    OVER              
+                dw    SUB               
+                dw    PAD               
+                dw    SWAP              
+                dw    CMOVE             
+                dw    PAD               
+                dw    COUNT             
+                dw    CLIT              
+                db    $1F               
+                dw    ANDD              
+                dw    TYPE              
+                dw    SPACE             
+                dw    SEMIS             
+;
+;                                       CREATE
+;                                       SCREEN 50 LINE 2
+;
+L2142           db    $86,"CREAT",$C5   
+                dw    L2113             ;link to ID
+CREAT           dw    DOCOL             
+                dw    TIB               ;)
+                dw    HERE              ;|
+                dw    CLIT              ;|  6502 only, assures
+                db    $A0               ;|  room exists in dict.
+                dw    PLUS              ;|
+                dw    ULESS             ;|
+                dw    TWO               ;|
+                dw    QERR              ;)
+                dw    DFIND             
+                dw    ZBRAN             
+L2155           dw    $0F               
+                dw    DROP              
+                dw    NFA               
+                dw    IDDOT             
+                dw    CLIT              
+                db    4                 
+                dw    MESS              
+                dw    SPACE             
+L2163           dw    HERE              
+                dw    DUP               
+                dw    CAT               
+                dw    WIDTH             
+                dw    AT                
+                dw    MIN               
+                dw    ONEP              
+                dw    ALLOT             
+                dw    DP                ;)
+                dw    CAT               ;| 6502 only. The code field
+                dw    CLIT              ;| must not straddle page
+                db    $FD               ;| boundaries
+                dw    EQUAL             ;|
+                dw    ALLOT             ;)
+                dw    DUP               
+                dw    CLIT              
+                db    $A0               
+                dw    TOGGL             
+                dw    HERE              
+                dw    ONE               
+                dw    SUB               
+                dw    CLIT              
+                db    $80               
+                dw    TOGGL             
+                dw    LATES             
+                dw    COMMA             
+                dw    CURR              
+                dw    AT                
+                dw    STORE             
+                dw    HERE              
+                dw    TWOP              
+                dw    COMMA             
+                dw    SEMIS             
+;
+;                                       [COMPILE]
+;                                       SCREEN 51 LINE 2
+;
+L2200           db    $C9,"[COMPILE",$DD
+                dw    L2142             ;link to CREATE
+                dw    DOCOL             
+                dw    DFIND             
+                dw    ZEQU              
+                dw    ZERO              
+                dw    QERR              
+                dw    DROP              
+                dw    CFA               
+                dw    COMMA             
+                dw    SEMIS             
+;
+;                                       LITERAL
+;                                       SCREEN 51 LINE 2
+;
+L2216           db    $C7,"LITERA",$CC  
+                dw    L2200             ;link to [COMPILE]
+LITER           dw    DOCOL        
+                dw    STATE             
+                dw    AT                
+                dw    ZBRAN             
+L2222           dw    8                 ;L2226-L2222
+                dw    COMP              
+                dw    LIT               
+                dw    COMMA             
+L2226           dw    SEMIS             
+;
+;                                       DLITERAL
+;                                       SCREEN 51 LINE 8
+;
+L2232           db    $C8,"DLITERA",$CC 
+                dw    L2216             ;link to LITERAL
+DLIT            dw    DOCOL             
+                dw    STATE             
+                dw    AT                
+                dw    ZBRAN             
+L2238           dw    8                 ;L2242-L2238
+                dw    SWAP              
+                dw    LITER             
+                dw    LITER             
+L2242           dw    SEMIS             
+;
+;                                       ?STACK
+;                                       SCREEN 51 LINE 13
+;
+L2248           db    $86,"?STAC",$CB   
+                dw    L2232             ;link to DLITERAL
+QSTAC           dw    DOCOL             
+                dw    CLIT              
+                db    TOS               
+                dw    SPAT              
+                dw    ULESS             
+                dw    ONE               
+                dw    QERR              
+                dw    SPAT              
+                dw    CLIT              
+                db    BOS               
+                dw    ULESS             
+                dw    CLIT              
+                db    7                 
+                dw    QERR              
+                dw    SEMIS             
+;
+;                                       INTERPRET
+;                                       SCREEN 52 LINE 2
+;
+L2269           db    $89,"INTERPRE",$D4
+                dw    L2248             ;link to ?STACK
+INTER           dw    DOCOL             
+L2272           dw    DFIND             
+                dw    ZBRAN             
+L2274           dw    $1E               ;L2289-L2274
+                dw    STATE             
+                dw    AT                
+                dw    LESS              
+                dw    ZBRAN             
+L2279           dw    $A                ;L2284-L2279
+                dw    CFA               
+                dw    COMMA             
+                dw    BRAN              
+L2283           dw    $6                ;L2286-L2283
+L2284           dw    CFA               
+                dw    EXEC              
+L2286           dw    QSTAC             
+                dw    BRAN              
+L2288           dw    $1C               ;L2302-L2288
+L2289           dw    HERE              
+                dw    NUMBER            
+                dw    DPL               
+                dw    AT                
+                dw    ONEP              
+                dw    ZBRAN             
+L2295           dw    8                 ;L2299-L2295
+                dw    DLIT              
+                dw    BRAN              
+L2298           dw    $6                ;L2301-L2298
+L2299           dw    DROP              
+                dw    LITER             
+L2301           dw    QSTAC             
+L2302           dw    BRAN              
+L2303           dw    $FFC2             ;L2272-L2303
+;
+;                                       IMMEDIATE
+;                                       SCREEN 53 LINE 1
+;
+L2309           db    $89,"IMMEDIAT",$C5
+                dw    L2269             ;; link to INTERPRET
+                dw    DOCOL             
+                dw    LATES             
+                dw    CLIT              
+                db    $40               
+                dw    TOGGL             
+                dw    SEMIS             
+;
+;                                       VOCABULARY
+;                                       SCREEN 53 LINE 4
+;
+L2321           db    $8A,"VOCABULAR",$D9
+                dw    L2309             ;link to IMMEDIATE
+                dw    DOCOL             
+                dw    BUILD             
+                dw    LIT,$A081         
+                dw    COMMA             
+                dw    CURR              
+                dw    AT                
+                dw    CFA               
+                dw    COMMA             
+                dw    HERE              
+                dw    VOCL              
+                dw    AT                
+                dw    COMMA             
+                dw    VOCL              
+                dw    STORE             
+                dw    DOES              
+DOVOC           dw    TWOP              
+                dw    CON               
+                dw    STORE             
+                dw    SEMIS             
+;
+;                                       FORTH
+;                                       SCREEN 53 LINE 9
+;
+L2346           db    $C5,"FORT",$C8    
+                dw    L2321             ;link to VOCABULARY
+FORTH           dw    DODOE             
+                dw    DOVOC             
+                dw    $A081             
+XFOR            dw    NTOP              ;points to top name in FORTH
+VL0             dw    0                 ;last vocab link ends at zero
+;
+;                                       DEFINITIONS
+;                                       SCREEN 53 LINE 11
+;
+;
+L2357           db    $8B,"DEFINITION",$D3
+                dw    L2346             ;link to FORTH
+DEFIN           dw    DOCOL             
+                dw    CON               
+                dw    AT                
+                dw    CURR              
+                dw    STORE             
+                dw    SEMIS             
+;
+;                                       (
+;                                       SCREEN 53 LINE 14
+;
+L2369           db    $C1,$A8           
+                dw    L2357             ;link to DEFINITIONS
+                dw    DOCOL             
+                dw    CLIT              
+                db    $29               
+                dw    WORD              
+                dw    SEMIS             
+;
+;                                       QUIT
+;                                       SCREEN 54 LINE 2
+;
+L2381           db    $84,"QUI",$D4     
+                dw    L2369             ;link to (
+QUIT            dw    DOCOL             
+                dw    ZERO              
+                dw    BLK               
+                dw    STORE             
+                dw    LBRAC             
+L2388           dw    RPSTO             
+                dw    CR                
+                dw    QUERY             
+                dw    INTER             
+                dw    STATE             
+                dw    AT                
+                dw    ZEQU              
+                dw    ZBRAN             
+L2396           dw    7                 ;L2399-L2396
+                dw    PDOTQ             
+                db    2,"OK"            
+L2399           dw    BRAN              
+L2400           dw    $FFE7             ;L2388-L2400
+                dw    SEMIS             
+;
+;                                       ABORT
+;                                       SCREEN 54 LINE 7
+;
+L2406           db    $85,"ABOR",$D4    
+                dw    L2381             ;link to QUIT
+ABORT           dw    DOCOL  
+                dw    SPSTO             
+                dw    DECIM             
+                dw    DR0               
+                dw    CR                
+                dw    PDOTQ             
+                db    14,"fig-FORTH 1.0a"
+                dw    FORTH             
+                dw    DEFIN             
+                dw    QUIT         
+;
+;                                       COLD
+;                                       SCREEN 55 LINE 1
+;
+L2423           db    $84,"COL",$C4     
+                dw    L2406             ;link to ABORT
+COLD            dw    *+2               
+                lda   ORIG+$0C          ;from cold start area
+                sta   FORTH+6           
+                lda   ORIG+$0D          
+                sta   FORTH+7           
+                ldy   #$15              
+                bne   L2433             
+WARM            ldy   #$0F              
+L2433           lda   ORIG+$10          
+                sta   UP                
+                lda   ORIG+$11          
+                sta   UP+1              
+L2437           lda   ORIG+$0C,y        
+                sta   (UP),y            
+                dey                     
+                bpl   L2437             
+                lda   #hi ABORT          ;actually #>(ABORT+2)
+                sta   IP+1              
+                lda   #lo ABORT+2        
+                sta   IP             
+                cld                     
+                lda   #$6C              ;ind jump opcode
+                sta   W-1               
+                jmp   RPSTO+2           ;And off we go !
+;
+;                                       S->D
+;                                       SCREEN 56 LINE 1
+;
+L2453           db    $84,"S->",$C4     
+                dw    L2423             ;link to COLD
+STOD            dw    DOCOL             
+                dw    DUP               
+                dw    ZLESS             
+                dw    MINUS             
+                dw    SEMIS             
+;
+;                                       +-
+;                                       SCREEN 56 LINE 4
+;
+L2464           db    $82,"+",$AD       
+                dw    L2453             ;link to S->D
+PM              dw    DOCOL             
+                dw    ZLESS             
+                dw    ZBRAN             
+L2469           dw    4                 
+                dw    MINUS             
+L2471           dw    SEMIS             
+;
+;                                       D+-
+;                                       SCREEN 56 LINE 6
+;
+L2476           db    $83,"D+",$AD      
+                dw    L2464             ;link to +-
+DPM             dw    DOCOL             
+                dw    ZLESS             
+                dw    ZBRAN             
+L2481           dw    4                 ;L2483-L2481
+                dw    DMINU             
+L2483           dw    SEMIS             
+;
+;                                       ABS
+;                                       SCREEN 56 LINE 9
+;
+L2488           db    $83,"AB",$D3      
+                dw    L2476             ;link to D+-
+ABS             dw    DOCOL             
+                dw    DUP               
+                dw    PM                
+                dw    SEMIS             
+;
+;                                       DABS
+;                                       SCREEN 56 LINE 10
+;
+L2498           db    $84,"DAB",$D3     
+                dw    L2488             ;link to ABS
+DABS            dw    DOCOL             
+                dw    DUP               
+                dw    DPM               
+                dw    SEMIS             
+;
+;                                       MIN
+;                                       SCREEN 56 LINE 12
+;
+L2508           db    $83,"MI",$CE      
+                dw    L2498             ;link to DABS
+MIN             dw    DOCOL             
+                dw    OVER              
+                dw    OVER              
+                dw    GREAT             
+                dw    ZBRAN             
+L2515           dw    4                 ;L2517-L2515
+                dw    SWAP              
+L2517           dw    DROP              
+                dw    SEMIS             
+;
+;                                       MAX
+;                                       SCREEN 56 LINE 14
+;
+L2523           db    $83,"MA",$D8      
+                dw    L2508             ;link to MIN
+MAX             dw    DOCOL             
+                dw    OVER              
+                dw    OVER              
+                dw    LESS              
+                dw    ZBRAN             
+L2530           dw    4                 ;L2532-L2530
+                dw    SWAP              
+L2532           dw    DROP              
+                dw    SEMIS             
+;
+;                                       M*
+;                                       SCREEN 57 LINE 1
+;
+L2538           db    $82,"M",$AA       
+                dw    L2523             ;link to MAX
+MSTAR           dw    DOCOL             
+                dw    OVER              
+                dw    OVER              
+                dw    XOR               
+                dw    TOR               
+                dw    ABS               
+                dw    SWAP              
+                dw    ABS               
+                dw    USTAR             
+                dw    RFROM             
+                dw    DPM               
+                dw    SEMIS             
+;
+;                                       M/
+;                                       SCREEN 57 LINE 3
+;
+L2556           db    $82,"M",$AF       
+                dw    L2538             ;link to M*
+MSLAS           dw    DOCOL             
+                dw    OVER              
+                dw    TOR               
+                dw    TOR               
+                dw    DABS              
+                dw    R                 
+                dw    ABS               
+                dw    USLAS             
+                dw    RFROM             
+                dw    R                 
+                dw    XOR               
+                dw    PM                
+                dw    SWAP              
+                dw    RFROM             
+                dw    PM                
+                dw    SWAP              
+                dw    SEMIS             
+;
+;                                       *
+;                                       SCREEN 57 LINE 7
+;
+L2579           db    $81,$AA           
+                dw    L2556             ;link to M/
+STAR            dw    DOCOL             
+                dw    USTAR             
+                dw    DROP              
+                dw    SEMIS             
+;
+;                                       /MOD
+;                                       SCREEN 57 LINE 8
+;
+L2589           db    $84,"/MO",$C4     
+                dw    L2579             ;link to *
+SLMOD           dw    DOCOL             
+                dw    TOR               
+                dw    STOD              
+                dw    RFROM             
+                dw    MSLAS             
+                dw    SEMIS             
+;
+;                                       /
+;                                       SCREEN 57 LINE 9
+;
+L2601           db    $81,$AF           
+                dw    L2589             ;link to /MOD
+SLASH           dw    DOCOL             
+                dw    SLMOD             
+                dw    SWAP              
+                dw    DROP              
+                dw    SEMIS             
+;
+;                                       MOD
+;                                       SCREEN 57 LINE 10
+;
+L2612           db    $83,"MO",$C4      
+                dw    L2601             ;link to /
+MOD             dw    DOCOL             
+                dw    SLMOD             
+                dw    DROP              
+                dw    SEMIS             
+;
+;                                       */MOD
+;                                       SCREEN 57 LINE 11
+;
+L2622           db    $85,"*/MO",$C4    
+                dw    L2612             ;link to MOD
+SSMOD           dw    DOCOL             
+                dw    TOR               
+                dw    MSTAR             
+                dw    RFROM             
+                dw    MSLAS             
+                dw    SEMIS             
+;
+;                                       */
+;                                       SCREEN 57 LINE 13
+;
+L2634           db    $82,"*",$AF       
+                dw    L2622             ;link to */MOD
+SSLAS           dw    DOCOL             
+                dw    SSMOD             
+                dw    SWAP              
+                dw    DROP              
+                dw    SEMIS             
+;
+;                                       M/MOD
+;                                       SCREEN 57 LINE 14
+;
+L2645           db    $85,"M/MO",$C4    
+                dw    L2634             ;link to */
+MSMOD           dw    DOCOL             
+                dw    TOR               
+                dw    ZERO              
+                dw    R                 
+                dw    USLAS             
+                dw    RFROM             
+                dw    SWAP              
+                dw    TOR               
+                dw    USLAS             
+                dw    RFROM             
+                dw    SEMIS             
+;
+;                                       USE
+;                                       SCREEN 58 LINE 1
+;
+L2662           db    $83,"US",$C5      
+                dw    L2645             ;link to M/MOD
+USE             dw    DOVAR             
+                dw    DAREA             
+;
+;                                       PREV
+;                                       SCREEN 58 LINE 2
+;
+L2670           db    $84,"PRE",$D6     
+                dw    L2662             ;link to USE
+PREV            dw    DOVAR             
+                dw    DAREA             
+;
+;                                       +BUF
+;                                       SCREEN 58 LINE 4
+;
+;
+L2678           db    $84,"+BU",$C6     
+                dw    L2670             ;link to PREV
+PBUF            dw    DOCOL             
+                dw    LIT               
+                dw    SSIZE+4           ;hold block #, one sector two num
+                dw    PLUS              
+                dw    DUP               
+                dw    LIMIT             
+                dw    EQUAL             
+                dw    ZBRAN             
+L2688           dw    6                 ;L2691-L2688
+                dw    DROP              
+                dw    FIRST             
+L2691           dw    DUP               
+                dw    PREV              
+                dw    AT                
+                dw    SUB               
+                dw    SEMIS             
+;
+;                                       UPDATE
+;                                       SCREEN 58 LINE 8
+;
+L2700           db    $86,"UPDAT",$C5   
+                dw    L2678             ;link to +BUF
+UPDAT           dw    DOCOL             
+                dw    PREV              
+                dw    AT                
+                dw    AT                
+                dw    LIT,$8000         
+                dw    OR                
+                dw    PREV              
+                dw    AT                
+                dw    STORE             
+                dw    SEMIS             
+;
+;                                       FLUSH
+;
+L2705           db    $85,"FLUS",$C8    
+                dw    L2700             ;link to UPDATE
+                dw    DOCOL             
+                dw    LIMIT,FIRST,SUB   
+                dw    BBUF,CLIT         
+                db    4                 
+                dw    PLUS,SLASH,ONEP   
+                dw    ZERO,PDO          
+L2835           dw    LIT,$7FFF,BUFFR   
+                dw    DROP,PLOOP        
+L2839           dw    $FFF6             ;L2835-L2839
+                dw    SEMIS             
+;
+;                                       EMPTY-BUFFERS
+;                                       SCREEN 58 LINE 11
+;
+L2716           db    $8D,"EMPTY-BUFFER",$D3
+                dw    L2705             ;link to FLUSH
+                dw    DOCOL             
+                dw    FIRST             
+                dw    LIMIT             
+                dw    OVER              
+                dw    SUB               
+                dw    ERASE             
+                dw    SEMIS             
+;
+;                                       DR0
+;                                       SCREEN 58 LINE 14
+;
+L2729           db    $83,"DR",$B0      
+                dw    L2716             ;link to EMPTY-BUFFERS
+DR0             dw    DOCOL             
+                dw    ZERO              
+                dw    OFSET             
+                dw    STORE             
+                dw    SEMIS             
+;
+;                                       DR1
+;                                       SCREEN 58 LINE 15
+;
+L2740           db    $83,"DR",$B1      
+                dw    L2729             ;link to DR0
+                dw    DOCOL             
+                dw    LIT,SECTR         ;sectors per drive
+                dw    OFSET             
+                dw    STORE             
+                dw    SEMIS             
+;
+;                                       BUFFER
+;                                       SCREEN 59 LINE 1
+;
+L2751           db    $86,"BUFFE",$D2   
+                dw    L2740             ;link to DR1
+BUFFR           dw    DOCOL             
+                dw    USE               
+                dw    AT                
+                dw    DUP               
+                dw    TOR               
+L2758           dw    PBUF              
+                dw    ZBRAN             
+L2760           dw    $FFFC             ;L2758-L2760
+                dw    USE               
+                dw    STORE             
+                dw    R                 
+                dw    AT                
+                dw    ZLESS             
+                dw    ZBRAN             
+L2767           dw    $14               ;L2776-L2767
+                dw    R                 
+                dw    TWOP              
+                dw    R                 
+                dw    AT                
+                dw    LIT,$7FFF         
+                dw    ANDD              
+                dw    ZERO              
+;          .WORD RSLW
+                dw    RSW               
+L2776           dw    R                 
+                dw    STORE             
+                dw    R                 
+                dw    PREV              
+                dw    STORE             
+                dw    RFROM             
+                dw    TWOP              
+                dw    SEMIS             
+;
+;                                       BLOCK
+;                                       SCREEN 60 LINE 1
+;
+L2788           db    $85,"BLOC",$CB    
+                dw    L2751             ;link to BUFFER
+BLOCK           dw    DOCOL             
+                dw    OFSET             
+                dw    AT                
+                dw    PLUS              
+                dw    TOR               
+                dw    PREV              
+                dw    AT                
+                dw    DUP               
+                dw    AT                
+                dw    R                 
+                dw    SUB               
+                dw    DUP               
+                dw    PLUS              
+                dw    ZBRAN             
+L2804           dw    $34               ;L2830-L2804
+L2805           dw    PBUF              
+                dw    ZEQU              
+                dw    ZBRAN             
+L2808           dw    $14               ;L2818-L2808
+                dw    DROP              
+                dw    R                 
+                dw    BUFFR             
+                dw    DUP               
+                dw    R                 
+                dw    ONE               
+;          .WORD RSLW
+                dw    RSW               
+                dw    TWO               
+                dw    SUB               
+L2818           dw    DUP               
+                dw    AT                
+                dw    R                 
+                dw    SUB               
+                dw    DUP               
+                dw    PLUS              
+                dw    ZEQU              
+                dw    ZBRAN             
+L2826           dw    $FFD6             ;L2805-L2826
+                dw    DUP               
+                dw    PREV              
+                dw    STORE             
+L2830           dw    RFROM             
+                dw    DROP              
+                dw    TWOP              
+                dw    SEMIS             ;end of BLOCK
+;
+;
+;                                       (LINE)
+;                                       SCREEN 61 LINE 2
+;
+L2838           db    $86,"(LINE",$A9   
+                dw    L2788             ;link to BLOCK
+PLINE           dw    DOCOL             
+                dw    TOR               
+                dw    CSLL              
+                dw    BBUF              
+                dw    SSMOD             
+                dw    RFROM             
+                dw    BSCR              
+                dw    STAR              
+                dw    PLUS              
+                dw    BLOCK             
+                dw    PLUS              
+                dw    CSLL              
+                dw    SEMIS             
+;
+;                                       .LINE
+;                                       SCREEN 61 LINE 6
+;
+L2857           db    $85,".LIN",$C5    
+                dw    L2838             ;link to (LINE)
+DLINE           dw    DOCOL             
+                dw    PLINE             
+                dw    DTRAI             
+                dw    TYPE              
+                dw    SEMIS             
+;
+;                                       MESSAGE
+;                                       SCREEN 61 LINE 9
+;
+L2868           db    $87,"MESSAG",$C5  
+                dw    L2857             ;link to .LINE
+MESS            dw    DOCOL             
+                dw    WARN              
+                dw    AT                
+                dw    ZBRAN             
+L2874           dw    $1B               ;L2888-L2874
+                dw    DDUP              
+                dw    ZBRAN             
+L2877           dw    $11               ;L2886-L2877
+                dw    CLIT              
+                db    4                 
+                dw    OFSET             
+                dw    AT                
+                dw    BSCR              
+                dw    SLASH             
+                dw    SUB               
+                dw    DLINE             
+L2886           dw    BRAN              
+L2887           dw    13                ;L2891-L2887
+L2888           dw    PDOTQ             
+                db    6,"MSG # "        
+                dw    DOT               
+L2891           dw    SEMIS             
+;
+;                                       LOAD
+;                                       SCREEN 62 LINE 2
+;
+L2896           db    $84,"LOA",$C4     
+                dw    L2868             ;link to MESSAGE
+LOAD            dw    DOCOL             
+                dw    BLK               
+                dw    AT                
+                dw    TOR               
+                dw    IN                
+                dw    AT                
+                dw    TOR               
+                dw    ZERO              
+                dw    IN                
+                dw    STORE             
+                dw    BSCR              
+                dw    STAR              
+                dw    BLK               
+                dw    STORE             
+                dw    INTER             
+                dw    RFROM             
+                dw    IN                
+                dw    STORE             
+                dw    RFROM             
+                dw    BLK               
+                dw    STORE             
+                dw    SEMIS             
+;
+;                                       -->
+;                                       SCREEN 62 LINE 6
+;
+L2924           db    $C3,"--",$BE      
+                dw    L2896             ;link to LOAD
+                dw    DOCOL             
+                dw    QLOAD             
+                dw    ZERO              
+                dw    IN                
+                dw    STORE             
+                dw    BSCR              
+                dw    BLK               
+                dw    AT                
+                dw    OVER              
+                dw    MOD               
+                dw    SUB               
+                dw    BLK               
+                dw    PSTOR             
+                dw    SEMIS             
+;
+;    XEMIT writes one ascii character to terminal
+;
+;
+XEMIT
+;	             TYA
+;                SEC
+;                LDY    #$1A
+;                ADC    (UP),Y
+;                STA    (UP),Y
+;                INY                 ; bump user variable OUT
+;                LDA    #0
+;                ADC    (UP),Y
+;                STA    (UP),Y
+                lda     0,x         ; fetch character to output
+;                STX    XSAVE
+                and     #$7F              
+                jsr     cout        ; and display it
+;                LDX    XSAVE
+                 jmp    POP               
+;
+;         XKEY reads one terminal keystroke to stack
+;
+;
+XKEY
+;                STX     XSAVE
+                jsr     cin         ; might otherwise clobber it while
+;                LDX     XSAVE      ; inputting a char to accumulator
+                jmp     PUSHOA            
+;
+;         XQTER leaves a boolean representing terminal break
+;
+;
+XQTER
+;               jsr     cbrk         ;if Ctrl-c, set C else clear C
+                clc
+                lda     #$00        ; 0
+                rol     a           ; move carry to bit 0
+                jmp     PUSHOA            
+;
+;         XCR displays a CR and LF to terminal
+;
+;
+XCR
+;                STX     XSAVE
+                jsr     crout               ;use monitor call
+;                LDX     XSAVE
+                jmp     NEXT              
+;
+; ***                                      -DISC
+;                                       machine level sector R/W
+;
+;L3030     .BYTE $85,"-DIS",$C3
+;          .WORD L2924    ; link to -->
+;DDISC     .WORD *+2
+;          LDA 0,X
+;          STA $C60C
+;          STA $C60D      ; store sector number
+;          LDA 2,X
+;          STA $C60A
+;          STA $C60B      ; store track number
+;          LDA 4,X
+;          STA $C4CD
+;          STA $C4CE      ; store drive number
+;          STX XSAVE
+;          LDA $C4DA      ; sense read or write
+;          BNE L3032
+;          JSR $E1FE
+;          JMP L3040
+;L3032     JSR $E262
+;L3040     JSR $E3EF      ; head up motor off
+;          LDX XSAVE
+;          LDA $C4E1      ; report error code
+;          STA 4,X
+;          JMP POPTWO
+;
+;                                       -BCD
+;                             Convert binary value to BCD
+;
+L3050           db    $84,"-BC",$C4     
+                dw    L2924             ;link to -DISC
+DBCD            dw    DOCOL             
+                dw    ZERO,CLIT         
+                db    10                
+                dw    USLAS,CLIT        
+                db    16                
+                dw    STAR,OR,SEMIS     
+
+;
+; ***                                       R/W
+;                              Read or write one sector
+;
+;L3060     .BYTE $83,"R/",$D7
+;          .WORD L3050    ; link to -BCD
+;RSLW      .WORD DOCOL
+;          .WORD ZEQU,LIT,$C4DA,CSTOR
+;          .WORD SWAP,ZERO,STORE
+;          .WORD ZERO,OVER,GREAT,OVER
+;          .WORD LIT,SECTL-1,GREAT,OR,CLIT
+;          .BYTE 6
+;          .WORD QERR
+;          .WORD ZERO,LIT,SECTR,USLAS,ONEP
+;          .WORD SWAP,ZERO,CLIT
+;          .BYTE $12
+;          .WORD USLAS,DBCD,SWAP,ONEP
+;          .WORD DBCD,DDISC,CLIT
+;          .BYTE 8
+;          .WORD QERR
+;          .WORD SEMIS
+;
+;
+;                                           RSW
+;                              Read or write one sector
+;
+L3070           db    $83,"RS",$D7      
+                dw    L3050             ;link to R/W
+RSW             dw    DOCOL             
+                dw    TOR               
+                dw    BBUF, STAR, LIT, $4000, PLUS, DUP
+                dw    LIT, $6800, GREAT, LIT, $6, QERR
+                dw    RFROM, ZBRAN, $4, SWAP
+                dw    BBUF, CMOVE       
+                dw    SEMIS             
+;
+;
+;                                       '
+;                                       SCREEN 72 LINE 2
+;
+L3202           db    $C1,$A7           
+                dw    L3070             ;link to RSW
+TICK            dw    DOCOL             
+                dw    DFIND             
+                dw    ZEQU              
+                dw    ZERO              
+                dw    QERR              
+                dw    DROP              
+                dw    LITER             
+                dw    SEMIS             
+;
+;                                       FORGET
+;                                       Altered from model
+;                                       SCREEN 72 LINE 6
+;
+L3217           db    $86,"FORGE",$D4   
+                dw    L3202             ;link to ' TICK
+FORG            dw    DOCOL             
+                dw    TICK,NFA,DUP      
+                dw    FENCE,AT,ULESS,CLIT
+                db    $15               
+                dw    QERR,TOR,VOCL,AT  
+L3220           dw    R,OVER,ULESS      
+                dw    ZBRAN,L3225-*     
+                dw    FORTH,DEFIN,AT,DUP
+                dw    VOCL,STORE        
+                dw    BRAN,$FFFF-24+1   ;L3220-*
+L3225           dw    DUP,CLIT          
+                db    4                 
+                dw    SUB               
+L3228           dw    PFA,LFA,AT        
+                dw    DUP,R,ULESS       
+                dw    ZBRAN,$FFFF-14+1  ;L3228-*
+                dw    OVER,TWO,SUB,STORE
+                dw    AT,DDUP,ZEQU      
+                dw    ZBRAN,$FFFF-39+1  ;L3225-*
+                dw    RFROM,DP,STORE    
+                dw    SEMIS             
+;
+;                                       BACK
+;                                       SCREEN 73 LINE 1
+;
+L3250           db    $84,"BAC",$CB     
+                dw    L3217             ;link to FORGET
+BACK            dw    DOCOL             
+                dw    HERE              
+                dw    SUB               
+                dw    COMMA             
+                dw    SEMIS             
+;
+;                                       BEGIN
+;                                       SCREEN 73 LINE 3
+;
+L3261           db    $C5,"BEGI",$CE    
+                dw    L3250             ;link to BACK
+                dw    DOCOL             
+                dw    QCOMP             
+                dw    HERE              
+                dw    ONE               
+                dw    SEMIS             
+;
+;                                       ENDIF
+;                                       SCREEN 73 LINE 5
+;
+L3273           db    $C5,"ENDI",$C6    
+                dw    L3261             ;link to BEGIN
+ENDIF           dw    DOCOL             
+                dw    QCOMP             
+                dw    TWO               
+                dw    QPAIR             
+                dw    HERE              
+                dw    OVER              
+                dw    SUB               
+                dw    SWAP              
+                dw    STORE             
+                dw    SEMIS             
+;
+;                                       THEN
+;                                       SCREEN 73 LINE 7
+;
+L3290           db    $C4,"THE",$CE     
+                dw    L3273             ;link to ENDIF
+                dw    DOCOL             
+                dw    ENDIF             
+                dw    SEMIS             
+;
+;                                       DO
+;                                       SCREEN 73 LINE 9
+;
+L3300           db    $C2,"D",$CF       
+                dw    L3290             ;link to THEN
+                dw    DOCOL             
+                dw    COMP              
+                dw    PDO               
+                dw    HERE              
+                dw    THREE             
+                dw    SEMIS             
+;
+;                                       LOOP
+;                                       SCREEN 73 LINE 11
+;
+;
+L3313           db    $C4,"LOO",$D0     
+                dw    L3300             ;link to DO
+                dw    DOCOL             
+                dw    THREE             
+                dw    QPAIR             
+                dw    COMP              
+                dw    PLOOP             
+                dw    BACK              
+                dw    SEMIS             
+;
+;                                       +LOOP
+;                                       SCREEN 73 LINE 13
+;
+L3327           db    $C5,"+LOO",$D0    
+                dw    L3313             ;link to LOOP
+                dw    DOCOL             
+                dw    THREE             
+                dw    QPAIR             
+                dw    COMP              
+                dw    PPLOO             
+                dw    BACK              
+                dw    SEMIS             
+;
+;                                       UNTIL
+;                                       SCREEN 73 LINE 15
+;
+L3341           db    $C5,"UNTI",$CC    
+                dw    L3327             ;link to +LOOP
+UNTIL           dw    DOCOL             
+                dw    ONE               
+                dw    QPAIR             
+                dw    COMP              
+                dw    ZBRAN             
+                dw    BACK              
+                dw    SEMIS             
+;
+;                                       END
+;                                       SCREEN 74 LINE 1
+;
+L3355           db    $C3,"EN",$C4      
+                dw    L3341             ;link to UNTIL
+                dw    DOCOL             
+                dw    UNTIL             
+                dw    SEMIS             
+;
+;                                       AGAIN
+;                                       SCREEN 74 LINE 3
+;
+L3365           db    $C5,"AGAI",$CE    
+                dw    L3355             ;link to END
+AGAIN           dw    DOCOL             
+                dw    ONE               
+                dw    QPAIR             
+                dw    COMP              
+                dw    BRAN              
+                dw    BACK              
+                dw    SEMIS             
+;
+;                                       REPEAT
+;                                       SCREEN 74 LINE 5
+;
+L3379           db    $C6,"REPEA",$D4   
+                dw    L3365             ;link to AGAIN
+                dw    DOCOL             
+                dw    TOR               
+                dw    TOR               
+                dw    AGAIN             
+                dw    RFROM             
+                dw    RFROM             
+                dw    TWO               
+                dw    SUB               
+                dw    ENDIF             
+                dw    SEMIS             
+;
+;                                       IF
+;                                       SCREEN 74 LINE 8
+;
+L3396           db    $C2,"I",$C6       
+                dw    L3379             ;link to REPEAT
+IF              dw    DOCOL             
+                dw    COMP              
+                dw    ZBRAN             
+                dw    HERE              
+                dw    ZERO              
+                dw    COMMA             
+                dw    TWO               
+                dw    SEMIS             
+;
+;                                       ELSE
+;                                       SCREEN 74 LINE 10
+;
+L3411           db    $C4,"ELS",$C5     
+                dw    L3396             ;link to IF
+                dw    DOCOL             
+                dw    TWO               
+                dw    QPAIR             
+                dw    COMP              
+                dw    BRAN              
+                dw    HERE              
+                dw    ZERO              
+                dw    COMMA             
+                dw    SWAP              
+                dw    TWO               
+                dw    ENDIF             
+                dw    TWO               
+                dw    SEMIS             
+;
+;                                       WHILE
+;                                       SCREEN 74 LINE 13
+;
+L3431           db    $C5,"WHIL",$C5    
+                dw    L3411             ;link to ELSE
+                dw    DOCOL             
+                dw    IF                
+                dw    TWOP              
+                dw    SEMIS             
+;
+;                                       SPACES
+;                                       SCREEN 75 LINE 1
+;
+L3442           db    $86,"SPACE",$D3   
+                dw    L3431             ;link to WHILE
+SPACS           dw    DOCOL             
+                dw    ZERO              
+                dw    MAX               
+                dw    DDUP              
+                dw    ZBRAN             
+L3449           dw    $0C               ;L3455-L3449
+                dw    ZERO              
+                dw    PDO               
+L3452           dw    SPACE             
+                dw    PLOOP             
+L3454           dw    $FFFC             ;L3452-L3454
+L3455           dw    SEMIS             
+;
+;                                       <#
+;                                       SCREEN 75 LINE 3
+;
+L3460           db    $82,"<",$A3       
+                dw    L3442             ;link to SPACES
+BDIGS           dw    DOCOL             
+                dw    PAD               
+                dw    HLD               
+                dw    STORE             
+                dw    SEMIS             
+;
+;                                       #>
+;                                       SCREEN 75 LINE 5
+;
+L3471           db    $82,"#",$BE       
+                dw    L3460             ;link to <#
+EDIGS           dw    DOCOL             
+                dw    DROP              
+                dw    DROP              
+                dw    HLD               
+                dw    AT                
+                dw    PAD               
+                dw    OVER              
+                dw    SUB               
+                dw    SEMIS             
+;
+;                                       SIGN
+;                                       SCREEN 75 LINE 7
+;
+L3486           db    $84,"SIG",$CE     
+                dw    L3471             ;link to #>
+SIGN            dw    DOCOL             
+                dw    ROT               
+                dw    ZLESS             
+                dw    ZBRAN             
+L3492           dw    $7                ;L3496-L3492
+                dw    CLIT              
+                db    $2D               
+                dw    HOLD              
+L3496           dw    SEMIS             
+;
+;                                       #
+;                                       SCREEN 75 LINE 9
+;
+L3501           db    $81,$A3           
+                dw    L3486             ;link to SIGN
+DIG             dw    DOCOL             
+                dw    BASE              
+                dw    AT                
+                dw    MSMOD             
+                dw    ROT               
+                dw    CLIT              
+                db    9                 
+                dw    OVER              
+                dw    LESS              
+                dw    ZBRAN             
+L3513           dw    7                 ;L3517-L3513
+                dw    CLIT              
+                db    7                 
+                dw    PLUS              
+L3517           dw    CLIT              
+                db    $30               
+                dw    PLUS              
+                dw    HOLD              
+                dw    SEMIS             
+;
+;                                       #S
+;                                       SCREEN 75 LINE 12
+;
+L3526           db    $82,"#",$D3       
+                dw    L3501             ;link to #
+DIGS            dw    DOCOL             
+L3529           dw    DIG               
+                dw    OVER              
+                dw    OVER              
+                dw    OR                
+                dw    ZEQU              
+                dw    ZBRAN             
+L3535           dw    $FFF4             ;L3529-L3535
+                dw    SEMIS             
+;
+;                                       D.R
+;                                       SCREEN 76 LINE 1
+;
+L3541           db    $83,"D.",$D2      
+                dw    L3526             ;link to #S
+DDOTR           dw    DOCOL             
+                dw    TOR               
+                dw    SWAP              
+                dw    OVER              
+                dw    DABS              
+                dw    BDIGS             
+                dw    DIGS              
+                dw    SIGN              
+                dw    EDIGS             
+                dw    RFROM             
+                dw    OVER              
+                dw    SUB               
+                dw    SPACS             
+                dw    TYPE              
+                dw    SEMIS             
+;
+;                                       D.
+;                                       SCREEN 76 LINE 5
+;
+L3562           db    $82,"D",$AE       
+                dw    L3541             ;link to D.R
+DDOT            dw    DOCOL             
+                dw    ZERO              
+                dw    DDOTR             
+                dw    SPACE             
+                dw    SEMIS             
+;
+;                                       .R
+;                                       SCREEN 76 LINE 7
+;
+L3573           db    $82,".",$D2       
+                dw    L3562             ;link to D.
+DOTR            dw    DOCOL             
+                dw    TOR               
+                dw    STOD              
+                dw    RFROM             
+                dw    DDOTR             
+                dw    SEMIS             
+;
+;                                       .
+;                                       SCREEN 76  LINE  9
+;
+L3585           db    $81,$AE           
+                dw    L3573             ;link to .R
+DOT             dw    DOCOL             
+                dw    STOD              
+                dw    DDOT              
+                dw    SEMIS             
+;
+;                                       ?
+;                                       SCREEN 76 LINE 11
+;
+L3595           db    $81,$BF           
+                dw    L3585             ;link to .
+QUES            dw    DOCOL             
+                dw    AT                
+                dw    DOT               
+                dw    SEMIS             
+;
+;                                       LIST
+;                                       SCREEN 77 LINE 2
+;
+L3605           db    $84,"LIS",$D4     
+                dw    L3595             ;link to ?
+LIST            dw    DOCOL             
+                dw    DECIM             
+                dw    CR                
+                dw    DUP               
+                dw    SCR               
+                dw    STORE             
+                dw    PDOTQ             
+                db    6,"SCR # "        
+                dw    DOT               
+                dw    CLIT              
+                db    16                
+                dw    ZERO              
+                dw    PDO               
+L3620           dw    CR                
+                dw    I                 
+                dw    THREE             
+                dw    DOTR              
+                dw    SPACE             
+                dw    I                 
+                dw    SCR               
+                dw    AT                
+                dw    DLINE             
+                dw    PLOOP             
+L3630           dw    $FFEC             
+                dw    CR                
+                dw    SEMIS             
+;
+;                                       INDEX
+;                                       SCREEN 77 LINE 7
+;
+L3637           db    $85,"INDE",$D8    
+                dw    L3605             ;link to LIST
+                dw    DOCOL             
+                dw    CR                
+                dw    ONEP              
+                dw    SWAP              
+                dw    PDO               
+L3647           dw    CR                
+                dw    I                 
+                dw    THREE             
+                dw    DOTR              
+                dw    SPACE             
+                dw    ZERO              
+                dw    I                 
+                dw    DLINE             
+                dw    QTERM             
+                dw    ZBRAN             
+L3657           dw    4                 ;L3659-L3657
+                dw    LEAVE             
+L3659           dw    PLOOP             
+L3660           dw    $FFE6             ;L3647-L3660
+                dw    CLIT              
+                db    $0C               ;form feed for printer
+                dw    EMIT              
+                dw    SEMIS             
+;
+;                                       TRIAD
+;                                       SCREEN 77 LINE 12
+;
+L3666           db    $85,"TRIA",$C4    
+                dw    L3637             ;link to INDEX
+                dw    DOCOL             
+                dw    THREE             
+                dw    SLASH             
+                dw    THREE             
+                dw    STAR              
+                dw    THREE             
+                dw    OVER              
+                dw    PLUS              
+                dw    SWAP              
+                dw    PDO               
+L3681           dw    CR                
+                dw    I                 
+                dw    LIST              
+                dw    PLOOP             
+L3685           dw    $FFF8             ;L3681-L3685
+                dw    CR                
+                dw    CLIT              
+                db    $F                
+                dw    MESS              
+                dw    CR                
+                dw    CLIT              
+                db    $0C               ;form feed for printer
+                dw    EMIT              
+                dw    SEMIS             
+;
+;                                       VLIST
+;                                       SCREEN 78 LINE 2
+;
+;
+L3696           db    $85,"VLIS",$D4    
+                dw    L3666             ;link to TRIAD
+VLIST           dw    DOCOL             
+                dw    CLIT              
+                db    $80               
+                dw    OUT               
+                dw    STORE             
+                dw    CON               
+                dw    AT                
+                dw    AT                
+L3706           dw    OUT               
+                dw    AT                
+                dw    CSLL              
+                dw    GREAT             
+                dw    ZBRAN             
+L3711           dw    $A                ;L3716-L3711
+                dw    CR                
+                dw    ZERO              
+                dw    OUT               
+                dw    STORE             
+L3716           dw    DUP               
+                dw    IDDOT             
+                dw    SPACE             
+                dw    SPACE             
+                dw    PFA               
+                dw    LFA               
+                dw    AT                
+                dw    DUP               
+                dw    ZEQU              
+                dw    QTERM             
+                dw    OR                
+                dw    ZBRAN             
+L3728           dw    $FFD4             ;L3706-L3728
+                dw    DROP              
+                dw      SEMIS             
+;
+;                                       MON
+;                                       SCREEN 79 LINE 3
+;
+NTOP            db      $83,"MO",$CE      
+                dw      L3696             ;link to VLIST
+MON             dw      *+2      
+                brk         
+;                jmp     ($FFFC)           ;back to SBC Monitor
+                jmp     NEXT
+;                STX     XSAVE
+;                BRK                     ; break to monitor which is assumed
+;                LDX     XSAVE           ; to save this as reentry point
+;                JMP     NEXT
+;
+TOP                                     ;end of listing
+

@@ -11,29 +11,23 @@ General Description
 
 This project provides a synthesizable microprogrammed IP core that implements 
 the instruction set architecture (ISA) of the 6502/65C02 microprocessors. The 
-initial release provides the instruction set of the 65C02 plus the WAI and STP
-instructions added by WDC in its W65C02S processor. 
+M65C02A core features a completely reworked microprogrammed control structure 
+compared to that used in the M65C02 project. In addition, the basic logic 
+structure of the core has been significantly altered to reduce the logic 
+required to implement the processor. It is also better equipped to work as a 
+single cycle core with both internal and external memory.
 
-The M65C02A core features a completely reworked microprogrammed control 
-structure compared to that used in the M65C02 project. In addition, the basic 
-logic structure of the core has been significantly altered to reduce the logic 
-required to implement the processor. In the process, logic has been added to 
-the basic structure that will allow the core to support adding instructions 
-and addressing modes. Theses changes to the core's logic will allow 
-enhacements such as stack relative addressing and custom FORTH support 
-instructions to be added without resynthesizing the core, i.e. all 
-enhancements can be added by only changing the microprogram.
-
-Another benefit of the new microprogram and logic structure is that the 
-resulting M65C02A core is significantly smaller than the M65C02 core. It is 
-also better equipped to work as a single cycle core with both internal and 
-external memory.
+The initial release provides the instruction set of the 65C02 plus the WAI and 
+STP instructions added by WDC in its W65C02S processor. Subsequent releases 
+include support for additional instruction set enhancements. Future releases 
+will provide direct instruction set support for a FORTH VM (r2.4.0) and 16-bit 
+arithmetic and logic operations (r2.5.0).
 
 Implementation
 --------------
 
-The implementation of the core provided consists of five Verilog source files 
-and several memory initialization files:
+The implementation of the current core provided consists of the following 
+Verilog source files and several memory initialization files:
 
     M65C02_CoreV2.v         - M65C02 Top level module
         M65C02_MPCv5.v      - M65C02 MPC with microcycle length controller
@@ -79,33 +73,38 @@ M65C02 core:
 
 The ISE 10.1i SP3 implementation results are as follows:
 
-    Core:                           M65C02A       M65C02
-    Number of Slice FFs:              125           191
-    Number of 4-input LUTs:           482           747
-    Number of Occupied Slices:        346           459
-    
-    Number of BUFGMUXs:                1             1
-    Number of RAMB16BWEs               2             2
-    
-    Best Case Achievable:           22.312 (1)     13.180 (2)
+    Core:                       M65C02        M65C02A(r2.1.0)   M65C02A(r2.3.1)     
+    Number of Slice FFs:          191           125               130          
+    Number of 4-input LUTs:       747           482               598          
+    Number of Occupied Slices:    459           346               398          
+                                                                               
+    Number of BUFGMUXs:            1             1                 1           
+    Number of RAMB16BWEs           2             2                 2           
+                                                                               
+    Best Case Achievable:        13.180 (1)   22.312 (2)        32.000 (3)     
     
     Notes:
-        (1) Single cycle memory operation, and single cycle BCD math operations.
-        (2) Requires 1 cycle to generate the address and another to read memory.
+        (1) Requires 1 cycle to generate the address and another to read memory.
             Also requires at least two cycles for BCD math operations.
+        (2) Single cycle memory operation, and single cycle BCD math operations.
+        (3) Includes instruction set enhancements for dual stacks, prefix
+            instructions, stack relative addressing, 16-bit relative addressing,
+            16-bit push/pull instructions, etc.
             
 The result is that the M65C02A can be connected to internal block RAM for 
 single cycle operation, and the M65C02 requires at least two cycles for 
 operation with internal block RAM. Further, the M65C02A adder can provide BCD 
 math operations in a single cycle, while the M65C02 BCD add unit will require 
-two cycles. If the M65C02 core is connected to Block RAM and configured for 
-single cycle operation by runnning the core logic on the rising edge of the 
-clock and the Block RAM on the falling edge of the same clock, the resulting 
-minimum period is at least twice the best period of the core: 13.180. This 
-suggests that the best single cycle period of the M65C02 is 26.36 ns. This is 
-4.05 ns slower than the M65C02A core, which suggests that the M65C02A, in 
-addition to being smaller, is faster than the M65C02 core by significant 
-margin.
+two cycles. 
+
+The M65C02A has proven to be easy to work with in order to add the instruction 
+set enhancements discussed below. The increase in the core's size to support 
+the enhancements has been modest, but the core's size still remains below that 
+of the M65C02 core. Some of the additions made to support the enhanced 
+instruction set have resulted in an increase in the clock period. However, the 
+majority of that increase is attributable to the multiplexers required to use 
+all of the internal block RAM of the target FPGA as program/data memory or 
+microprogram memory.
 
 Status
 ------
@@ -115,6 +114,14 @@ features that have been included in the instruction set of the M65C02A core.
 
 Release Notes
 -------------
+
+###Release 2.3.1
+
+This release of the M65C02A core and microprocessor implementation provides no 
+additional features. It does split the 8kB user ROM of the previous release 
+into two 4kB ROMs, and provides the source files for a working fig-FORTH 1.0 
+implementation. A support/utility program to create MEM files compatible with 
+the Xilinx tools is also provided.
 
 ###Release 2.3.0
 
@@ -138,7 +145,7 @@ loads X with the immediate data.
 All of the additional capabilities have not caused a significant increase in 
 the size of the core:
 
-    Core:                           M65C02A (2.1.0) M65C02A (2.3.0)
+    Core:                           M65C02A(r2.1.0) M65C02A(r2.3.0)
     Number of Slice FFs:                125             131
     Number of 4-input LUTs:             482             597
     Number of Occupied Slices:          346             407
@@ -155,7 +162,7 @@ the size of the core:
             handler, Kernel/User mode 4kB page MMU, 2 UARTs with 16 byte FIFOs,
             and 1 SPI Master I/F with 16 byte FIFOs.
             
-A description of the instruction set corrently implemented is provided in the 
+A description of the instruction set currently implemented is provided in the 
 header of the file: M65C02A_IPOM.v.
 
 ###Release 2.2.4

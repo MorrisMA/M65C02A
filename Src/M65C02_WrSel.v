@@ -113,14 +113,14 @@ wire    WE;
 always @(*)
 begin
     case(Reg_WE)
-        3'b000 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b000_0_0;
-        3'b001 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b100_1_0;
-        3'b010 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b010_1_0;
-        3'b011 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b001_1_0;
-        3'b100 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b000_0_0;
-        3'b101 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b000_0_1;
-        3'b110 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b000_1_0;
-        3'b111 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= #1 5'b000_0_0;
+        3'b000 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= 5'b000_0_0;
+        3'b001 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= 5'b100_1_0;
+        3'b010 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= 5'b010_1_0;
+        3'b011 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= 5'b001_1_0;
+        3'b100 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= 5'b000_0_0;
+        3'b101 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= 5'b000_0_1;
+        3'b110 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= 5'b000_1_0;
+        3'b111 : {uP_X, uP_Y, uP_A, uP_P, uP_S} <= 5'b000_0_0;
     endcase
 end
 
@@ -129,22 +129,22 @@ assign WE = (Reg_WE == 3'b100);
 always @(*)
 begin
     case({WE, WSel})
-        4'b0000 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b0001 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b0010 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b0011 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b0100 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b0101 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b0110 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b0111 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b1000 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b1001 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b100_1_0;
-        4'b1010 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b010_1_0;
-        4'b1011 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b001_1_0;
-        4'b1100 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_0;
-        4'b1101 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_0_1;
-        4'b1110 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_1_0;
-        4'b1111 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= #1 5'b000_1_0;
+        4'b0000 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b000_0_0;
+        4'b0001 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b000_0_0;
+        4'b0010 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b000_0_0;
+        4'b0011 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b000_0_0;
+        4'b0100 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b000_0_0;
+        4'b0101 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b000_0_0;
+        4'b0110 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b000_0_0;
+        4'b0111 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b000_0_0;
+        4'b1000 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b000_0_0;
+        4'b1001 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b100_1_0;
+        4'b1010 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b010_1_0;
+        4'b1011 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b001_1_0;
+        4'b1100 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b000_0_0;
+        4'b1101 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b000_0_1;
+        4'b1110 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b000_1_0;
+        4'b1111 : {iD_X, iD_Y, iD_A, iD_P, iD_S} <= 5'b000_1_0;
     endcase
 end
 

@@ -175,8 +175,8 @@ module M65C02A #(
 
     parameter pWS_Delay       = 4'b0011,    // Default Internal Wait State Delay
 
-//    parameter pFrequency      = 14745600,   // M65C02 Development Board 
-    parameter pFrequency       = 29491200,  // Chameleon Board
+    parameter pFrequency      = 14745600,   // M65C02 Development Board 
+//    parameter pFrequency       = 29491200,  // Chameleon Board
 
     parameter pUART_LCR       = 8'h40,  // ~BRRE, RTSo, 232 w/o HS, 8N1 
     parameter pUART_IER       = 8'h00,  // No interrupts enabled
@@ -192,11 +192,18 @@ module M65C02A #(
     parameter pSPI_FIFO_Init  = "Pgms/SPI_FIFO_Init_16.coe",
 
     parameter pMON_AddrWidth  = 8'd12,      // Internal ROM Address Width:  4 kB
-    parameter pMON_File       = "Pgms/M65C02_Tst3.txt",
-    parameter pROM_AddrWidth  = 8'd13,      // Internal RAM Address Width:  8 kB
-    parameter pROM_File       = "Pgms/EhBASIC0.txt",
+//    parameter pMON_File       = "Pgms/M65C02_Tst3.txt",
+    parameter pMON_File       = "Pgms/Mon65_SBC25.txt",
+//    parameter pROM_AddrWidth  = 8'd13,      // Internal RAM Address Width:  8 kB
+////    parameter pROM_File       = "Pgms/EhBASIC0.txt",
+//    parameter pROM_File       = "Pgms/figFORTH.txt",
+    parameter pROM1_AddrWidth = 8'd12,      // Internal RAM Address Width:  4 kB
+    parameter pROM1_File      = "Pgms/figFRTHb.txt",
+    parameter pROM0_AddrWidth = 8'd12,      // Internal RAM Address Width:  4 kB
+    parameter pROM0_File      = "Pgms/figFRTHa.txt",
     parameter pRAM_AddrWidth  = 8'd14,      // Internal RAM Address Width: 16 kB
     parameter pRAM_File       = "Pgms/65C02_ft.txt",
+//    parameter pRAM_File       = "Pgms/figFORTH.txt",
                                                                         
     parameter pM65C02_uPgm    = "Pgms/M65C02_uPgm_V4a.coe",     // SEQ   :  2 kB
     parameter pM65C02_IDec    = "Pgms/M65C02_IDecode_ROMa.coe"  // DEC   :  2 kB
@@ -320,7 +327,8 @@ reg     [3:0] WSGen;            // Internal Wait State Generator Counter
 wire    Int_Wait;               // Internal Wait State Request Signal
 
 wire    [7:0] MON_DO;           // Output Data Bus of MON
-wire    [7:0] ROM_DO;           // Output Data Bus of ROM
+wire    [7:0] ROM1_DO;          // Output Data Bus of ROM 1
+wire    [7:0] ROM0_DO;          // Output Data Bus of ROM 0
 wire    [7:0] RAM_DO;           // Output Data Bus of RAM
 
 wire    [7:0] SPI0_DO;          // SPI0 Output Data Bus
@@ -474,7 +482,8 @@ assign WAI = (Mode == pWAI);        // WAit for Interrupt instruction decoded
 //  MMU - Maps Virtual Addresses to Physical Addresses using 16 4kB pages
 //
 //  CE[15]  - MON   : Boot ROM - 0xF000:FFFF; ( 4 kB -  2 BRAMs)
-//  CE[13]  - ROM   : User ROM - 0xD000:EFFF; ( 8 kB -  4 BRAMs)
+//  CE[14]  - ROM1  : User ROM - 0xE000:EFFF; ( 4 kB -  2 BRAMs)
+//  CE[13]  - ROM0  : User ROM - 0xD000:DFFF; ( 4 kB -  2 BRAMs)
 //  CE[ 8]  - RAM   : User RAM - 0x0000:3FFF; (16 kB -  8 BRAMs)
 //                             Total RAM/ROM: (28 kB - 14 BRAMs
 //
@@ -571,9 +580,10 @@ assign Int_Wait = Int_WS & |WSGen;
 
 //  Generate Selects for Internal BRAMs
 
-assign Sel_MON = CE[15] & ~IO_Page | Sel_VEC;   // Create IO_Page hole
-assign Sel_ROM = CE[13];
-assign Sel_RAM = CE[ 8];
+assign Sel_MON  = CE[15] & ~IO_Page | Sel_VEC;   // Create IO_Page hole
+assign Sel_ROM1 = CE[14];
+assign Sel_ROM0 = CE[13];
+assign Sel_RAM  = CE[ 8];
 
 //  MON - 0xF000-FEFF (Monitor), 0xFFE0-FFFF (Vector Table) ( 4 kB)
 
@@ -594,24 +604,43 @@ BRAM_SP_mn  #(
             
 assign CPU_DI = ((Sel_MON) ? MON_DO : 0);
 
-//  ROM  - 0xD000-EFFF ( 8 kB)
+//  ROM 1 - 0xE000-EFFF ( 4 kB)
 
 BRAM_SP_mn  #(
-                .pBRAM_AddrWidth(pROM_AddrWidth),
-                .pBRAM_SP_mn_Init(pROM_File)
-            ) ROM (
+                .pBRAM_AddrWidth(pROM1_AddrWidth),
+                .pBRAM_SP_mn_Init(pROM1_File)
+            ) ROM1 (
                 .Clk(~Clk), 
                 .WP(1'b0),
                 
-                .CE(Sel_ROM), 
+                .CE(Sel_ROM1), 
 
                 .WE(WE), 
-                .PA(PA[(pROM_AddrWidth - 1):0]), 
+                .PA(PA[(pROM1_AddrWidth - 1):0]), 
                 .DI(CPU_DO), 
-                .DO(ROM_DO)
+                .DO(ROM1_DO)
             );
             
-assign CPU_DI = ((Sel_ROM) ? ROM_DO : 0);
+assign CPU_DI = ((Sel_ROM1) ? ROM1_DO : 0);
+
+//  ROM 0 - 0xD000-DFFF ( 4 kB)
+
+BRAM_SP_mn  #(
+                .pBRAM_AddrWidth(pROM0_AddrWidth),
+                .pBRAM_SP_mn_Init(pROM0_File)
+            ) ROM0 (
+                .Clk(~Clk), 
+                .WP(1'b0),
+                
+                .CE(Sel_ROM0), 
+
+                .WE(WE), 
+                .PA(PA[(pROM0_AddrWidth - 1):0]), 
+                .DI(CPU_DO), 
+                .DO(ROM0_DO)
+            );
+            
+assign CPU_DI = ((Sel_ROM0) ? ROM0_DO : 0);
 
 //  RAM  - 0x0000-3FFF (16 kB)
 
@@ -729,7 +758,7 @@ UART    #(
             .Sel(Sel_COM0), 
             .Reg(PA[1:0]), 
             .RE(RE), 
-            .WE(RE), 
+            .WE(WE), 
             .DI(CPU_DO), 
             .DO(COM0_DO),
             
@@ -759,7 +788,8 @@ assign Sync =  Done;
 assign nML  = ~RMW | Done;
 assign nVP  = ~VP;
 
-assign nCE  = ~{CE[11], CE[15], CE[13], CE[8]};
+//assign nCE  = ~{CE[11], CE[15], CE[13], CE[8]};
+assign nCE  = ~{CE[4], CE[3], CE[2], CE[1]};
 assign nWR  = ~WE;
 assign nRD  = ~RE;
 assign XA   =  PA[19:16];

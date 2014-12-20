@@ -552,7 +552,7 @@ assign En_DU  = En &  (FU_Sel[1] &  D);               // Decimal Adder
 
 assign Valid = ~|FU_Sel;
 
-//  Accumulator Multiplexer - Used to implement ALU Source Register Overrides
+//  A Multiplexer - Used to implement ALU Source Register Overrides
 
 assign B = ((OAX) ? X : ((OAY) ? Y : A));
 
@@ -601,7 +601,7 @@ end
 //  1   X   : STX/TXA/TXS/PHX
 //  2   Y   : STY/TYA/PHY
 //  3   A   : STA/TAX/TAY/PHA
-//  4   Tmp : PHW/PHR (lo byte held in Tmp, Tmp pushed to stack after hi byte)
+//  4   Tmp : PHW/PHR
 //  5   S   : TSX
 //  6   P   : PHP
 //  7   M   : LDA/PLA/LDX/PLX/LDY/PLY/PLP
