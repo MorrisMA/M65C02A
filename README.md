@@ -214,7 +214,7 @@ provided to convey the character and behavior of the M65C02A-specific
 instructions. Additional detail can be gleaned from the Verilog source code, 
 the microprogram listings, and the User Guide (under development).
 
-#Prefix instructions
+##Prefix instructions
 
 The M65C02A gains much of its power from six (6) prefix instructions: IND, 
 SIZ, ISZ, OAX, OAY, and OSX. The IND and SIZ instructions add indirection and 
@@ -275,7 +275,7 @@ provided against an infinite long series of prefix instructions, all of which
 are uninterruptable, or application of prefix instructions to create an 
 existing addressing mode.
 
-##Access to User Stack Pointer (SU) from Kernel Mode
+###Access to User Stack Pointer (SU) from Kernel Mode
 
 When in Kernel mode, access to SU is provided by applying IND or ISZ to the 
 instruction sequences that access the system stack pointer:
@@ -307,7 +307,7 @@ IND will transfer only the lower 8-bits of SU. Adding SIZ by using ISZ will
 transfer the complete 16-bit value of SU; if only SIZ is used, then only SK 
 will be accessed.
 
-#Register Stack Manipulation instructions
+##Register Stack Manipulation instructions
 
 A unique feature of the M65C02A soft-core processor are the three level push-down
 stacks used to implement each of the three primary registers. Load and 
@@ -340,7 +340,7 @@ to memory by rotating the stack:
 Although this preserves the TOS in BOS, it provides the needed popping of the 
 register stack.
 
-##Special Behavior of the A Register Stack
+###Special Behavior of the A Register Stack
 
 In addition to the operations discussed above, the A register stack provides 
 several special behaviors. Using the IND prefix instruction, the bytes of the 
@@ -368,7 +368,7 @@ IP register can be exchanged:
 
     ISZ DUP :   ATOS <= IP; IP <= ATOS; => XAI
     
-##Special Behavior of the X Register Stack
+###Special Behavior of the X Register Stack
 
 In addition to the behaviors discussed above, the X TOS register implements a 
 counter function that allows it to operate as a third stack pointer. Further, 
@@ -381,7 +381,7 @@ is set and X is not the default stack pointer. The M65C02A move byte
 instruction uses this functionality to implement the source pointer increment, 
 decrement, or hold operations.
 
-##Special Behavior of the Y Register Stack
+###Special Behavior of the Y Register Stack
 
 In addition to the behaviors discussed above, the Y TOS register implements a 
 counter function that allows it to operate as the destination pointer for the 
@@ -390,7 +390,7 @@ implementation as the X TOS register. The M65C02A move byte instruction uses
 this functionality to implement the destination pointer increment, decrement, 
 or hold operations.
 
-#Base-Pointer Relative Addressing Mode Instructions
+##Base-Pointer Relative Addressing Mode Instructions
 
 The M65C02A introduces the base-pointer relative [bp,B] and post-indexed base-pointer
 relative indirect [(bp,B),Y] addressing modes. The M65C02A 
@@ -448,7 +448,7 @@ non-sensical situation where OAX and OAY are both applied. This would result
 in A being simultaneously used as the base-pointer and the post-index 
 register, which is not sensical.
 
-#Extended (16-bit) Push/Pop Instructions
+##Extended (16-bit) Push/Pop Instructions
 
 The M65C02A provides four push instructions and two pop/pull instructions not 
 found on the 6502/65C02 processors. These instructions push/pull 16-bit values 
@@ -501,7 +501,7 @@ support the IND and the OSX prefix instructions with the expected results to
 the addressing mode (IND) and default stack pointer (OSX). Other prefix 
 instructions have no affect on these instructions.
 
-#FORTH VM Support
+##FORTH VM Support
 
 The 6502/65C02 processors have long supported FORTH. The FORTH inner 
 interpreter can be implemented using the native instruction set. The 65C02-specific
@@ -650,7 +650,7 @@ the absolute address branches and jumps provide greater performance.
     
     (Note: another use of the ip,I++ addressing mode is for string operations.)
     
-#PC-relative 16-bit Unconditional Branch 
+##PC-relative 16-bit Unconditional Branch 
 
 The M65C02A provides an unconditional branch to a 16-bit PC-relative address:
 
@@ -666,7 +666,7 @@ subroutines:
 This instruction's behavior is not modified by any of the M65C02A prefix 
 instructions.
 
-#Move Byte Instruction
+##Move Byte Instruction
 
 The M65C02A provides a move byte instruction. The instruction includes an 
 immediate parameter which specifies whether uninterruptable block moves or 
