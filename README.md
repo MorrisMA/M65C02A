@@ -279,15 +279,15 @@ or application of prefix instructions to create an existing addressing mode.
 When in Kernel mode, access to SU is provided by applying the IND or ISZ to 
 the instruction sequences that access the system stack pointer:
 
-[SIZ] TSX           =>  TSX : X  <= SK;     IND/ISZ TSX =>  TSX : X  <= SU
-[SIZ] TXS           =>  TXS : SK <= X;      IND/ISZ TXS =>  TXS : SU <= X
+    [SIZ] TSX           =>  TSX : X  <= SK;     IND/ISZ TSX =>  TSX : X  <= SU
+    [SIZ] TXS           =>  TXS : SK <= X;      IND/ISZ TXS =>  TXS : SU <= X
+        
+    [SIZ] OSX/OAX TXA   =>  TSA : A  <= SK;     IND/ISZ TSA =>  TSA : A  <= SU
+    [SIZ] OSX/OAX TAX   =>  TAS : SK <= A;      IND/ISZ TAS =>  TAS : SU <= A
     
-[SIZ] OSX/OAX TXA   =>  TSA : A  <= SK;     IND/ISZ TSA =>  TSA : A  <= SU
-[SIZ] OSX/OAX TAX   =>  TAS : SK <= A;      IND/ISZ TAS =>  TAS : SU <= A
-
-[SIZ] OSX OAY TXA   =>  TSY : Y  <= SK;     IND/ISZ TSY =>  TSY : Y  <= SU
-[SIZ] OSX OAY TAX   =>  TYS : SK <= Y;      IND/ISZ TYS =>  TYS : SU <= Y
-    
+    [SIZ] OSX OAY TXA   =>  TSY : Y  <= SK;     IND/ISZ TSY =>  TSY : Y  <= SU
+    [SIZ] OSX OAY TAX   =>  TYS : SK <= Y;      IND/ISZ TYS =>  TYS : SU <= Y
+        
 The fastest way to access either SK or SU is to use the standard TXS/TSX 
 instructions. Use only SIZ to access the 16-bit SK or use only ISZ to access 
 the 16-bit SU. Use either OAX or OSX in order to transfer SK or SU to/from A. 
@@ -540,8 +540,8 @@ the various FORTH VM registers (described by Brad Rodriguez):
     UP  - Memory (page 0 an option)
     X   - Not needed, {OP2, OP1} or MAR can provide temporary storage required
 
-The following pseudo code defines the operations for these three operations in 
-terms of the ITC and the DTC models:
+The following pseudo code defines the operations for the NEXT, ENTER, and EXIT 
+operations in terms of the ITC and the DTC models:
 
                    ITC                                   DTC
     ================================================================================
@@ -560,6 +560,15 @@ terms of the ITC and the DTC models:
             W      <= (IP++) -- Ld *Code_Fld    ; W      <= (IP++) -- Ld *Code_Fld
             PC     <= (W)    -- Jump Indirect   ; PC     <= W      -- Jump Direct
     ================================================================================
+
+The EXIT function, or return from subtroutine, is not supported by a dedicated 
+M65C02A instruction. EXIT is implemented as instruction sequences using the 
+other dedicated instructions:
+
+    ITC             DTC
+    ===             ===
+    PLI             PLI
+    IND NXT         NXT
     
 ENT, PHI, and PLI all default to the RS, which is set to be implemented by the 
 auxiliary stack feature of the X TOS register. If OSX is prefixed to these 
