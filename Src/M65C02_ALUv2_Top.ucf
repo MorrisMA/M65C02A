@@ -1,9 +1,0 @@
-NET "Clk" TNM_NET = Clk;
-#
-#TIMESPEC TS_Clk = PERIOD "Clk" 24.390 ns HIGH 50%;      # S3A-4,  41.0000 MHz
-#TIMESPEC TS_Clk = PERIOD "Clk" 22.605 ns HIGH 50%;      # S3A-4,  44.2368 MHz
-#TIMESPEC TS_Clk = PERIOD "Clk" 20.833 ns HIGH 50%;      # S3A-4,  48.0000 MHz
-TIMESPEC TS_Clk = PERIOD "Clk" 20.000 ns HIGH 50%;      # S3A-4,  50.0000 MHz
-#TIMESPEC TS_Clk = PERIOD "Clk" 16.954 ns HIGH 50%;      # S3A-4,  58.9824 MHz
-#TIMESPEC TS_Clk = PERIOD "Clk" 16.666 ns HIGH 50%;      # S3A-4,  60.0000 MHz
-#TIMESPEC TS_Clk = PERIOD "Clk" 16.000 ns HIGH 50%;      # S3A-4,  62.5000 MHz
