@@ -1,0 +1,541 @@
+                            org $F000
+                            
+                PLW_ZP_Dat  =$FF
+            
+F000: 800E                  bra Rel16_Fwd1
+F002: 00                    brk
+F003: 60        Rel16_Sub1  rts
+F004: 0000      PLW_Abs_Dat dw  $0000
+F006: BEEF      PHW_Abs_Dat dw  $EFBE
+F008: 9B800800  Rel16_Bwd1  jrl Rel16_Fwd2
+F00C: 4C30F0                jmp $F030
+F00F: 00                    brk
+F010: 9B80F4FF  Rel16_Fwd1  jrl Rel16_Bwd1 
+F014: EAEA      Rel16_Fwd2  nop 2
+F016: FC06F0                phw PHR_Abs_Dat
+F019: F4DEAD                phw #$ADDE
+F01C: E204F0                plw PLW_Abs_Dat
+F01F: C2FF                  plw PLW_ZP_Dat
+F021: D4FF                  phw PLW_ZP_Dat
+F023: 62DDFF                phr Rel16_Sub1
+;
+F026: EA                    nop
+;
+F027: F40CF0                phw #$F00C
+;
+F02A: ABBA                  tsx.w
+F02C: A000                  ldy #0
+;
+F02E: 80DC                  bra $F00C
+;
+F030: A004                  ldy #$04
+F031: 5A                    phy
+F033: 28                    plp
+;
+F034: A000                  ldy #$00
+F036: F4AA55                phw #$55AA
+F039: A3FE                  lda -2,B
+F03B: C9AA                  cmp #$AA
+F03D: F004                  beq Continue 
+;
+F03F: DB                    stp
+;
+F040: DA        COP_ISR     phx
+F041: FA                    plx
+F042: 40                    rti
+;
+F043: 03FF      Continue    ora -1,B
+F045: 83FE                  sta -2,B 
+F047: 23FF                  and -1,B
+F049: 43FE                  eor -2,B
+F04B: 43FF                  eor -1,B
+F04D: 83FE                  sta -2,B 
+F04F: 43FF                  eor -1,B
+F051: 83FE                  sta -2,B 
+F053: C9AA                  cmp #$AA
+F055: F001                  beq *+1
+F057: DB                    stp
+;
+F058: F4F801                phw #$01F8
+F05B: B3FC                  lda (-4,B),Y
+F05D: C9AA                  cmp #$AA
+F05F: F001                  beq *+1
+F061: DB                    stp
+;
+F062: C8                    iny          
+F063: 13FC                  ora (-4,B),Y
+F065: 88                    dey
+F066: 93FC                  sta (-4,B),Y
+F068: C8                    iny
+F069: 33FC                  and (-4,B),Y
+F06B: 88                    dey
+F06C: 53FC                  eor (-4,B),Y
+F06E: C8                    iny
+F06F: 53FC                  eor (-4,B),Y
+F071: 88                    dey
+F072: 93FC                  sta (-4,B),Y
+F074: C8                    iny
+F075: 53FC                  eor (-4,B),Y
+F077: 88                    dey
+F078: 93FC                  sta (-4,B),Y
+F07A: C9AA                  cmp #$AA
+F07C: EA                    nop
+F07D: F001                  beq *+1
+F07F: DB                    stp
+;
+F080: 78                    sei
+F081: D8                    cld
+F082: 18                    clc
+F083: 08                    php
+F084: 68                    pla
+;
+F085: A3FE                  lda -2,B 
+F087: C9AA                  cmp #$AA
+F089: F001                  beq *+1
+F08B: DB                    stp
+;
+F08C: 18                    clc
+F08D: 63FF                  adc -1,B 
+F08F: 83FE                  sta -2,B 
+F091: C9FF                  cmp #$FF
+F093: F001                  beq *+1
+F095: DB                    stp
+;
+F096: 38                    sec
+F097: E3FF                  sbc -1,B 
+F099: 83FE                  sta -2,B 
+F09B: C9AA                  cmp #$AA
+F09D: F001                  beq *+1
+F09F: DB                    stp
+;
+F0A0: A9AA                  lda #$AA
+F0A2: C3FE                  cmp -2,B 
+F0A4: F001                  beq *+1
+F0A6: DB                    stp
+F0A7: A955                  lda #$55
+F0A9: C3FF                  cmp -1,B 
+F0AB: F001                  beq *+1
+F0AD: DB                    stp
+;
+F0AE: A000                  ldy #$00
+F0B0: B3FC                  lda (-4,B),Y
+F0B2: C8                    iny
+F0B3: 18                    clc
+F0B4: 73FC                  adc (-4,B),Y
+F0B6: 88                    dey
+F0B7: 38                    sec
+F0B8: F3FC                  sbc (-4,B),Y
+F0BA: 93FC                  sta (-4,B),Y
+F0BC: C8                    iny
+F0BD: D3FC                  cmp (-4,B),Y
+F0BF: F001                  beq *+1
+F0C1: DB                    stp
+;
+F0C2: 4C00F1                jmp $F100
+;
+F0FF: 55                    db  $55
+;
+F100: 9B                    ind
+F101: EA                    nop
+F102: AB                    siz
+F103: EA                    nop
+F104: BB                    isz
+F105: EA                    nop
+F106: EB                    oax
+F107: EA                    nop
+F108: FB                    oay
+F109: EA                    nop
+F10A: 8B                    osx
+F10B: EB                    oax
+F10C: 9B                    ind
+F10D: AB                    siz
+F10E: FB                    oay
+F10F: EA                    nop
+;
+F110: F4FFF0                phw #$F0FF
+F113: C280                  plw $80
+F115: A9AA                  lda #$AA
+F117: 4580                  eor $80
+F119: C955                  cmp #$55
+F11B: F001                  beq *+1
+F11D: DB                    stp
+F11E: 0A                    asl a
+F11F: EA                    nop
+F120: 5280                  eor ($80)
+F122: C580                  cmp $80
+F124: EA                    nop
+F125: F001                  beq *+1
+F127: DB                    stp
+;
+F128: A255                  ldx #$55
+F12A: EB4580                eor.x $80                   ; oax eor zp
+F12D: E0AA                  cpx #$AA
+F12F: F001                  beq *+1
+F131: DB                    stp
+;
+F132: A0AA                  ldy #$AA
+F134: FB4580                eor.y $80                   ; oay eor zp
+F137: C055                  cpy #$55
+F139: F001                  beq *+1
+F13B: DB                    stp
+;
+F13C: A27F                  ldx #$7F                    ; init page 0 aux stack                
+F13E: A900                  lda #$00                    ; clear accumulator
+F140: 8B68                  pla.s                       ; osx pla (ignore OSX)
+F142: C9FF                  cmp #$FF
+F144: EA                    nop
+F145: F001                  beq *+1
+F147: DB                    stp
+F148: E080                  cpx #$80
+F14A: EA                    nop
+F14B: F001                  beq *+1
+F14D: DB                    stp
+;
+F14E: 9A                    txs                         ; initialize Sk
+F14F: 8BDA                  phx.s                       ; osx phx
+F151: E07F                  cpx #$7F
+F153: F001                  beq *+1
+F155: DB                    stp
+F158: BA                    tsx
+F156: E480                  cpx $80
+F159: F001                  beq *+1
+F15B: DB                    stp
+;
+F15C: CA                    dex
+F15D: 8BF4AA55              phw.s #$55AA                ; osx phw #imm16
+F161: 8BF4DEAD              phw.s #$ADDE                ; osx phw #imm16
+F165: E07B                  cpx #$7B
+F167: F001                  beq *+1
+F169: DB                    stp
+;
+F16A: 18                    clc
+F16B: EB6903                adc.x #$03                  ; oax adc #imm8
+F16E: 8BFBC300              cmp.sy 0,B                  ; osx oay cmp 0,B
+F172: EA                    nop
+F173: F001                  beq *+1
+F175: DB                    stp
+;
+F176: 6481                  stz $81
+F178: 8BA2FF                ldx.s #$FF                  ; osx ldx #imm8
+F17B: 8B8681                stx.s $81                   ; osx stx zp
+F17E: BA                    tsx
+F17F: E0FF                  cpx #$FF
+F181: F001                  beq *+1
+F183: DB                    stp
+F184: E481                  cpx $81
+F186: EA                    nop
+F187: F001                  beq *+1
+F189: DB                    stp
+;
+F18A: 8B8A                  txa.s                       ; osx txa
+F18C: 490A                  eor #$0A
+F18E: 8BAA                  tax.s                       ; osx tax
+F190: C9F5                  cmp #$F5
+F192: EA                    nop
+F193: F001                  beq *+1
+F195: DB                    stp
+;
+F196: 8BE8                  inx.s                       ; osx inx
+F198: 8BE0F6                cpx.s #$F6                  ; osx cpx #imm8
+F19B: F001                  beq *+1
+F19D: DB                    stp
+;
+F19E: 8BCA                  dex.s                       ; osx dex
+F1A0: 8BE0F5                cpx.s #$F5                  ; osx cpx #imm8
+F1A3: F001                  beq *+1
+F1A5: DB                    stp
+;
+F1A6: A908                  lda #$08                    ; load transfer count
+F1A8: ABA200F0              ldx.w #$F000                ; load src pointer
+F1AC: ABA0F0F0              ldy.w #$F0F0                ; load dst pointer
+F1B0: 8233                  mvb +,+                     ; move block: sm=+,dm=+
+;
+F1B2: A908                  lda #$08                    ; load transfer count
+F1B4: ABA200F0              ldx.w #$F000                ; load src pointer
+F1B8: ABA0F7F0              ldy.w #$F0F7                ; load dst pointer
+F1BC: 8223                  mvb +,-                     ; move block: sm=+,dm=-
+;
+F1BE: A908                  lda #$08                    ; load transfer count
+F1C0: ABA200F0              ldx.w #$F000                ; load src pointer
+F1C4: ABA0F0F0              ldy.w #$F0F0                ; load dst pointer
+F1C8: 8203                  mvb +,0                     ; move block: sm=+,dm=0
+;
+F1CA: A908                  lda #$08                    ; load transfer count
+F1CC: ABA207F0              ldx.w #$F007                ; load src pointer
+F1D0: ABA0F0F0              ldy.w #$F0F0                ; load dst pointer
+F1D4: 8232                  mvb -,+                     ; move block: sm=-,dm=+
+;
+F1D6: A908                  lda #$08                    ; load transfer count
+F1D8: ABA207F0              ldx.w #$F007                ; load src pointer
+F1DC: ABA0F7F0              ldy.w #$F0F7                ; load dst pointer
+F1E0: 8222                  mvb -,-                     ; move block: sm=-,dm=-
+;
+F1E2: A908                  lda #$08                    ; load transfer count
+F1E4: ABA207F0              ldx.w #$F007                ; load src pointer
+F1E8: ABA0F0F0              ldy.w #$F0F0                ; load dst pointer
+F1EC: 8202                  mvb -,0                     ; move block: sm=-,dm=0
+;
+F1EE: A908                  lda #$08                    ; load transfer count
+F1F0: ABA200F0              ldx.w #$F000                ; load src pointer
+F1F4: ABA0F0F0              ldy.w #$F0F0                ; load dst pointer
+F1F8: 8230                  mvb 0,+                     ; move block: sm=0,dm=+
+;
+F1FA: A908                  lda #$08                    ; load transfer count
+F1FC: ABA200F0              ldx.w #$F000                ; load src pointer
+F200: ABA0F7F0              ldy.w #$F0F7                ; load dst pointer
+F204: 8220                  mvb 0,-                     ; move block: sm=0,dm=-
+;
+F206: A908                  lda #$08                    ; load transfer count
+F208: ABA200F0              ldx.w #$F000                ; load src pointer
+F20C: ABA0F0F0              ldy.w #$F0F0                ; load dst pointer
+F210: 8200                  mvb 0,0                     ; move block: sm=0,dm=0
+;
+F212: A908                  lda #$08                    ; load transfer count
+F214: ABA200F0              ldx.w #$F000                ; load src pointer
+F218: ABA0F0F0              ldy.w #$F0F0                ; load dst pointer
+F21C: 82B3                  mvs 0,0                    ; move block: sm=0,dm=0
+F21E: D0FC                  bne *-4                     ; loop until done
+;
+F220: A2EA                  ldx #$EA
+;
+F222: 8BF428F2              phw.s #$F228                ; test DTC EXE
+F226: 6B                    pli
+F227: 3B                    nxt
+F228: 2CF2                  dw  *+4
+F22A: 0000                  brk #0
+F22C: 8000                  bra *+0
+F22E: A9FF                  lda #$FF
+F230: 8D0002                sta $200
+;
+F232: 5B                    ini
+F234: 5B                    ini
+F235: 9B5B                  inw
+F237: 9B5B                  inw
+;
+F239: 8BF440F2              phw.s #$F240                ; test DTC ENT
+F23D: 9B6B                  plw
+F23F: 7B                    ent
+F240: 0000                  brk #0
+F242: 46F2                  dw  *+4                     ; skip code field
+F244: 0000                  brk #0
+F246: A9FE                  lda #$FE
+F248: 8D0002                sta $200
+;
+F24B: 4B                    phi
+F24C: 9B4B                  phw
+;
+F24E: 5B5B                  ini 2
+F250: ABAF00                lda.w 0,I++
+F253: ABC9A9FE              cmp.w #$FEA9
+F257: F001                  beq *+1
+F259: DB                    stp
+;
+F25A: F460F2                phw #ModeSwitch
+F25D: A9DB                  lda #$DB            ; NVBDZC set, user mode selected
+F25F: 48                    pha                 ; PSW for user mode routine
+F260: 40        ModeSwitch: rti                 ; switch mode to user mode
+F261: 2003F0                jsr $F003           ; call user mode subroutine
+F264: BA                    tsx                 ; read user mode stack pointer
+F265: E0FF                  cpx #$FF            ; Su should be $FF after return
+F267: F001                  beq *+1             ; skip if equal, else stop
+F269: DB                    stp
+;
+F26A: 00                    brk
+F26B: 00                    brk
+;
+F26C: 0B                    dup A
+F26D: 2B                    rot A
+F26E: 1B                    swp A
+F26F: 2B                    rot A
+;
+F270: EB0B                  dup X
+F272: EB2B                  rot X
+F274: EB1B                  swp X
+F276: EB2B                  rot X
+;
+F278: FB0B                  dup Y
+F27A: FB2B                  rot Y
+F27C: FB1B                  swp Y
+F27E: FB2B                  rot Y
+;
+F280: ABA90010              lda.w   #$1000      ;  4096
+;
+F284: ABC90110              cmp.w   #$1001      ;  4097
+F288: AB7001                blt     *+1
+F28B: DB                    stp
+;
+F28C: AB3001                ble     *+1
+F28F: DB                    stp
+;
+F290: ABC90010              cmp.w   #$1000      ;  4096
+F294: AB3001                ble     *+1
+F297: DB                    stp
+;
+F298: AB5001                bge     *+1
+F29B: DB                    stp
+;
+F29C: ABC9FF0F              cmp.w   #$0FFF      ;  4095
+F2A0: AB5001                bge     *+1
+F2A3: DB                    stp
+;
+F2A4: AB1001                bgt     *+1
+F2A7: DB                    stp
+;
+F2A8: ABC90090              cmp.w   #$9000      ; -28672
+F2AC: AB1001                bgt     *+1
+F2AF: DB                    stp
+;
+F2B0: ABA9FF8F              lda.w   #$8FFF      ; -28673
+;
+F2B4: ABC90090              cmp.w   #$9000      ; -28672
+F2B8: AB7001                blt     *+1
+F2BB: DB                    stp
+;
+F2BC: AB3001                ble     *+1
+F2BF: DB                    stp
+;
+F2C0: ABC9FF8F              cmp.w   #$8FFF      ; -28673
+F2C4: AB3001                ble     *+1
+F2C7: DB                    stp
+;
+F2C8: AB5001                bge     *+1
+F2CB: DB                    stp
+;
+F2CC: ABC9FE8F              cmp.w   #$8FFE      ; -28674
+F2D0: AB5001                bge     *+1
+F2D3: DB                    stp
+;
+F2D4: AB1001                bgt     *+1
+F2D7: DB                    stp
+;
+F2D8: ABC90070              cmp.w   #$7000      ;  28672
+F2DC: AB7001                blt     *+1
+F2DF: DB                    stp
+;
+F2E0: ABA955AA              lda.w   #$AA55
+F2E4: 9B1B                  swp.a
+F2E6: ABA91032              lda.w   #$3210
+F2EA: 9B2B                  rot.a
+F2EC: 9B2B                  rot.a
+F2EE: 9B1B                  swp.a
+;
+F2F1: ABA90080              lda.w   #$8000
+F2F5: BB4A                  asr.w   A 
+F2F7: ABC900C0              cmp.w   #$C000
+F2FB: F001                  beq     *+1
+F2FD: DB                    stp
+;
+F2FE: A002                  ldy     #$02
+F300: DC                    adj
+F301: AB8B8A                tsa.w
+F304: ABC90101              cmp.w   #$0101
+F308: EA                    nop
+F209: F001                  beq     *+1
+F30B: DB                    stp
+;
+F30C: ABA0FEFF              ldy.w     #-2
+F310: DC                    adj
+F311: AB8B8A                tsa.w
+F314: ABC9F701              cmp.w   #$01FF
+F318: EA                    nop
+F319: F001                  beq     *+1
+F31B: DB                    stp
+;
+F31C: ABA4002               ldx.w   #$0240
+F320: AB9A                  txs.w
+;
+F322: ABA000FF              ldy.w   #-256
+F326: DC                    adj
+F327: AB8B8A                tsa.w
+F32A: ABC94001              cmp.w   #$0140
+F32E: EA                    nop
+F32F: F001                  beq     *+1
+F331: DB                    stp
+;
+F332: A0FF                  ldy     #255
+F334: DC                    adj
+F335: AB8B8A                tsa.w
+F338: ABC93F01              cmp.w   #$013F
+F33C: EA                    nop
+F33D: F001                  beq     *+1
+F33F: DB                    stp
+;
+F340: ABA90080              lda.w   #$8000
+F344: 18                    clc
+F345: AB690080              adc.w   #$8000
+F349: BB4A                  asr.w   a 
+F34B: ABC90080              cmp.w   #$8000
+F34F: F001                  beq     *+1
+F351: DB                    stp
+;
+F352: FC60F3                psh     M       ;; Push Multiplicand 
+F355: ABAD62F3              lda.w   R       ;; Load Multiplier
+F359: 9B2B                  rev a           ;; Reverse Multiplier
+F35B: AB48                  pha.w           ;; Push Multiplier  
+;
+F35D: 4C68F3                jmp _imul       ;; Jump to _imul
+;
+F360: 5555          M:      dw $5555        ;; Multiplicand
+F362: AAAA          R:      dw $AAAA        ;; Multiplier
+F364: 721C          PL:     dw $1C72        ;; Expected Product (Lo)
+F366: 8EE3          PH:     dw $E38E        ;; Expected Product (Hi)
+;
+F368: A900          _imul:  lda #0          ;; {TOS, NOS, BOS} <= { 0,  x,  x}
+F36A: 0B                    dup a           ;; {TOS, NOS, BOS} <= { 0,  0,  x}
+F36B: 0B                    dup a           ;; {TOS, NOS, BOS} <= { 0,  0,  0}
+
+F36C: A010                  ldy #16         ;; Load loop counter
+
+F36E: AB68                  pla.w           ;; {TOS, NOS, BOS} <= {`R,  0,  0}
+F370: F024                  beq Exit        ;; if(Z) exit
+
+F372: 18                    clc             ;; Init Booth recoding bit: C
+F373: 2B                    rot a           ;; {TOS, NOS, BOS} <= { 0,  0, `R}
+
+F374: 8003                  bra Test_B  
+                            
+F376: AB0A          Loop:   asl.w a         ;; `R <<< 1 (Arithmetic Shift)
+F378: 2B                    rot a           ;; {TOS, NOS, BOS} <= { 0,  0, `R}
+
+F379: 9009          Test_B: bcc Sub_Shift   ;; {C, x} ? Add_Shft : Sub_Shft
+
+                    Add_Shift:
+F37B: 3010                  bmi Shft_P      ;; {1, N} ? P >> 1 : (P += M) >> 1
+F37D: 18            Add_M:  clc             ;; Clr C flag before addition of M
+F37E: AB8B6300              adc.w 0,S       ;; Add Multiplicand from stack
+F382: 8009                  bra Shft_P
+
+                    Sub_Shift:
+F384: 1007                  bpl Shft_P      ;; {0, N} ? (P -= M) >> 1 : P >> 1
+F386: 38            Sub_M:  sec             ;; Set C before subtraction of M
+F387: AB8BE300              sbc.w 0,S       ;; Sub Multiplicand from stack
+F38B: 8000                  bra Shft_P
+                    
+F38D: BB4A          Shft_P: asr.w a         ;; PH >>> 1 (Arithmetic Shift)
+F38F: 2B                    rot a           ;; {TOS, NOS, BOS} <= {PL, `R, PH}
+F390: AB6A                  ror.w a         ;; PL >> 1 (Rotate PL Right)
+F392: 2B                    rot a           ;; {TOS, NOS, BOS} <= {`R, PH, PL}
+                    
+F393: 88                    dey             ;; Decrement loop counter
+F394: D0E0                  bne Loop        ;; if(Cntr) loop
+                            
+F396: 2B            Exit:   rot a           ;; {TOS, NOS, BOS} <= {PH, PL,  0}
+F397: A002                  ldy #2          ;; Remove operands from stack
+F399: EAEAEA                nop 3           ;; rts
+;
+F39C: DC                    adj
+F39D: ABCD66F3              cmp.w   PH
+F3A1: F001                  beq     *+1
+F3A3: DB                    stp
+F3A4: 1B                    swp
+F3A5: ABCD64F3              cmp.w   PL
+F3A9: F001                  beq     *+1
+F3AB: DB                    stp
+;
+F3AC: AB5C00                xma.w 0,S
+F3AF: AB5C00                xma.w 0,S
+;
+F3B2: BB5C00                xma.w (0,S)
+F3B5: BB5C00                xma.w (0,S)
+;
+F3B8: DB                    stp

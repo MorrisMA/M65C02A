@@ -1,0 +1,2131 @@
+header
+Project: M65C02A_uPgm_ROM
+File Revision: 0014
+Author(s): Michael A. Morris
+Description: M65C02A Microprogram
+endh
+
+--------------------------------------------------------------------------------
+--
+--  Copyright 2015 by Michael A. Morris, dba M. A. Morris & Associates
+--
+--  All rights reserved. The source code contained herein is publicly released
+--  under the terms and conditions of the GNU General Public License as conveyed
+--  in the license provided below.
+--
+--  This program is free software: you can redistribute it and/or modify it
+--  under the terms of the GNU General Public License as published by the Free
+--  Software Foundation, either version 3 of the License, or any later version.
+--
+--  This program is distributed in the hope that it will be useful, but WITHOUT
+--  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+--  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+--  more details.
+--
+--  You should have received a copy of the GNU General Public License along with
+--  this program.  If not, see <http://www.gnu.org/licenses/>, or write to
+--
+--  Free Software Foundation, Inc.
+--  51 Franklin Street, Fifth Floor
+--  Boston, MA  02110-1301 USA
+--
+--  Further, no use of this source code is permitted in any form or means
+--  without inclusion of this banner prominently in any derived works.
+--
+--  Michael A. Morris <morrisma_at_mchsi_dot_com>
+--  164 Raleigh Way
+--  Huntsville, AL 35811
+--  USA
+--
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- Revision History:
+--------------------------------------------------------------------------------
+--
+--  0001    15A03   MAM     Initial release.
+--
+--  0002    15C01   MAM     Modified the SPN addressing mode for stack relative
+--                          addressing. To support stack frame based language
+--                          implementations, the stack relative addressing mode
+--                          is changed to a base pointer plus offset addressing
+--                          mode. The base pointer will be X, and it will have
+--                          the inherent -1 offset of a 6502 stack pointer rela-
+--                          tive to the memory address of the data in the stack.
+--                          Thus, bp relative addressing includes an automatic
+--                          +1 offset.
+--
+--  0003    15G06   MAM     Modified the address mode table to support the src
+--                          (X) and dst (Y) pointers (without offsets) for use
+--                          with the MOV instruction. Update COP #imm instruc-
+--                          tion; it no longers causes an interrupt/trap, but
+--                          instead it loads OP2 with the immediate operand and
+--                          initiates a co-processor operation. In this Revision
+--                          only OP2 is loaded with the coprocessor operand. It 
+--                          functions as a 2 cycle NOP for the time being. A mux
+--                          for multi-way branching is required in the core in
+--                          order to properly implement the M65C02A co-processor
+--                          interface.
+--
+--  0004    15G12   MAM     Added microroutine and definitions for MOV instruc-
+--                          tion.
+--
+--  0005    15G19   MAM     Changed the dispatch of the WAI instruction to im-
+--                          prove the response time by 1 cycle.
+--
+--  0006    15J25   MAM     Corrected error in DUP/SWP/ROT microsequences where
+--                          WE_R field shifted right one field into ISR field.
+--
+--  0007    15K10   MAM     Corrected error in the application of the index reg.
+--                          to the IND prefixed (zp,X) addressing mode. Indexing
+--                          was being applied twice, resulting in ((zp,X)),X, an
+--                          undefined, non-sensical addressing mode.
+--
+--  0008    15K13   MAM     Changed the assigned opcode for MOV from $44 to $42.
+--                          Assigned the unused opcode at $44 to STA ip,I++ to
+--                          match the LDA ip,I++ opcode at $54. The new instruc-
+--                          tion uses the same addressing mode as LDA ip,I++, 
+--                          but stores the accumulator at the address specified
+--                          by IP and autoincrements IP. IND, SIZ, and ISZ pre-
+--                          fix instructions may be applied to both of these 
+--                          instructions with the expected indirection and size
+--                          effects.
+--
+--  0009    15K25   MAM     Replaced the BSR rel16 instruction with the 
+--                          JMP (bp,B),Y instruction . BSR rel16 can be synthe-
+--                          sized using PSH #imm16; BRL rel16; with only a four
+--                          cycle penalty. Replaced JMP (bp,B),Y with the
+--                          ADC ip,I++ as $82. This instruction will be used for
+--                          computing IP-relative jumps and branches. The 
+--                          ADC ip,I++ instruction will use sequence used for
+--                          the LDA ip,I++ instruction, so the sequence is re-
+--                          named to _RO_ipIPP, since more than one instruction
+--                          uses the sequence. Recovered the microcode space for
+--                          the BSR rel16 instruction.
+--
+--  0010    15L10   MAM     Replaced the JMP (bp,B),Y instruction with the 
+--                          ADJ #imm16 instruction. The ADJ instruction directly
+--                          adjusts the system or auxiliary stack pointers with
+--                          the 16-bit two's complement immediate value.
+--
+--  0011    15L19   MAM     Changed the ADJ #imm16 instruction into a single
+--                          byte, single cycle instruction that adjusts the sys-
+--                          tem stack or auxiliary pointer by the value of the Y
+--                          register. Recovered the extra microcode space.
+--
+--  0012    15A01   MAM     Modified the instruction decode to conform with ver-
+--                          sion 0014 of the Instruction Decode ROM. MOV moved
+--                          to 82 and 42 defined as a NOP. ADD/LDA ip,I++ and 
+--                          STA ip,I++ moved to column F. Column 7 replaced.
+--                          Added addressing mode sequences for addressing modes
+--                          RO/WO sp,S, RMW bp,B, and RMW ip,I++, and deleted
+--                          sequences supporting the Rockwell bit-oriented in-
+--                          structions: RMBx/SMBx and BBRx/BBSx.
+--
+--  0013    16A05   MAM     Converted ADC/SBC sp,S to RMW where the left operand
+--                          is M and the right operand is A, and the result is
+--                          written back to M. This is expected to improve the
+--                          HLL performance of the core by operating directly on 
+--                          local variables found on the system stack either in
+--                          function/procedure stack frame (relative to BP) or 
+--                          in dynamically created variables used for expression
+--                          evaluation.
+--
+--  0014    16A08   MAM     Added XMA sp,S: M <= [EA]; [EA] <= A; A <= M; Will
+--                          require a RMW-like microsequence with a change in
+--                          the ALU control word. The instruction decode will 
+--                          enable [EA] <= A, i.e. store accumulator. The in-
+--                          struction sequence will first read the effective
+--                          address into M, i.e. {OP2, OP1}, the write A to the
+--                          effective address, and finally write M into A. To 
+--                          write A to the effective address, the initial ALU
+--                          control word will be for the STA instruction. To
+--                          write M into A after writing A to memory, the ALU
+--                          control word must be changed during the final cycle
+--                          of the write to memory from a STA to an LDA control
+--                          word using the BA control field in the Microprogram.
+--
+--------------------------------------------------------------------------------
+--  Comments
+--------------------------------------------------------------------------------
+--
+--  The microprogram controller being targeted is the F9408A MPC. That control-
+--  ler provides for sequential execution (FTCH), microroutine subroutines (RTS,
+--  BSR), multi-way branching (BMW), unconditional externally controlled branch-
+--  ing (BRV0, BRV1, BRV2, BRV3), and conditional branching using external test
+--  inputs (BTL0, BTH0, BTL1, BTH1, BTL2, BTH2, BTL3, BTH3). Past use of this
+--  controller has been focused on using the FTCH, BRV0, BSR, RTS, and BTL0/BTH0
+--  as the basis of control. An external multiplexer controlled by the microword
+--  and tied to the T0 test pin has been used for most tests. BRV0 has been used
+--  in a conventional manner, and as such, it has only been used as an uncondi-
+--  tional branch to a microprogram address supplied in the microword. No extra-
+--  ordinary use of these basic control structures has been attempted.
+--
+--  With the program and data memory of the target, the M65C02A synthesizable
+--  microprocessor/microcomputer, external to the core, there is a need to
+--  implement a memory interface. From an implementation perspective, the exter-
+--  nal memory interface would need to supply a ready signal so that the M65C02A
+--  logic can capture any input data into the instruction register, IR, one of
+--  the two internal temporary operand registers, OP1 and OP2, or one of the
+--  programmer-visible registers of the processor core: A, X, Y, P, or S.
+--
+--  If the direct approach to using the F9408A MPC is maintained, a number of
+--  additional clock cycles will be added to each operation because of the con-
+--  ditional test and branch instructions required to test the external ready
+--  signal. A discrete logic FSM approach for the processor core controller
+--  would branch to any number of multiple states as needed to minimize the to-
+--  tal number of cycles needed to implement any instruction of the processor
+--  core. A microprogrammed approach for implementing the processor core is the
+--  objective because it provides a more flexible approach to the implementa-
+--  tion, and provides an easier path to upgrading the instruction set with
+--  additional instructions such as the Rockwell RMBx/SMBx/BBRx/BBSx, the WDC
+--  WAI/STP, or even instructions for a FORTH VM.
+--
+--  With an F9408A MPC, a simple straight forward approach can be taken to the
+--  development of the microprogrammed state machine. Without using external
+--  logic to augment the operation of the F9408A, the resulting micoprogram can
+--  be limited to simple, single variable tests, which will result in additional
+--  clock cycles in most operations/algorithms. This is not a limitation of the
+--  F9408A MPC itself, or microprogramming in general, but of the application in
+--  which the F9408A is included.
+--
+--  Mult-way branching in standard FSMs is natural, but is also one of the most
+--  difficult design aspects of FSMs. Depending on the type of FSM being develp-
+--  ed, implementing (area and speed) efficient state transition equations for
+--  FSMs with many branches into or out of many states is difficult and can be
+--  difficult to test and debug. The same statement applies to microprogrammed
+--  state machines, and is one reason why most MPCs have only a limited number
+--  of instructions which support multi-way branching. However, microprogrammed
+--  state machines are not limited by the architectural limitation imposed by
+--  standard MPCs.
+--
+--  The M65C02A supports the reset trap, a non-maskable interrupt (NMI), a mask-
+--  able interrupt, and the break instruction trap. In most cases, the two
+--  interrupts are evaluated at the completion of each instruction. However, the
+--  first instruction after one of these traps/interrupts is always executed. To
+--  allow for this behavior to be easily implemented, BRV1 is used to initiate
+--  the execution of an instruction regardless of the state of the NMI/IRQ
+--  signals. BMW is used to test up to three signals and select the appropriate
+--  action. Thus, most instructions will initiate the fetch of the next instruc-
+--  tion by terminating their execution with BMW. Using a 2-way table, the BMW
+--  will either complete the execution of the current instruction and the fetch
+--  of the next instruction's opcode, or it will complete the execution of the
+--  current instruction and branch to the interrupt/trap handler microroutine.
+--  Single cycle instructions will use BRV3 for the same purpose, but implement-
+--  ed in a different manner. The next state for BMW is either BRV1 or BRV2.
+--  BRV1 is used to complete the execution of the current instruction and fetch
+--  the next instruction's opcode. BRV2 is used to capture the interrupt vector
+--  and complete the execution of the current instruction. Both the IRQ/NMI trap
+--  handler and the BRK handler start with a BRV2 instruction, which completes
+--  the current instruction and captures the PC. The BRV3 MPC operation performs
+--  the same function as BRV1, but the next state is either the first state of
+--  the next instruction or the IRQ/NMI trap microroutine, which capture's the
+--  current instruction PC with BRV2.
+--
+--  The microprogram behavior is based on two assumptions: (1) external memory
+--  is of a type in which the data read is related to the address presented
+--  during the cycle, i.e. asynchronous, no-wait state RAM; and (2) the PC con-
+--  trol field causes the modification of the PC for the next clock cycle. With
+--  these two assumptions, the microprogram starts with an unconditional jump
+--  to a 2-way jump table which initiates the fetch of an instruction opcode
+--  from memory, or vectors to the microprogram's interrupt handler. The BRV1
+--  instruction is used to capture/decode the fetched opcode using a ROM/RAM.
+--  The opcode is used directly as it is being read from memory to address a
+--  256-way branch table in the microprogram ROM, and simultaneously a second
+--  decode ROM/RAM that provides the fixed portion of each instructions opera-
+--  tion. That is, the 256-way instruction decoder built into the microprogram
+--  ROM is the decoder for the variable microprogram, and the second ROM is the
+--  decoder for the fixed portion of the microword. The variable microprogram
+--  implements the control sequences necessary for an instruction from the pers-
+--  pective of the addressing mode of the instruction, and the fixed micropro-
+--  gram word defines the ALU operation to be performed when all operands are
+--  available. The fixed microword is applied to the ALU under control of the
+--  microprogram. Altogether, the number of bits required is 36 for the variable
+--  microwords, and 36 for the fixed microword, or 72 bits total.
+--
+--  The 2-way jump table, which is the target of the first unconditional branch,
+--  has two locations which are expected to be accessed by a BMW instruction.
+--  The first location is labeled as _Nxt to signify that it is the fetch cycle
+--  for the next opcode. The second location is used to initiate the interrupt
+--  handler in the event that the external INT signal is asserted. An external
+--  interrupt handler is expected to determine if an NMI or unmasked IRQ inter-
+--  rupt should be taken. If INT is asserted, then the BRV2 instruction in the
+--  second location of the jump table will capture the interrupt vector and jump
+--  to the microprogram's interrupt handler.
+--
+--  Following the jump table are microroutines for handling specific instruc-
+--  tions, or for handling specific addressing modes. The most significant 256
+--  locations in the microprogram ROM/RAM constitute the initial microstate for
+--  each of the 256 possible instruction opcodes. In the M65C02A implementation,
+--  256 of these instructions represent valid instructions. 
+--
+--  A second 2-way jump table is included specifically for the RMW instructions.
+--  The purpose of the microword with the BRV1 instruction is to complete the
+--  execution of the current instruction, and simultaneously to fetch and decode
+--  the next instruction. For most instructions, the ALU operation is performed
+--  during in a terminal microstate with a BRV1 instruction which has Done and
+--  Reg_WE asserted. For RMW instructions, the ALU operation initiated by the
+--  Reg_WE control field occurs before the write back to memory of the computed
+--  result. To use a BMW instruction to jump to the same 2-way jump table used
+--  for RO or WO multicycle instructions may result in the M65C02A registers,
+--  including the PSW, being written twice during a cycle. To avoid this issue,
+--  a second BRV1/BRV2 2-way jump table accessed by a BMW instruction is used
+--  for the RMW instructions. The BRV1 microstate in the RMW jump table does not
+--  assert Reg_WE. This allows a RMW instruction to complete in the same manner
+--  as other multicycle instructions, and prevents any of the registers from
+--  being written more than once per instruction cycle.
+--
+--  To support the extended instruction set of the M65C02A microprocessor, the
+--  F9408A instruction set was modified. The base instructions, BTLx, have been
+--  redefined as BMWx, respectively. Furthermore, the method used to implement
+--  multiway branching has also been changed. Instead of bit stuffing the multi-
+--  way data into the microprogram Branch Address (BA) field, the multi-way data
+--  is added to the BA field. Multi-way branching using bit stuffing requires
+--  that the multi-way jump tables be aligned on 2, 4, or 8 word boundaries
+--  based on the number of multi-way branch bits used. Multi-way branching using
+--  addition removes the alignment restriction, which greatly simplifies the
+--  microprogram, and allows multi-way branch tables to be placed at any loca-
+--  tion in the microprogram.
+--
+--  The IND prefix instruction is used to convert direct (zero page or absolute)
+--  addressing modes into indirect addressing modes. Since the address indirec-
+--  tion operation must be performed first, IND is tested using one of the new
+--  multi-way branch instructions added to the F9409A MPC. Furthermore, the com-
+--  plement of IND is used as the test rather than IND in order to place the
+--  extra address indirection step before the operand fetch microsequence. This
+--  allows the microprogram to use fewer branches, which makes for a shorter and
+--  and more readable microprogram.
+--
+--  Controlling the length of the instruction cycle to accomodate the SIZ pre-
+--  fix instruction is accomplished using two techniques: (1) multi-way branch-
+--  ing, and (2) MPC instruction substitution. The first technique is used when
+--  dispatching the instruction requires branching to different sequences. The
+--  second technique is used when all that is required is extending the micro-
+--  sequence by an additional cycle. When MPC instruction substitution is used,
+--  a FTCH instruction is substituted for whatever instruction is provided by
+--  the microprogram.
+--
+--  The BTLx microinstructions were redefined for the M65C02A MPC in order to
+--  provide additional multi-way branches to efficiently support the IND and SIZ
+--  prefix instructions. The Verilog code given below for the MW[2:0] inputs
+--  defines how the IND, SIZ, xIRQ, and Int signals are used with the multi-way
+--  branch instructions.
+--
+--  The T[3:0] inputs had been previously connected to IND and SIZ, but the cur-
+--  rent implementation of the core has connected the ALU flags to the MPC test
+--  inputs: T[3:0] = {ALU_N, ALU_V, ALU_Z, CC}. The BTH0, BTH1, BTH2, and BTH3
+--  instructions can still be used to test these four inputs, although only the
+--  test for a logic 1 is still retained by the M65C02A MPC. This should still
+--  allow additional instructions to be added to the M65C02A core without addi-
+--  tional core logic changes.
+--
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+--
+--------------------------------------------------------------------------------
+-- F9408A Instruction definitions
+--------------------------------------------------------------------------------
+
+RTS         .asm    0       -- Return from Subroutine
+BSR         .asm    1       -- Branch to subroutine
+FTCH        .asm    2       -- Fetch next instruction
+BMW         .asm    3       -- Branch multi-way
+BRV0        .asm    4       -- Branch via 0
+BRV1        .asm    5       -- Branch via 1
+BRV2        .asm    6       -- Branch via 2
+BRV3        .asm    7       -- Branch via 3
+BTH0        .asm    8       -- Branch if T0 is high
+BTH1        .asm    9       -- Branch if T1 is high
+BTH2        .asm    10      -- Branch if T2 is high
+BTH3        .asm    11      -- Branch if T3 is high
+BMW0        .asm    12      -- Branch multi-way
+BMW1        .asm    13      -- Branch multi-way
+BMW2        .asm    14      -- Branch multi-way
+BMW3        .asm    15      -- Branch multi-way
+
+--------------------------------------------------------------------------------
+-- ROM ( output ) Field definitions
+--------------------------------------------------------------------------------
+
+Inst        .def    4       -- Instruction
+BA          .def    8       -- Branch Address
+uP_Cntl     .def    4       -- Microprogram Control
+NA_Cntl     .def    9       -- Next Address Control Field
+IO_Cntl     .def    2       -- I/O Cycle Control Field
+DIO_Cntl    .def    4       -- Data Input/Output Demux/Mux Control Field
+RegWE_Cntl  .def    1       -- Register Write Enable (A, X, Y, S, P)
+PSW_Cntl    .def    1       -- Asserted to Clear D and Set I in PSW
+uMCntl      .def    3       -- micro-Machine Control Field
+
+--------------------------------------------------------------------------------
+-- Constant definitions
+--------------------------------------------------------------------------------
+
+--  Next Address Control Definitions
+
+--                         L PSIM XYA C
+--                         d CtPA   b i   OP2 <= (SGN)          ? sign(OP1)  : 0
+--                         P  k R   s     M   <= (CC | ~Ld_PC)  ? {OP2, OP1} : 0
+--------------------------------------------------------------------------------
+Vec     .equ    258     -- 1_0000_001_0; Vec:  NA  <=       M + 0; PC,MAR <= NA
+Jmp     .equ    258     -- 1_0000_001_0; Jmp:  NA  <=       M + 0; PC,MAR <= NA
+JmpX    .equ    266     -- 1_0000_101_0; JmpX: NA  <= X   + M + 0; PC,MAR <= NA
+JmpY    .equ    262     -- 1_0000_011_0; JmpY: NA  <= Y   + M + 0; PC,MAR <= NA
+Rtn     .equ    259     -- 1_0000_001_1; Rtn:  NA  <=       M + 1; PC,MAR <= NA
+--------------------------------------------------------------------------------
+PC      .equ    384     -- 1_1000_000_0; PC:   NA  <= PC      + 0; PC,MAR <= NA
+Inc     .equ    385     -- 1_1000_000_1; Inc:  NA  <= PC      + 1; PC,MAR <= NA
+--------------------------------------------------------------------------------
+Bra     .equ    387     -- 1_1000_001_1; Bra:  NA  <= PC  + M + 1; PC,MAR <= NA
+Rel     .equ    131     -- 0_1000_001_1; Rel:  NA  <= PC  + M + 1; MAR <= NA
+--------------------------------------------------------------------------------
+Psh     .equ     64     -- 0_0100_000_0; Psh:  NA  <= S       + 0; MAR <= NA
+Pop     .equ     65     -- 0_0100_000_1; Pop:  NA  <= S       + 1; MAR <= NA
+SPM     .equ     67     -- 0_0100_001_1; BP:   NA  <= S   + M + 1; MAR <= NA
+--------------------------------------------------------------------------------
+BPM     .equ     11     -- 0_0000_101_1; BP:   NA  <= X   + M + 1; MAR <= NA
+--------------------------------------------------------------------------------
+IPN     .equ     32     -- 0_0010_000_0; IP:   NA  <= IP      + 0; MAR <= NA
+--------------------------------------------------------------------------------
+ZPN     .equ      2     -- 0_0000_001_0; ZPN:  NA  <=       M + 0; MAR <= NA
+ZPX     .equ     10     -- 0_0000_101_0; ZPX:  NA  <= X   + M + 0; MAR <= NA
+ZPY     .equ      6     -- 0_0000_011_0; ZPY:  NA  <= Y   + M + 0; MAR <= NA
+--------------------------------------------------------------------------------
+LDA     .equ      2     -- 0_0000_001_0; LDA:  NA  <=       M + 0; MAR <= NA
+LDAX    .equ     10     -- 0_0000_101_0; LDAX: NA  <= X   + M + 0; MAR <= NA
+LDAY    .equ      6     -- 0_0000_011_0; LDAY: NA  <= Y   + M + 0; MAR <= NA
+--------------------------------------------------------------------------------
+SRC     .equ      8     -- 0_0000_100_0; LDA:  NA  <= X       + 0; MAR <= NA
+DST     .equ      4     -- 0_0000_010_0; LDA:  NA  <= Y       + 0; MAR <= NA
+--------------------------------------------------------------------------------
+MAR     .equ     16     -- 0_0001_000_0; MAR:  NA  <= MAR     + 0; MAR <= NA
+Nxt     .equ     17     -- 0_0001_000_1; Nxt:  NA  <= MAR     + 1; MAR <= NA
+--------------------------------------------------------------------------------
+
+--  uPCntl Definitions
+
+MOD     .equ    1       -- Asserts MOD (% 256), page determined by AL[15:8]
+SIZ     .equ    2       -- Asserts TSiz
+PRV     .equ    4       -- Complements AR to force decrement of NA
+BA      .equ    8       -- uPgm control of ALU using ROM[uMCntl]
+
+--  uPCntl Combinations
+
+SMD     .equ    3       -- Asserts TSiz and MOD (% 256)
+SPV     .equ    6       -- Asserts TSiz and PRV for 16-bit RMW Write Cycles
+BSZ     .equ    10      -- Asserts BA and TSiz for 16-bit XMA Read Cycles
+
+--  Bus Interface Unit  Definitions
+
+WR      .equ    1       -- Bus Operand Write
+RD      .equ    2       -- Bus Operand Read
+IF      .equ    2       -- Bus Insruction Fetch
+
+--  Memory Data Input Demultiplexer Definitions
+
+SGN     .equ    7       -- OP1 <= DI; OP2 <= sign(DI);
+OP2     .equ    2       -- OP2 <= DI; OP1 <= OP1;
+OP1     .equ    6       -- OP1 <= DI; OP2 <= 0;
+MEM     .equ    4       -- OP1 <= DI; OP2 <= OP2;
+IR      .equ    8       -- IR  <= DI;
+
+--  Memory Data Output Multiplexer Definitions
+
+ALU     .equ    1       -- DO  <= ALU
+DOH     .equ    3       -- DO  <= ALU_DO[15:8]
+DOL     .equ    5       -- DO  <= ALU_DO[ 7:0]
+DMH     .equ    2       -- DO  <= ((PHR) ? MARH : PCH)
+DML     .equ    4       -- DO  <= ((PHR) ? MARL : PCL)
+PSW     .equ    8       -- DO  <= PSW (P)
+
+--  Register Write Enable Control Field Definitions
+
+WE_R    .equ    1       -- Write Enable Selected Register/Enable ALU operation
+
+--  Interrupt/Vector Pull Control Field Definitions
+
+ISR     .equ    1       -- Assert ISR: Clear D, Set I, set M
+
+--  FORTH VM Control uMCntl Field Definitions
+
+STW     .equ    1       -- Output W else IP     : T  <= ((STW) ? W : IP)
+IP1     .equ    2       -- Increment IP by 1    : IP <= IP + 1
+WP2     .equ    3       -- increment W  by 2    : W  <= W  + 2
+M2W     .equ    4       -- Load W  with M       : W  <= {OP2, OP1}
+M2I     .equ    5       -- Load IP with M       : IP <= {OP2, OP1}
+A2I     .equ    6       -- Load IP with A       : IP <= A
+W2I     .equ    7       -- Load IP with W       : IP <= W
+
+--  MOV Instruction uMCntl Field Definitions
+
+DecCntr .equ    1       -- Decrement Transfer Length Counter (A)
+UpdtPtr .equ    6       -- Update Source (X) and Destination (Y) Pointers
+
+--------------------------------------------------------------------------------
+--
+--  Microprogram Controller Resources
+--
+--  T[0]    -   CC
+--  T[1]    -   ALU_Z
+--  T[2]    -   ALU_V
+--  T[3]    -   ALU_N
+--
+--  Via[0]  -   BA, but also waits for the completion of a memory or ALU cycle
+--  Via[1]  -   Instruction Decoder, effectively functions as a 256 way branch
+--  Via[2]  -   Samples Vector and loads it into {OP2, OP1}
+--  Via[3]  -   Instruction Decoder with branch to Interrupt Handler, _Int
+--
+--  MW[2:0] -   See Verilog code below:
+--
+--  always @(*)
+--  begin
+--      if(&I[3:2]) // Used by the BMWx MPC instructions
+--          case(I[1:0])
+--              2'b00 : MW <= {1'b0,  SIZ, 1'b0};   // #Imm Operand Instructions
+--              2'b01 : MW <= {1'b0, ~IND, ~SIZ};   // RMW Instructions
+--              2'b10 : MW <= {1'b0, ~IND, 1'b0};   // Other Instructions
+--              2'b11 : MW <= {1'b0, 1'b0, ~IND};   // Other Instructions
+--          endcase
+--      else        // Used by the BMW MPC instruction
+--          MW <= ((WAI) ? {1'b0, xIRQ, Int} : {2'b00, Int});
+--  end
+--
+--  Memory Output Data Multiplexer Definitions
+--      Output Data Multiplexer provides a means by which 16-bit operands may be
+--      pushed/written to memory. Currently, three 16-bit operands are tied to
+--      the Output Data Multiplexer: PC, MAR, ALU. In addition, to support
+--      traps and interrupts, the PSW is also tied to the Output Data multi-
+--      plexer. The multiplexer is controlled by three one-hot selects:
+--
+--  TSZ = SIZ & TSiz;
+--
+--  always @(posedge Clk) dTSZ <= ((Rst) ? 1'b0 : TSZ & ~dTSZ) 
+--
+--  HB = ((SIZ) ?  (^{dTSZ, PSH}) : 1'b0);
+--  LB = ((SIZ) ? ~(^{dTSZ, PSH}) : 1'b1);
+--
+--  case(DO_Op)
+--      4'b0000 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, 1'b0, 1'b0};    // NONE
+--      4'b0001 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, LB,   HB  };    // ALU
+--      4'b0010 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, 1'b0, 1'b1};    // DMH
+--      4'b0011 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, 1'b0, 1'b1};    // ALU_DOH
+--      4'b0100 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, 1'b1, 1'b0};    // DML
+--      4'b0101 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, 1'b1, 1'b0};    // ALU_DOL
+--      4'b0110 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, 1'b0, 1'b0};    // NONE
+--      4'b0111 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, 1'b0, 1'b0};    // NONE
+--      4'b1000 : {Sel_P, Sel_DL, Sel_DH} <= {1'b1, 1'b0, 1'b0};    // P
+--      4'b1001 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, 1'b0, 1'b0};    // NONE
+--      4'b1010 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, 1'b0, 1'b0};    // NONE
+--      4'b1011 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, 1'b0, 1'b0};    // NONE
+--      4'b1100 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, 1'b0, 1'b0};    // NONE
+--      4'b1101 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, 1'b0, 1'b0};    // NONE
+--      4'b1110 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, 1'b0, 1'b0};    // NONE
+--      4'b1111 : {Sel_P, Sel_DL, Sel_DH} <= {1'b0, 1'b0, 1'b0};    // NONE
+--  endcase
+--
+--  MuxDat = ((DO_Op[0]) ? ALU_DO : ((PHR) ? MAR : PC));
+--
+--  OutMux = ((Sel_DH) ? MuxDat[15:8] : 0);
+--  OutMux = ((Sel_DL) ? MuxDat[ 7:0] : 0);
+--  OutMux = ((Sel_P ) ? P            : 0);
+--
+--------------------------------------------------------------------------------
+-- M65C02A Microprogram Start
+--------------------------------------------------------------------------------
+
+--  I   BA, NA, IO, DI, Reg_WE, ISR, VM
+
+_Start: .org    0
+    BRV2    _Rst                                -- {OP2, OP1}<={RST}
+_Rst:
+    FTCH    $,MOD, Psh, WR, DMH, WE_R           -- NA<={1,SP}; DO<=PCH; SP--
+    FTCH    $,MOD, Psh, WR, DML, WE_R           -- NA<={1,SP}; DO<=PCL; SP--
+    FTCH    $,MOD, Psh, WR, PSW, WE_R, ISR      -- NA<={1,SP}; DO<=PSW; SP--
+--
+    FTCH    $,, LDA, RD, OP1                    -- NA<={OP2,OP1}; OP1<=Lo(RST)
+    FTCH    $,, Nxt, RD, OP2,, ISR              -- NA<=MAR+1;     OP2<=Hi(RST)
+--
+    BRV1    $,, Jmp, IF, IR                     -- PC<={OP2,OP1}; NA<={OP2,OP1}
+
+--------------------------------------------------------------------------------
+-- 2-Way Jump Table: _Nxt and _Int; Instruction Fetch and Execute Microstate
+--------------------------------------------------------------------------------
+
+_Nxt:   .org 8
+_Php:
+_Plp:
+    BRV1    _Nxt,, Inc, IF, IR, WE_R                -- Instruction Fetch/Execute
+
+--------------------------------------------------------------------------------
+--  Interrupt Entry - NMI, (unmasked) IRQ (falls through to second state of BRK)
+--------------------------------------------------------------------------------
+
+_Int:
+    BRV2    _PshPCL,MOD, Psh, WR, DMH, WE_R -- Push PCH, {OP2,OP1}<=Vector(INT)
+
+--------------------------------------------------------------------------------
+--  BRK Entry - BRK #imm (_Int falls through to _PshPCL, see comment above)
+--------------------------------------------------------------------------------
+
+_Brk:
+    BRV2    _PshPCL,MOD, Psh, WR, DMH, WE_R         -- Push PCH
+_PshPCL:
+    FTCH    $,MOD, Psh, WR, DML, WE_R               -- Push PCL
+    FTCH    $,MOD, Psh, WR, PSW, WE_R, ISR          -- Push PSW; Clr D, Set I;
+                                                    -- {OP2,OP1}<=Vector(BRK)
+--
+    FTCH    $,, Vec, RD, OP1                        -- Read Indirect Dst Ptr Lo
+    FTCH    $,, Nxt, RD, OP2,, ISR                  -- Read Indirect Dst Ptr Hi
+--
+    BRV1    $,, Jmp, IF, IR                         -- Instruction Fetch
+
+--------------------------------------------------------------------------------
+--  Branch if CC - Bcc Rel                          (Not interruptable)
+--------------------------------------------------------------------------------
+
+_Rel:
+    FTCH    $,, Inc, IF, OP2                        -- Read Hi Byte
+    BRV1    $,, Bra, IF, IR                         -- Instruction Fetch
+
+--------------------------------------------------------------------------------
+--  Jump To Subroutine - JSR abs, JSR (abs)         (Not interruptable)
+--------------------------------------------------------------------------------
+
+_JSR:
+    FTCH    $,, Inc, RD, OP2                        -- Load Dst Ptr Hi
+    FTCH    $,MOD, Psh, WR, DMH                     -- Push PC Hi
+    BMW2    _JSR_absI,MOD, Psh, WR, DML             -- Push PC Lo
+_JSR_absI:
+    FTCH    $,, LDA, RD, OP1                        -- Load Dst Ptr Lo
+    FTCH    $,, Nxt, RD, OP2                        -- Load Dst Ptr Hi
+--
+    BRV1    $,, Jmp, IF, IR                         -- Instruction Fetch
+
+--------------------------------------------------------------------------------
+--  Return from Interrupt - RTI                     (Not interruptable)
+--------------------------------------------------------------------------------
+
+_RTI:
+    FTCH    $,MOD, Pop, RD, OP1, WE_R               -- Pop PCL, PSW <= OP1
+
+--------------------------------------------------------------------------------
+--  Return From Subroutine - RTS                    (Not interruptable)
+--------------------------------------------------------------------------------
+
+_RTS:
+    FTCH    $,MOD, Pop, RD, OP2                     -- Pop PCH
+    BRV1    $,, Rtn, IF, IR                         -- Execute RTS
+
+--------------------------------------------------------------------------------
+--  Jump Indirect - JMP (dp)                        (Not interruptable)
+--------------------------------------------------------------------------------
+
+_Jmp_zpII:
+    FTCH    $,MOD, ZPN, RD, OP1
+    BRV0    _Jmp_absI_Exit,MOD, Nxt, RD, OP2
+_JMP_zpI:
+    FTCH    $,MOD, ZPN, RD, OP1
+    BRV0    _Jmp_Exit,MOD, Nxt, RD, OP2
+
+--------------------------------------------------------------------------------
+--  Jump Pre-Indexed Indirect - JMP (abs, X)        (Not interruptable)
+--------------------------------------------------------------------------------
+
+_Jmp_absXI:
+    BMW2    _Jmp_absIIX,, Inc, IF, OP2              -- Load Dst Ptr Hi
+_Jmp_absIIX:
+    FTCH    $,, LDA, RD, OP1                        -- Read Dst Ptr Lo
+    BRV0    _Jmp_absIIX_Exit,, Nxt, RD, OP2         -- Read Dst Ptr Hi
+--
+    BRV0    _Jmp_absXI_Exit,, LDAX, RD, OP1         -- Read Dst Ptr Lo
+--
+_Jmp_absIIX_Exit:
+    FTCH    $,, LDA, RD, OP1                        -- Read Dst Ptr Lo
+    FTCH    $,, Nxt, RD, OP2                        -- Read Dst Ptr Hi
+--
+    BRV1    $,, JmpX, IF, IR
+--------------------------------------------------------------------------------
+--  Jump Absolute - JMP  abs                        (Not interruptable)
+--------------------------------------------------------------------------------
+
+_Jmp_abs:
+    BMW2    _Jmp_absI_Exit,, Nxt, RD, OP2           -- Read Dst Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Jump Indirect - JMP (abs)                       (Not interruptable)
+--------------------------------------------------------------------------------
+
+_Jmp_absI:
+    BMW2    _Jmp_absII,, Inc, IF, OP2               -- Load Dst Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Jump Double Indirect - JMP ((abs))              (Not interruptable)
+--------------------------------------------------------------------------------
+
+_Jmp_absII:
+    FTCH    $,, LDA, RD, OP1                        -- Read Dst Ptr Lo
+    FTCH    $,, Nxt, RD, OP2                        -- Read Dst Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Jump Absolute Indirect Exit                     (Not interruptable)
+--------------------------------------------------------------------------------
+
+_Jmp_absI_Exit:
+    FTCH    $,, LDA, RD, OP1                        -- Read Dst Ptr Lo
+_Jmp_absXI_Exit:
+    FTCH    $,, Nxt, RD, OP2                        -- Read Dst Ptr Hi
+_Jmp_Exit:
+    BRV1    $,, Jmp, IF, IR                         -- Next, no Reg_WE, P okay
+
+--------------------------------------------------------------------------------
+-- Immediate Operand: ORA/ANL/EOR/ADC/LDA/CMP/SBC, LDX/CPX, LDY/CPY, BIT
+--
+--  BMW0 uses MW <= {1'b0, SIZ, 1'b0}.
+--      #imm8  : Listed immediate instructions complete execution mormally.
+--      #imm16 : Listed immediate instructions complete execution with extra
+--               read cycle to read the high byte of the immediate operand.
+--------------------------------------------------------------------------------
+
+_Imm:
+    BRV1    _Nxt,, Inc, IF, IR, WE_R                -- Instruction Fetch/Execute
+    BRV2    _PshPCL,MOD, Psh, WR, DMH, WE_R         -- {OP2,OP1}<=Vector(INT)
+--
+    BMW     _Imm,, Inc, IF, OP2                     -- Read Operand Hi
+
+--------------------------------------------------------------------------------
+-- Stack Pop: PLA/PLX/PLY
+--
+--  BMW0 uses MW <= {1'b0, SIZ, 1'b0}.
+--      8-bit  : Listed stack instructions complete execution mormally.
+--      16-bit : Listed stack instructions complete execution with extra
+--               read cycle to read the high byte of the register from stack.
+--------------------------------------------------------------------------------
+
+_Pop:
+    BRV1    _Nxt,, Inc, IF, IR, WE_R                -- Instruction Fetch/Execute
+    BRV2    _PshPCL,MOD, Psh, WR, DMH, WE_R         -- {OP2,OP1}<=Vector(INT)
+--
+    BMW     _Pop,MOD, Pop, RD, OP2                  -- Read Operand Hi
+
+--------------------------------------------------------------------------------
+-- Stack Push: PHA/PHX/PHY
+--
+--  BMW0 uses MW <= {1'b0, SIZ, 1'b0}.
+--      8-bit  : Listed stack instructions complete execution mormally.
+--      16-bit : Listed stack instructions complete execution with extra
+--               write cycle to write the high byte of the register to stack.
+--------------------------------------------------------------------------------
+
+_Psh:
+    BRV1    _Nxt,, Inc, IF, IR, WE_R                -- Instruction Fetch/Execute
+    BRV2    _PshPCL,MOD, Psh, WR, DMH, WE_R         -- {OP2,OP1}<=Vector(INT)
+--
+    BMW     _Psh,MOD, Psh, WR, ALU, WE_R            -- Write Operand Lo
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Zero Page Double Indirect - xxx ((zp))
+--
+--  Keep _RO_zpII and _RO_zpI as a 4 word jump table accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_RO_zpII:
+    FTCH    $,MOD, ZPN, RD, OP1                     -- Read zp Mem Ptr Lo
+    BRV0    _RO_absI,MOD, Nxt, RD, OP2              -- Read zp Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Zero Page Indirect - xxx (zp)
+--
+--  Keep _RO_zpI and _RO_zp as a 4 word jump table accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_RO_zpI:
+    FTCH    $,MOD, ZPN, RD, OP1                     -- Read zp Mem Ptr Lo
+    BRV0    _RO_abs_Exit,MOD, Nxt, RD, OP2          -- Read zp Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Zero Page Direct - xxx zp
+--
+--  Keep _RO_zpI and _RO_zp as a 4 word jump table accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_RO_zp:
+    BMW     _Nxt,SMD, ZPN, RD, OP1                  -- Read Operand Lo
+    BMW     _Nxt,MOD, Nxt, RD, OP2
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Post-Indexed Zero Page Double Indirect - xxx ((zp)),X
+--
+--  Keep _RO_zpIIX and _RO_zpXI as a 4 word jump table accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_RO_zpIIX:
+    FTCH    $,MOD, ZPN, RD, OP1                     -- Read zp Mem Ptr Lo
+    BRV0    _RO_absIX,MOD, Nxt, RD, OP2             -- Read zp Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Pre-Indexed Zero Page Indirect - xxx (zp,X)
+--
+--  Keep _RO_zpIIX and _RO_zpXI as a 4 word jump table accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_RO_zpXI:
+    FTCH    $,MOD, ZPX, RD, OP1                     -- Read zp Mem Ptr Lo (zp,X)
+    BRV0    _RO_abs_Exit,MOD, Nxt, RD, OP2          -- Read zp Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Post-Indexed Zero Page Indirect - xxx (zp),X
+--
+--  Keep _RO_zpIX and _RO_zpX as a 4 word jump table accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_RO_zpIX:
+    FTCH    $,MOD, ZPN, RD, OP1                     -- Read zp Mem Ptr Lo
+    BRV0    _RO_absX_Exit,MOD, Nxt, RD, OP2         -- Read zp Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Pre-Indexed Zero Page Direct - xxx zp,X
+--
+--  Keep _RO_zpIX and _RO_zpX as a 4 word jump table accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_RO_zpX:
+    BMW     _Nxt,SMD, ZPX, RD, OP1                  -- Read Operand Lo
+    BMW     _Nxt,MOD, Nxt, RD, OP2                  -- Read Operand Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Post-Indexed Zero Page Double Indirect - xxx ((zp)),Y
+--
+--  Keep _RO_zpIIY and_RO_zpIY as a 4 word jump table accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_RO_zpIIY:
+    FTCH    $,MOD, ZPN, RD, OP1                     -- Read zp Mem Ptr Lo
+    BRV0    _RO_absIY,MOD, Nxt, RD, OP2             -- Read zp Mem Ptr Lo
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Post-Indexed Zero Page Indirect - xxx (zp),Y
+--
+--  Keep _RO_zpIY and RO_zpY as a 4 word jump table accessed by BMW2
+--
+--------------------------------------------------------------------------------
+_RO_zpIY:
+    FTCH    $,MOD, ZPN, RD, OP1                     -- Read zp Mem Ptr Lo
+    BRV0    _RO_absY_Exit,MOD, Nxt, RD, OP2         -- Read zp Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Post-Indexed Zero Page Direct - xxx zp,Y
+--
+--  Keep _RO_zpIY and _RO_zpY as a 4 word jump table accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_RO_zpY:
+    BMW     _Nxt,SMD, ZPY, RD, OP1                  -- Read Operand Lo
+    BMW     _Nxt,MOD, Nxt, RD, OP2                  -- Read Operand Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Zero Page Indirect - xxx (zp)
+--
+--  Keep _WO_zpI and _WO_zp as a 4 word jump table to be accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_WO_zpI:
+    FTCH    $,MOD, ZPN, RD, OP1                     -- Read zp Mem Ptr Lo
+    BRV0    _WO_abs_Exit,MOD, Nxt, RD, OP2          -- Read zp Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Zero Page Direct - xxx zp
+--------------------------------------------------------------------------------
+
+_WO_zp:
+    BMW     _Nxt,SMD, ZPN, WR, ALU, WE_R            -- Write Memory Lo
+    BMW     _Nxt,MOD, Nxt, WR, ALU, WE_R            -- Write Memory Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Post-Indexed Zero Page Double Indirect - xxx ((zp)),X
+--
+--  Keep _WO_zpIIX and _WO_zpXI as a 4 word jump table to be accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_WO_zpIIX:
+    FTCH    $,MOD, ZPN, RD, OP1                     -- Read zp Mem Ptr Lo
+    BRV0    _WO_absIX,MOD, Nxt, RD, OP2             -- Read zp Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Pre-Indexed Zero Page Indirect - xxx (zp,X)
+--
+--  Keep _WO_zpIX and _WO_zpX as a 4 word jump table to be accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_WO_zpXI:
+    FTCH    $,MOD, ZPX, RD, OP1                     -- Read zp Mem Ptr Lo
+    BRV0    _WO_abs_Exit,MOD, Nxt, RD, OP2          -- Read zp Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Post-Indexed Zero Page Indirect - xxx (zp),X
+--
+--  Keep _WO_zpIX and _WO_zpX as a 4 word jump table to be accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_WO_zpIX:
+    FTCH    $,MOD, ZPX, RD, OP1                     -- Read zp Mem Ptr Lo
+    BRV0    _WO_abs_Exit,MOD, Nxt, RD, OP2          -- Read zp Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Pre-Indexed Zero Page Direct - xxx zp,X
+--
+--  Keep _WO_zpIX and _WO_zpX as a 4 word jump table to be accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_WO_zpX:
+    BMW     _Nxt,SMD, ZPX, WR, ALU, WE_R            -- Write Memory Lo
+    BMW     _Nxt,MOD, Nxt, WR, ALU, WE_R            -- Write Memory Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Post-Indexed Zero Page Double Indirect - xxx ((zp)),Y
+--
+--  Keep _WO_zpIIY and _WO_zpIY as a 4 word jump table accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_WO_zpIIY:
+    FTCH    $,MOD, ZPN, RD, OP1                     -- Read zp Mem Ptr Lo
+    BRV0    _WO_absIY,MOD, Nxt, RD, OP2             -- Read zp Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Post-Indexed Zero Page Indirect - xxx (zp),Y
+--
+--  Keep _WO_zpIY and _WO_zpY as a 4 word jump table accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_WO_zpIY:
+    FTCH    $,MOD, ZPN, RD, OP1                     -- Read zp Mem Ptr Lo
+    BRV0    _WO_absY_Exit,MOD, Nxt, RD, OP2         -- Read zp Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Post-Indexed Zero Page Direct - xxx zp,Y
+--
+--  Keep _WO_zpIY and _WO_zpY as a 4 word jump table accessed by BMW2
+--
+--------------------------------------------------------------------------------
+
+_WO_zpY:
+    BMW     _Nxt,SMD, ZPY, WR, ALU, WE_R            -- Write Memory Lo
+    BMW     _Nxt,MOD, Nxt, WR, ALU, WE_R            -- Write Memory Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Absolute - xxx abs
+--------------------------------------------------------------------------------
+
+_RO_abs:
+    BMW2    _RO_absI,, Inc, IF, OP2                 -- Read Mem Ptr Hi
+_RO_absI:
+    FTCH    $,, LDA, RD, OP1                        -- Read Mem Ptr Lo
+_RO_absI_Exit:
+    FTCH    $,, Nxt, RD, OP2                        -- Read Mem Ptr Hi
+_RO_abs_Exit:
+    BMW     _Nxt,SIZ, LDA, RD, OP1                  -- Read Operand Lo
+    BMW     _Nxt,, Nxt, RD, OP2                     -- Read Operand Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Pre-Indexed Absolute - xxx abs,X
+--------------------------------------------------------------------------------
+
+_RO_absX:
+    BMW2    _RO_absIX,, Inc, IF, OP2                -- Read Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Pre-Indexed Absolute Indirect - xxx (abs),X
+--------------------------------------------------------------------------------
+
+_RO_absIX:
+    FTCH    $,, LDA, RD, OP1                        -- Read Mem Ptr Lo
+    FTCH    $,, Nxt, RD, OP2                        -- Read Mem Ptr Hi
+_RO_absX_Exit:
+    BMW     _Nxt,SIZ, LDAX, RD, OP1                 -- Read Operand Lo
+    BMW     _Nxt,, Nxt, RD, OP2                     -- Read Operand Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Post-Indexed Absolute - xxx abs,Y
+--------------------------------------------------------------------------------
+
+_RO_absY:
+    BMW2    _RO_absIY,, Inc, IF, OP2                -- Read Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Post-Indexed Absolute Indirect - xxx (abs),Y
+--------------------------------------------------------------------------------
+
+_RO_absIY:
+    FTCH    $,, LDA, RD, OP1                        -- Read Mem Ptr Lo
+    FTCH    $,, Nxt, RD, OP2                        -- Read Mem Ptr Hi
+_RO_absY_Exit:
+    BMW     _Nxt,SIZ, LDAY, RD, OP1                 -- Read Operand Lo
+    BMW     _Nxt,, Nxt, RD, OP2                     -- Read Operand Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Absolute - xxx abs
+--------------------------------------------------------------------------------
+
+_WO_abs:
+    BMW2    _WO_absI,, Inc, IF, OP2                 -- Read Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Absolute Indirect - xxx (abs)
+--------------------------------------------------------------------------------
+
+_WO_absI:
+    FTCH    $,, LDA, RD, OP1                        -- Read Mem Ptr Lo
+    FTCH    $,, Nxt, RD, OP2                        -- Read Mem Ptr Hi
+_WO_abs_Exit:
+    BMW     _Nxt,SIZ, LDA, WR, ALU, WE_R            -- Write Memory Lo
+    BMW     _Nxt,, Nxt, WR, ALU, WE_R               -- Write Memory Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Pre-Indexed Absolute - xxx abs,X
+--------------------------------------------------------------------------------
+
+_WO_absX:
+    BMW2    _WO_absIX,, Inc, IF, OP2                -- Read Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Post-Indexed Absolute Indirect - xxx (abs),X
+--------------------------------------------------------------------------------
+
+_WO_absIX:
+    FTCH    $,, LDA, RD, OP1                        -- Read Mem Ptr Lo
+    FTCH    $,, Nxt, RD, OP2                        -- Read Mem Ptr Hi
+--
+    BMW     _Nxt,SIZ, LDAX, WR, ALU, WE_R           -- Write Memory Lo
+    BMW     _Nxt,, Nxt, WR, ALU, WE_R               -- Write Memory Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Post-Indexed Absolute - xxx abs,Y
+--------------------------------------------------------------------------------
+
+_WO_absY:
+    BMW2    _WO_absIY,, Inc, IF, OP2                -- Read Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Post-Indexed Absolute Indirect - xxx (abs),Y
+--------------------------------------------------------------------------------
+
+_WO_absIY:
+    FTCH    $,, LDA, RD, OP1                        -- Read Mem Ptr Lo
+    FTCH    $,, Nxt, RD, OP2                        -- Read Mem Ptr Hi
+_WO_absY_Exit:
+    BMW     _Nxt,SIZ, LDAY, WR, ALU, WE_R           -- Write Memory Lo
+    BMW     _Nxt,, Nxt, WR, ALU, WE_R               -- Write Memory Hi
+
+--------------------------------------------------------------------------------
+--  2-way Read-Modify-Write Instruction/Interrupt Jump Table
+--------------------------------------------------------------------------------
+
+_RMW:
+    BRV1    _RMW,, Inc, IF, IR                      -- Instruction Fetch/Execute
+    BRV2    _Brk,MOD, Psh, WR, DMH                  -- Push PCH, capture Vector
+
+--------------------------------------------------------------------------------
+--  Read-Modify-Write Pre-Indexed Zero Page Direct - RMW zp,X
+--------------------------------------------------------------------------------
+
+_RMW_zpX:
+    BMW1    _RMW_zp_IS,MOD, ZPX, RD, OP1            -- Read Op/Op Ptr Lo
+
+--------------------------------------------------------------------------------
+--  Read-Modify-Write Zero Page Direct - RMW zp
+--------------------------------------------------------------------------------
+
+_RMW_zp:
+    BMW1    _RMW_zp_IS,MOD, ZPN, RD, OP1            -- Read Op/Op Ptr Lo
+
+--------------------------------------------------------------------------------
+--  Common Jump Table for RMW zp; RMW zp,X; RMW bp,B;
+--------------------------------------------------------------------------------
+
+_RMW_zp_IS:                                         -- MW<=000<={0, IND,  SIZ}
+    BRV0    _RMW_IS_Exit,MOD, Nxt, RD, OP2          -- Read Op Ptr Hi
+_RMW_zp_I:                                          -- MW<=001<={0, IND, ~SIZ}
+    BRV0    _RMW_I_Exit,MOD, Nxt, RD, OP2           -- Read Op Ptr Hi
+_RMW_zp_S:                                          -- MW<=010<={0,~IND,  SIZ}
+    BRV0    _RMW_S_Exit,MOD, Nxt, RD, OP2           -- Read Op Hi
+--                                                  -- MW<=011<={0,~IND, ~SIZ}
+    BMW     _RMW,, MAR, WR, ALU, WE_R               -- Write 8-bit Result
+
+--------------------------------------------------------------------------------
+--  Read-Modify-Write Pre-Indexed Absolute - RMW abs,X
+--------------------------------------------------------------------------------
+
+_RMW_absX:
+    FTCH    $,, Inc, IF, OP2                        -- Rd Mem Ptr Hi
+    BMW1    _RMW_abs_IS,, LDAX, RD, OP1             -- Rd Op/Op Ptr Lo
+
+--------------------------------------------------------------------------------
+--  Read-Modify-Write Absolute - RMW abs
+--------------------------------------------------------------------------------
+
+_RMW_abs:
+    FTCH    $,, Inc, IF, OP2                        -- Rd Mem Ptr Hi
+    BMW1    _RMW_abs_IS,, LDA, RD, OP1              -- Rd Op/Op Ptr Lo
+
+--------------------------------------------------------------------------------
+--  Common Jump Table for RMW abs and RMW abs,X
+--------------------------------------------------------------------------------
+
+_RMW_abs_IS:                                        -- MW<=000<={0, IND,  SIZ}
+    BRV0    _RMW_IS_Exit,, Nxt, RD, OP2             -- Read Op Ptr Hi
+_RMW_abs_I:                                         -- MW<=001<={0, IND, ~SIZ}
+    BRV0    _RMW_I_Exit,, Nxt, RD, OP2              -- Read Op Ptr Hi
+_RMW_abs_S:                                         -- MW<=010<={0,~IND,  SIZ}
+    BRV0    _RMW_S_Exit,, Nxt, RD, OP2              -- Read Op Hi
+--                                                  -- MW<=011<={0,~IND, ~SIZ}
+    BMW     _RMW,, MAR, WR, ALU, WE_R               -- Write 8-bit Result
+
+--------------------------------------------------------------------------------
+--  Common RMW Instruction Microsequences: RMW zp; RMW zp,X; RMW abs; RMW abs,X
+--                                         RMW bp,B; RMW ip,I++
+--------------------------------------------------------------------------------
+
+_RMW_IS_Exit:
+    FTCH    $,, LDA, RD, OP1                        -- Read 16-bit Operand Lo
+    FTCH    $,, Nxt, RD, OP2                        -- Read 16-bit Operand Hi
+--
+_RMW_S_Exit:
+    BRV0    $,SPV, MAR, WR, ALU, WE_R               -- Write 16-bit Result Lo
+    BMW     _RMW,, Nxt, WR, ALU, WE_R               -- Write 16-bit Result Hi
+--
+_RMW_I_Exit:
+    FTCH    _$,, LDA, RD, OP1                       -- Read 8-bit Operand
+    BMW     _RMW,, MAR, WR, ALU, WE_R               -- Write 8-bit Result
+
+--------------------------------------------------------------------------------
+--  STP - Wait for Interrupt
+--------------------------------------------------------------------------------
+
+_STP:
+    BRV0    $,, PC                              -- Halt Exection
+
+--------------------------------------------------------------------------------
+--  WAI - Wait for Interrupt
+--------------------------------------------------------------------------------
+
+_WAI:                           -- Set up 4-way table for WAI instruction
+    BMW     _WAI,, PC           -- No external interrupts asserted
+    BRV0    _Int,, PC           -- Int asserted by NMI, do NMI interrupt
+    BRV0    _Nxt,, PC           -- xIRQ asserted with IRQ_Msk asserted, continue
+    BRV0    _Int,, PC           -- Int asserted by xIRQ, do IRQ interrupt
+
+--------------------------------------------------------------------------------
+--  M65C02A Specific instructions
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+--  Unconditional Branch - BRL rel16                (Not interruptable)
+--------------------------------------------------------------------------------
+
+_BRL_Rel16:
+    FTCH    $,, Inc, RD, OP2                        -- Load Dst Ptr Hi
+--
+    BRV1    $,, Bra, IF, IR                         -- Instruction Fetch
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only BP-relative Indirect - xxx (bp,B)
+--
+--  Keep _RO_bpI and _RO_bp as a 4 word jump table accessed by BMW2
+--------------------------------------------------------------------------------
+
+_RO_bpI:
+    FTCH    $,MOD, BPM, RD, OP1                     -- Read bp Mem Ptr Lo
+    BRV0    _RO_abs_Exit,MOD, Nxt, RD, OP2          -- Read bp Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only BP-relative Direct - xxx bp,B
+--
+--  Keep _RO_bpI and _RO_bp as a 4 word jump table accessed by BMW2
+--------------------------------------------------------------------------------
+
+_RO_bp:
+    BMW     _Nxt,SMD, BPM, RD, OP1                  -- Read Operand Lo
+    BMW     _Nxt,MOD, Nxt, RD, OP2                  -- Read Operand Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only Post-Indexed BP-relative Indirect - xxx (bp,B),Y
+--------------------------------------------------------------------------------
+
+_RO_bpIY:
+    FTCH    $,MOD, BPM, RD, OP1                     -- Read Mem Ptr Lo
+    BMW2    _RO_bpIIY,MOD, Nxt, RD, OP2             -- Read Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Mem. Read-Only Post-Indexed BP-relative Double Indirect - xxx ((bp,B)),Y
+--------------------------------------------------------------------------------
+
+_RO_bpIIY:
+    FTCH    $,, LDA, RD, OP1                        -- Load Indirect Dst Ptr Lo
+    FTCH    $,, Nxt, RD, OP2                        -- Load Indirect Dst Ptr Hi
+--
+    BMW     _Nxt,SIZ, LDAY, RD, OP1                 -- Read Operand Lo
+    BMW     _Nxt,, Nxt, RD, OP2                     -- Read Operand Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only BP-relative Indirect - xxx (bp,B)
+--
+--  Keep _WO_bpI and _WO_bp as a 4 word jump table to be accessed by BMW2
+--------------------------------------------------------------------------------
+
+_WO_bpI:
+    FTCH    $,MOD, BPM, RD, OP1                     -- Read Mem Ptr Lo
+    BRV0    _WO_abs_Exit,MOD, Nxt, RD, OP2          -- Read Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only BP-relative Direct - xxx bp,B
+--
+--  Keep _WO_bpI and _WO_bp as a 4 word jump table to be accessed by BMW2
+--------------------------------------------------------------------------------
+
+_WO_bp:
+    BMW     _Nxt,SMD, BPM, WR, ALU, WE_R            -- Write Memory Lo
+    BMW     _Nxt,MOD, Nxt, WR, ALU, WE_R            -- Write Memory Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only Post-Indexed BP-relative Indirect - xxx (bp,B),Y
+--------------------------------------------------------------------------------
+
+_WO_bpIY:
+    FTCH    $,MOD, BPM, RD, OP1                     -- Read Mem Ptr Lo
+    BMW2    _WO_bpIIY,MOD, Nxt, RD, OP2             -- Read Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Mem. Write-Only Post-Indexed BP-relative Double Indirect - xxx ((bp,B)),Y
+--------------------------------------------------------------------------------
+
+_WO_bpIIY:
+    FTCH    $,, LDA, RD, OP1                        -- Load Indirect Dst Ptr Lo
+    FTCH    $,, Nxt, RD, OP2                        -- Load Indirect Dst Ptr Hi
+--
+    BMW     _Nxt,SIZ, LDAY, WR, ALU, WE_R           -- Write Memory Lo
+    BMW     _Nxt,, Nxt, WR, ALU, WE_R               -- Write Memory Hi
+
+--------------------------------------------------------------------------------
+--  Read-Modify-Write BP-relative - RMW bp,B
+--------------------------------------------------------------------------------
+
+_RMW_bp:
+    BMW1    _RMW_zp_IS,MOD, BPM, RD, OP1            -- Read Op/Op Ptr Lo
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only SP-relative Indirect - xxx (sp,S)
+--
+--  Keep _RO_spI and _RO_sp as a 4 word jump table accessed by BMW2
+--------------------------------------------------------------------------------
+
+_RO_spI:
+    FTCH    $,MOD, SPM, RD, OP1                     -- Read bp Mem Ptr Lo
+    BRV0    _RO_abs_Exit,MOD, Nxt, RD, OP2          -- Read bp Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Read-Only BP-relative Direct - xxx sp,S
+--
+--  Keep _RO_spI and _RO_sp as a 4 word jump table accessed by BMW2
+--------------------------------------------------------------------------------
+
+_RO_sp:
+    BMW     _Nxt,SMD, SPM, RD, OP1                  -- Read Operand Lo
+    BMW     _Nxt,MOD, Nxt, RD, OP2                  -- Read Operand Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only BP-relative Indirect - xxx (sp,S)
+--
+--  Keep _WO_spI and _WO_sp as a 4 word jump table to be accessed by BMW2
+--------------------------------------------------------------------------------
+
+_WO_spI:
+    FTCH    $,MOD, SPM, RD, OP1                     -- Read Mem Ptr Lo
+    BRV0    _WO_abs_Exit,MOD, Nxt, RD, OP2          -- Read Mem Ptr Hi
+
+--------------------------------------------------------------------------------
+--  Memory Write-Only SP-relative Direct - xxx sp,S
+--
+--  Keep _WO_spI and _WO_sp as a 4 word jump table to be accessed by BMW2
+--------------------------------------------------------------------------------
+
+_WO_sp:
+    BMW     _Nxt,SMD, SPM, WR, ALU, WE_R            -- Write Memory Lo
+    BMW     _Nxt,MOD, Nxt, WR, ALU, WE_R            -- Write Memory Hi
+
+--------------------------------------------------------------------------------
+--  Read-Modify-Write SP-relative - RMW sp,S
+--------------------------------------------------------------------------------
+
+_RMW_sp:
+    BMW1    _RMW_zp_IS,MOD, SPM, RD, OP1            -- Read Op/Op Ptr Lo
+
+--------------------------------------------------------------------------------
+--  Push 16-bit PC-Relative Value - PHR Rel16
+--------------------------------------------------------------------------------
+
+_PHR_Rel16:
+    FTCH    $,, Inc, IF, OP2                        -- Read Hi(Rel16)
+    FTCH    $,, Rel                                 -- MAR = PC + {OP2, OP1} + 1
+    FTCH    $,MOD, Psh, WR, DMH, WE_R               -- Push Hi(MAR) (MAR[15:8])
+    BMW     _Nxt,MOD, Psh, WR, DML, WE_R            -- Push Lo(MAR) (MAR[ 7:0])
+
+--------------------------------------------------------------------------------
+--  Push 16-bit Value - PSH #Imm16; PSH dp; PSH (dp); PSH abs; PSH (abs)
+--------------------------------------------------------------------------------
+
+_PSH_Imm:
+    FTCH    _$,, Inc, IF, OP2                       -- Read Hi(imm16)
+--
+_PSH_Exit:
+    FTCH    $,MOD, Psh, WR, DOH, WE_R               -- Push Hi(imm16) (OP2)
+    BMW     _Nxt,MOD, Psh, WR, DOL, WE_R            -- Push Lo(imm16) (OP1)
+
+_PSH_zp:
+    BMW2    _PSH_zpI,MOD, ZPN, RD, OP1              -- Read Operand Lo
+_PSH_zpI:
+    FTCH    $,MOD, Nxt, RD, OP2                     -- Read Operand Hi
+    BRV0    _PSH_zpI_Exit,, LDA, RD, OP1            -- Read Operand Lo Indirect
+--
+    BRV0    _PSH_Exit,MOD, Nxt, RD, OP2             -- Read Operand Hi
+_PSH_zpI_Exit:
+    BRV0    _PSH_Exit,, Nxt, RD, OP2                -- Read Operand Hi Indirect
+
+_PSH_abs:
+    FTCH    $,, Inc, IF, OP2                        -- Read Data Ptr Hi
+    BMW2    _PSH_absI,, LDA, RD, OP1                -- Read Operand Lo
+_PSH_absI:
+    FTCH    $,, Nxt, RD, OP2                        -- Read Operand Hi
+    BRV0    _PSH_absI_Exit,, LDA, RD, OP1           -- Read Operand Lo Indirect
+--
+    BRV0    _PSH_Exit,, Nxt, RD, OP2                -- Read Operand Hi
+_PSH_absI_Exit:
+    BRV0    _PSH_Exit,, Nxt, RD, OP2                -- Read Operand Hi Indirect
+
+--------------------------------------------------------------------------------
+--  Pull 16-bit Value - PUL dp; PUL (dp)
+--------------------------------------------------------------------------------
+
+_PUL_zpI:
+    FTCH    $,MOD, ZPN, RD, OP1                     -- Read Data Ptr Lo
+    BRV0    _PUL_zpI_Exit,MOD, Nxt, RD, OP2         -- Read Data Ptr Hi
+_PUL_zp:
+    BRV0    _PUL_zp_Exit,MOD, ZPN                   -- MAR = {0, OP1}
+_PUL_zpI_Exit:
+    FTCH    $,, LDA                                 -- MAR = {OP2, OP1}
+--
+_PUL_zp_Exit:
+    FTCH    $,MOD, Pop, RD, OP1                     -- Pop Operand Lo
+    FTCH    $,MOD, Pop, RD, OP2                     -- Pop Operand Hi
+    FTCH    $,MOD, MAR, WR, DOL, WE_R               -- Write Operand Lo
+    BMW     _Nxt,MOD, Nxt, WR, DOH, WE_R            -- Write Operand Hi
+
+--------------------------------------------------------------------------------
+--  Pull 16-bit Value - PUL abs; PUL (abs)
+--------------------------------------------------------------------------------
+
+_PUL_abs:
+    BMW2    _PUL_absI,, Inc, IF, OP2                -- Read Data Ptr Hi
+_PUL_absI:
+    FTCH    $,, LDA, RD, OP1                        -- Read Data Ptr Lo
+    FTCH    $,, Nxt, RD, OP2                        -- Read Data Ptr Hi
+--
+    FTCH    $,, LDA                                 -- MAR = {OP2, OP1}
+    FTCH    $,MOD, Pop, RD, OP1                     -- Pop Operand Lo
+    FTCH    $,MOD, Pop, RD, OP2                     -- Pop Operand Hi
+--
+    FTCH    $,, MAR, WR, DOL, WE_R                  -- Write Operand Lo
+    BMW     _Nxt,, Nxt, WR, DOH, WE_R               -- Write Operand Hi
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+--  FORTH VM Instructions
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+--  ENTER - FORTH VM Inner Interpreter Call/Enter   (Not Interruptable)
+--------------------------------------------------------------------------------
+
+_ENTER:
+    FTCH    $,SMD, Psh, WR, DOL, WE_R,, W2I         -- Push FORTH Addrs Ptr Hi 
+--
+    FTCH    $,, IPN, RD, OP1,,, IP1                 -- Read FORTH Addrs Ptr Lo
+    
+--------------------------------------------------------------------------------
+--  NEXT - FORTH VM Inner Interpreter               (Not Interruptable)
+--------------------------------------------------------------------------------
+
+_NEXT:
+    BMW2    _ITC,, IPN, RD, OP2,,, IP1              -- Read FORTH Addrs Ptr Hi 
+_ITC:
+    FTCH    $,, LDA, RD, OP1,,, M2W                 -- Read FORTH Word CFA Lo
+    BRV0    _ITC_EXIT,, Nxt, RD, OP2                -- Read FORTH Word CFA Hi   
+_DTC:    
+    BRV1    $,, Jmp, IF, IR,,, M2W                  -- Fetch next instruction
+_ITC_EXIT:
+    BRV1    $,, Jmp, IF, IR                         -- Fetch next instruction
+    
+--------------------------------------------------------------------------------
+--  Push 16-bit IP/W - PSH I (PHI); PSH W (IND PHI)
+--------------------------------------------------------------------------------
+
+_PHI:
+    BMW     _Nxt,MOD, Psh, WR, DOL, WE_R            -- Push IP/W Lo
+
+--------------------------------------------------------------------------------
+--  Pull 16-bit IP/W - PUL I (PLI); PUL W (PLW) (IND PLI)
+--------------------------------------------------------------------------------
+
+_PLI:
+    BMW     _PLI_Exit,MOD, Pop, RD, OP2             -- Read Operand Hi
+
+_PLI_Exit:
+    BRV1    $,, Nxt, IF, IR,,, M2I                  -- Fetch next instruction
+    BRV2    _PshPCL,MOD, Psh, WR, DMH, WE_R,, M2I   -- {OP2, OP1} <= Vector(INT)
+                                                    -- Push PCH
+
+--------------------------------------------------------------------------------
+--  RO IP-relative (with autoincrement) Indirect: xxx (ip,I++)
+--
+--  Keep in 4 word table with RO xxx ip,I++
+--------------------------------------------------------------------------------
+
+_RO_ipI:
+    FTCH    $,, IPN, RD, OP1,,, IP1                 -- Read Pointer Lo
+    BRV0    _RO_abs_Exit,, IPN, RD, OP2,,, IP1      -- Read Pointer Hi
+
+--------------------------------------------------------------------------------
+--  RO IP-relative (with autoincrement): xxx ip,I++
+--
+--  Keep in 4 word table with RO xxx (ip,I++)
+--------------------------------------------------------------------------------
+
+_RO_ip:
+    BMW     _Nxt,SIZ, IPN, RD, OP1,,, IP1           -- Read Operand Lo
+    BMW     _Nxt,, IPN, RD, OP2,,, IP1              -- Read Operand Hi
+
+--------------------------------------------------------------------------------
+--  WO IP-relative (with autoincrement) Indirect: xxx (ip,I++)
+--
+--  Keep in 4 word table with WO xxx ip,I++
+--------------------------------------------------------------------------------
+
+_WO_ipI:
+    FTCH    $,, IPN, RD, OP1,,, IP1                 -- Read Pointer Lo
+    BRV0    _WO_abs_Exit,, IPN, RD, OP2,,, IP1      -- Read Pointer Hi
+
+--------------------------------------------------------------------------------
+--  WO IP-relative (with autoincrement): xxx ip,I++
+--
+--  Keep in 4 word table with WO xxx (ip,I++)
+--------------------------------------------------------------------------------
+
+_WO_ip:
+    BMW     _Nxt,SIZ, IPN, WR, ALU, WE_R,, IP1      -- Write Accumulator Lo
+    BMW     _Nxt,, IPN, WR, ALU, WE_R,, IP1         -- Write Accumulator Hi
+
+--------------------------------------------------------------------------------
+--  Read-Modify-Write IP-relative - RMW ip,I++
+--------------------------------------------------------------------------------
+
+_RMW_ip:
+    BMW1    _RMW_ip_IS,MOD, IPN, RD, OP1,,, IP1     -- Read Op/Op Ptr Lo
+
+--------------------------------------------------------------------------------
+--  Jump Table for RMW ip,I++
+--------------------------------------------------------------------------------
+
+_RMW_ip_IS:                                         -- MW<=000<={0, IND,  SIZ}
+    BRV0    _RMW_IS_Exit,MOD, Nxt, RD, OP2,,, IP1   -- Read Op Ptr Hi
+_RMW_ip_I:                                          -- MW<=001<={0, IND, ~SIZ}
+    BRV0    _RMW_I_Exit,MOD, Nxt, RD, OP2,,, IP1    -- Read Op Ptr Hi
+_RMW_ip_S:                                          -- MW<=010<={0,~IND,  SIZ}
+    BRV0    _RMW_S_Exit,MOD, Nxt, RD, OP2,,, IP1    -- Read Op Hi
+--                                                  -- MW<=011<={0,~IND, ~SIZ}
+    BMW     _RMW,, MAR, WR, ALU, WE_R               -- Write 8-bit Result
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+--  Miscellaneous Instructions
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+--  MOV - Move Byte: A - Cnt; X - Src; Y - Dst; Mode: 0 - hold, 2 - dec, 3 - inc
+--------------------------------------------------------------------------------
+
+_MOV:
+    FTCH    $,, SRC, RD, MEM, WE_R,, DecCntr        -- Read Memory, Decrement A
+    BTH0    _MOV,, DST, WR, ALU, WE_R,, UpdtPtr     -- Write Memory, Update Ptrs
+--
+    BRV1    $,, Inc, IF, IR                         -- Fetch next instruction
+      
+--------------------------------------------------------------------------------
+--  eXchange Memory and Accumulator SP-relative - XMA sp,S
+--------------------------------------------------------------------------------
+
+_XMA_sp:
+    BMW1    _XMA_sp_IS,MOD, SPM, RD, OP1            -- Read Op/Op Ptr Lo
+
+--------------------------------------------------------------------------------
+--  Jump Table: XMA sp,S; XMA.w sp,S; XMA (sp,S); XMA.w (sp,S);
+--------------------------------------------------------------------------------
+
+_XMA_sp_IS:                                         -- MW<=000<={0, IND,  SIZ}
+    BRV0    _XMA_IS_Exit,MOD, Nxt, RD, OP2          -- Read Op Ptr Hi
+_XMA_sp_I:                                          -- MW<=001<={0, IND, ~SIZ}
+    BRV0    _XMA_I_Exit,MOD, Nxt, RD, OP2           -- Read Op Ptr Hi
+_XMA_sp_S:                                          -- MW<=010<={0,~IND,  SIZ}
+    BRV0    _XMA_S_Exit,MOD, Nxt, RD, OP2           -- Read Op Hi
+--                                                  -- MW<=011<={0,~IND, ~SIZ}
+    BMW     _Nxt,BA, MAR, WR, ALU, WE_R             -- Write 8-bit Result
+
+--------------------------------------------------------------------------------
+--  XMA Instruction Exit Microsequences: XMA sp,S;   XMA.w sp,S;
+--                                       XMA (sp,S); XMA.w (sp,S);
+--------------------------------------------------------------------------------
+
+_XMA_IS_Exit:
+    FTCH    $,, LDA, RD, OP1                        -- Read 16-bit Operand Lo
+    FTCH    $,, Nxt, RD, OP2                        -- Read 16-bit Operand Hi
+--
+_XMA_S_Exit:
+    BRV0    $,SPV, MAR, WR, ALU, WE_R               -- Write 16-bit Result Lo
+    BMW     _Nxt,BA, Nxt, WR, ALU, WE_R             -- Write 16-bit Result Hi
+--
+_XMA_I_Exit:
+    FTCH    _$,, LDA, RD, OP1                       -- Read 8-bit Operand
+    BMW     _Nxt,BA, MAR, WR, ALU, WE_R             -- Write 8-bit Result
+
+--------------------------------------------------------------------------------
+--  End of Microprogram Routines for Normal Instructions
+--------------------------------------------------------------------------------
+
+_End_uPgm:
+
+_IDEC_Start:    .org    256
+
+--------------------------------------------------------------------------------
+--  Start of Instruction Decode Table (Entry for each Opcode)
+--
+--  Instead of being organized in numerical order, the table is organized by
+--  columns: the least significant nibble and the most significant nibble of the
+--  opcode are swapped. This organization more clearly shows the arrangement of
+--  the addressing modes of the WDC W65C02 microprocessor being emulated. It al-
+--  so more clearly shows the regularity of the ALU instructions that are imple-
+--  mented. The implementation of the microprogram is first based on the addres-
+--  sing mode, and then on the ALU function. Single cycle instructions will be
+--  easily recognized in the following table because their table entries use the
+--  BRV3 instruction. Multi-cycle instructions use the BRV0 instruction to vec-
+--  tor a microroutine in the lower 256 words of the microprogram ROM/RAM.
+--
+--  Single byte instructions such as BRK, RTS, RTI, and register push/pull in-
+--  structions (PHA, PLA, PHP, PLP, PHX, PLX, PHY, PLY), and multi-byte instruc-
+--  tions like JSR abs are implemented with special microroutines that perform
+--  the necessary stack accesses. The remainder of the microroutines are orga-
+--  nized by addressing mode, and whether the addressing mode is used in a RO,
+--  WO, or RMW manner.
+--
+--  Microprogram Word Format:
+--
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+--  Row 0 : 0x00-0xF0 (All Bcc/JMP/JSR/RTS/RTI implemented as uninterruptable)
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_BRK_imm:
+    BRV0    _Brk,, Inc, IF, OP1                     -- Start Break Handler
+_BPL_rel:
+    BMW3    _Rel,, Inc, IF, SGN                     -- Read rel Value
+_JSR_abs:
+    BRV0    _JSR,, Inc, IF, OP1                     -- Read Dst Ptr Lo
+_BMI_rel:
+    BMW3    _Rel,, Inc, IF, SGN                     -- Read rel Value
+_RTI_imp:
+    BRV0    _RTI,MOD, Pop, RD, OP1                  -- Read PSW from Stack
+_BVC_rel:
+    BMW3    _Rel,, Inc, IF, SGN                     -- Read rel Value
+_RTS_imp:
+    BRV0    _RTS,MOD, Pop, RD, OP1                  -- Read PCL from Stack
+_BVS_rel:
+    BMW3    _Rel,, Inc, IF, SGN                     -- Read rel Value
+_BRA_rel:
+    BMW3    _Rel,, Inc, IF, SGN                     -- Read rel Value
+_BCC_rel
+    BMW3    _Rel,, Inc, IF, SGN                     -- Read rel Value
+_LDY_imm:
+    BMW0    _Imm,, Inc, IF, OP1                     -- Read #imm Value
+_BCS_rel:
+    BMW3    _Rel,, Inc, IF, SGN                     -- Read rel Value
+_CPY_imm:
+    BMW0    _Imm,, Inc, IF, OP1                     -- Read #imm Value
+_BNE_rel:
+    BMW3    _Rel,, Inc, IF, SGN                     -- Read rel Value
+_CPX_imm:
+    BMW0    _Imm,, Inc, IF, OP1                     -- Read #imm Value
+_BEQ_rel:
+    BMW3    _Rel,, Inc, IF, SGN                     -- Read rel Value
+--------------------------------------------------------------------------------
+-- Row 1 : 0x01-0xF1
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_ORA_zpXi:
+    BMW2    _RO_zpIIX,, Inc, IF, OP1                -- Read zp Ptr
+_ORA_zpiY:
+    BMW2    _RO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
+_ANL_zpXi:
+    BMW2    _RO_zpIIX,, Inc, IF, OP1                -- Read zp Ptr
+_ANL_zpiY:
+    BMW2    _RO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
+_EOR_zpXi:
+    BMW2    _RO_zpIIX,, Inc, IF, OP1                -- Read zp Ptr
+_EOR_zpiY:
+    BMW2    _RO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
+_ADC_zpXi:
+    BMW2    _RO_zpIIX,, Inc, IF, OP1                -- Read zp Ptr
+_ADC_zpiY:
+    BMW2    _RO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
+_STA_zpXi:
+    BMW2    _WO_zpIIX,, Inc, IF, OP1                -- Read zp Ptr
+_STA_zpiY:
+    BMW2    _WO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
+_LDA_zpXi:
+    BMW2    _RO_zpIIX,, Inc, IF, OP1                -- Read zp Ptr
+_LDA_zpiY:
+    BMW2    _RO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
+_CMP_zpXi:
+    BMW2    _RO_zpIIX,, Inc, IF, OP1                -- Read zp Ptr
+_CMP_zpiY:
+    BMW2    _RO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
+_SBC_zpXi:
+    BMW2    _RO_zpIIX,, Inc, IF, OP1                -- Read zp Ptr
+_SBC_zpiY:
+    BMW2    _RO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
+--------------------------------------------------------------------------------
+-- Row 2 : 0x02-0xF2
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_COP_imm:
+    BMW     _Nxt,, Inc, IF, OP2                     -- Read #imm (OP2 <= imm8)
+_ORA_zpi:
+    BMW2    _RO_zpII,, Inc, IF, OP1                 -- Read zp
+_Jmp_zpI:
+    BMW2    _Jmp_zpII,, Inc, IF, OP1                -- Read zp
+_ANL_zpi:
+    BMW2    _RO_zpII,, Inc, IF, OP1                 -- Read zp
+_NOP_42:
+    BRV3    $,, Inc, IF, IR                         -- Skip True NOP Instruction
+_EOR_zpi:
+    BMW2    _RO_zpII,, Inc, IF, OP1                 -- Read zp
+_PHR_rel16:
+    BRV0    _PHR_Rel16,, Inc, IF, OP1               -- Read low(rel16)
+_ADC_zpi:
+    BMW2    _RO_zpII,, Inc, IF, OP1                 -- Read zp
+_MOV_82:
+    BRV0    _MOV,, Inc, IF, OP2                     -- Read MOV operand
+_STA_zpi:
+    BRV0    _WO_zpI,, Inc, IF, OP1                  -- Read zp
+_LDX_imm:
+    BMW0    _Imm,, Inc, IF, OP1                     -- Read #imm Value
+_LDA_zpi:
+    BMW2    _RO_zpII,, Inc, IF, OP1                 -- Read zp
+_PUL_zp:
+    BRV0    _PUL_zp,, Inc, IF, OP1                  -- Read zp
+_CMP_zpi:
+    BMW2    _RO_zpII,, Inc, IF, OP1                 -- Read zp
+_PUL_abs:
+    BRV0    _PUL_abs,, Inc, IF, OP1                 -- Read low(abs)
+_SBC_zpi:
+    BMW2    _RO_zpII,, Inc, IF, OP1                 -- Read zp
+--------------------------------------------------------------------------------
+-- Row 3 : 0x03-0xF3
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_ORA_bp:
+    BMW2    _RO_bpI,, Inc, IF, SGN                  -- Read bp Offset
+_ORA_bpiY:
+    BRV0    _RO_bpIY,, Inc, IF, SGN                 -- Read bp Offset
+_ANL_bp:
+    BMW2    _RO_bpI,, Inc, IF, SGN                  -- Read bp Offset
+_ANL_bpiY:
+    BRV0    _RO_bpIY,, Inc, IF, SGN                 -- Read bp Offset
+_EOR_bp:
+    BMW2    _RO_bpI,, Inc, IF, SGN                  -- Read bp Offset
+_EOR_bpiY:
+    BRV0    _RO_bpIY,, Inc, IF, SGN                 -- Read bp Offset
+_ADC_bp:
+    BMW2    _RO_bpI,, Inc, IF, SGN                  -- Read bp Offset
+_ADC_bpiY:
+    BRV0    _RO_bpIY,, Inc, IF, SGN                 -- Read bp Offset
+_STA_bp:
+    BMW2    _WO_bpI,, Inc, IF, SGN                  -- Read bp Offset
+_STA_bpiY:
+    BRV0    _WO_bpIY,, Inc, IF, SGN                 -- Read bp Offset
+_LDA_bp:
+    BMW2    _RO_bpI,, Inc, IF, SGN                  -- Read bp Offset
+_LDA_bpiY:
+    BRV0    _RO_bpIY,, Inc, IF, SGN                 -- Read bp Offset
+_CMP_bp:
+    BMW2    _RO_bpI,, Inc, IF, SGN                  -- Read bp Offset
+_CMP_bpiY:
+    BRV0    _RO_bpIY,, Inc, IF, SGN                 -- Read bp Offset
+_SBC_bp:
+    BMW2    _RO_bpI,, Inc, IF, SGN                  -- Read bp Offset
+_SBC_bpiY:
+    BRV0    _RO_bpIY,, Inc, IF, SGN                 -- Read bp Offset
+--------------------------------------------------------------------------------
+-- Row 4 : 0x04-0xF4
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_TSB_zp:
+    BRV0    _RMW_zp,, Inc, IF, OP1                  -- Read ZP Pointer
+_TRB_zp:
+    BRV0    _RMW_zp,, Inc, IF, OP1                  -- Read ZP Pointer
+_BIT_zp:
+    BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_BIT_zpX:
+    BMW2    _RO_zpIX,, Inc, IF, OP1                 -- Read ZP Pointer
+_NOP_44:
+    BRV3    $,, Inc, IF, IR                         -- Skip True NOP Instruction
+_NOP_54:
+    BRV3    $,, Inc, IF, IR                         -- Skip True NOP Instruction
+_STZ_zp:
+    BMW2    _WO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_STZ_zpX:
+    BMW2    _WO_zpIX,, Inc, IF, OP1                 -- Read ZP Pointer
+_STY_zp:
+    BMW2    _WO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_STY_zpX:
+    BMW2    _WO_zpIX,, Inc, IF, OP1                 -- Read ZP Pointer
+_LDY_zp:
+    BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_LDY_zpX:
+    BMW2    _RO_zpIX,, Inc, IF, OP1                 -- Read ZP Pointer
+_CPY_zp:
+    BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_PSH_zp:
+    BRV0    _PSH_zp,, Inc, IF, OP1                  -- Read ZP Pointer
+_CPX_zp:
+    BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_PSH_imm:
+    BRV0    _PSH_Imm,, Inc, IF, OP1                 -- Read low(imm16)
+--------------------------------------------------------------------------------
+-- Row 5 : 0x05-0xF5
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_ORA_zp:
+    BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_ORA_zpX:
+    BMW2    _RO_zpIX,, Inc, IF, OP1                 -- Read ZP Pointer
+_ANL_zp:
+    BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_ANL_zpX:
+    BMW2    _RO_zpIX,, Inc, IF, OP1                 -- Read ZP Pointer
+_EOR_zp:
+    BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_EOR_zpX:
+    BMW2    _RO_zpIX,, Inc, IF, OP1                 -- Read ZP Pointer
+_ADC_zp:
+    BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_ADC_zpX:
+    BMW2    _RO_zpIX,, Inc, IF, OP1                 -- Read ZP Pointer
+_STA_zp:
+    BMW2    _WO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_STA_zpX:
+    BMW2    _WO_zpIX,, Inc, IF, OP1                 -- Read ZP Pointer
+_LDA_zp:
+    BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_LDA_zpX:
+    BMW2    _RO_zpIX,, Inc, IF, OP1                 -- Read ZP Pointer
+_CMP_zp:
+    BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_CMP_zpX:
+    BMW2    _RO_zpIX,, Inc, IF, OP1                 -- Read ZP Pointer
+_SBC_zp:
+    BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_SBC_zpX:
+    BMW2    _RO_zpIX,, Inc, IF, OP1                 -- Read ZP Pointer
+--------------------------------------------------------------------------------
+-- Row 6 : 0x06-0xF6
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_ASL_zp:
+    BRV0    _RMW_zp,, Inc, IF, OP1                  -- Read ZP Pointer
+_ASL_zpX:
+    BRV0    _RMW_zpX,, Inc, IF, OP1                 -- Read ZP Pointer
+_ROL_zp:
+    BRV0    _RMW_zp,, Inc, IF, OP1                  -- Read ZP Pointer
+_ROL_zpX:
+    BRV0    _RMW_zpX,, Inc, IF, OP1                 -- Read ZP Pointer
+_LSR_zp:
+    BRV0    _RMW_zp,, Inc, IF, OP1                  -- Read ZP Pointer
+_LSR_zpX:
+    BRV0    _RMW_zpX,, Inc, IF, OP1                 -- Read ZP Pointer
+_ROR_zp:
+    BRV0    _RMW_zp,, Inc, IF, OP1                  -- Read ZP Pointer
+_ROR_zpX:
+    BRV0    _RMW_zpX,, Inc, IF, OP1                 -- Read ZP Pointer
+_STX_zp:
+    BMW2    _WO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_STX_zpY:
+    BMW2    _WO_zpIY,, Inc, IF, OP1                 -- Read ZP Pointer
+_LDX_zp:
+    BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
+_LDX_zpY:
+    BMW2    _RO_zpIY,, Inc, IF, OP1                 -- Read ZP Pointer
+_DEC_zp:
+    BRV0    _RMW_zp,, Inc, IF, OP1                  -- Read ZP Pointer
+_DEC_zpX:
+    BRV0    _RMW_zpX,, Inc, IF, OP1                 -- Read ZP Pointer
+_INC_zp:
+    BRV0    _RMW_zp,, Inc, IF, OP1                  -- Read ZP Pointer
+_INC_zpX:
+    BRV0    _RMW_zpX,, Inc, IF, OP1                 -- Read ZP Pointer
+--------------------------------------------------------------------------------
+-- Row 7 : 0x07-0xF7 SP-relative RO/WO, and BP-relative RMW
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_ORA_sp:
+    BMW2    _RO_spI,, Inc, IF, SGN                  -- Read bp Offset
+_ASL_bp:
+    BRV0    _RMW_bp,, Inc, IF, SGN                  -- Read bp Offset
+_ANL_sp:
+    BMW2    _RO_spI,, Inc, IF, SGN                  -- Read bp Offset
+_ROL_bp:
+    BRV0    _RMW_bp,, Inc, IF, SGN                  -- Read bp Offset
+_EOR_sp:
+    BMW2    _RO_spI,, Inc, IF, SGN                  -- Read bp Offset
+_LSR_bp:
+    BRV0    _RMW_bp,, Inc, IF, SGN                  -- Read bp Offset
+_ADC_sp:
+    BRV0    _RMW_sp,, Inc, IF, SGN                  -- Read bp Offset
+_ROR_bp:
+    BRV0    _RMW_bp,, Inc, IF, SGN                  -- Read bp Offset
+_STA_sp:
+    BMW2    _WO_spI,, Inc, IF, SGN                  -- Read bp Offset
+_TSB_bp:
+    BRV0    _RMW_bp,, Inc, IF, SGN                  -- Read bp Offset
+_LDA_sp:
+    BMW2    _RO_spI,, Inc, IF, SGN                  -- Read bp Offset
+_TRB_bp:
+    BRV0    _RMW_bp,, Inc, IF, SGN                  -- Read bp Offset
+_CMP_sp:
+    BMW2    _RO_spI,, Inc, IF, SGN                  -- Read bp Offset
+_DEC_bp:
+    BRV0    _RMW_bp,, Inc, IF, SGN                  -- Read bp Offset
+_SBC_sp:
+    BRV0    _RMW_sp,, Inc, IF, SGN                  -- Read bp Offset
+_INC_bp:
+    BRV0    _RMW_bp,, Inc, IF, SGN                  -- Read bp Offset
+--------------------------------------------------------------------------------
+-- Row 8 : 0x08-0xF8
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_PHP:
+    BMW     _Php,MOD, Psh, WR, ALU, WE_R            -- Push P (8-bit only)
+_CLC:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Clear Carry Flag
+_PLP:
+    BMW     _Plp,MOD, Pop, RD, OP1                  -- Pop P (8-bit only)
+_SEC:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Set Carry Flag
+_PHA:
+    BMW0    _Psh,SMD, Psh, WR, ALU, WE_R            -- Push A (SIZ ? Hi : Lo)
+_CLI:
+    BRV1    $,, Inc, IF, IR, WE_R                   -- Clear Interrupt Mask Flg
+_PLA:
+    BMW0    _Pop,MOD, Pop, RD, OP1                  -- Pop A
+_SEI:
+    BRV1    $,, Inc, IF, IR, WE_R                   -- Set Interrupt Mask Flag
+_DEY:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Decrement Y
+_TYA:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Transfer Y to A
+_TAY:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Transfer A to Y
+_CLV:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Clear oVerflow Flag
+_INY:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Increment Y
+_CLD:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Clear Decimal Mode Flag
+_INX:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Increment X
+_SED:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Set Decimal Mode Flag
+--------------------------------------------------------------------------------
+-- Row 9 : 0x09-0xF9
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_ORA_imm:
+    BMW0    _Imm,, Inc, IF, OP1                     -- Read Immediate Operand
+_ORA_absY:
+    BRV0    _RO_absY,, Inc, IF, OP1                 -- Read Mem Ptr Lo
+_ANL_imm:
+    BMW0    _Imm,, Inc, IF, OP1                     -- Read Immediate Operand
+_ANL_absY:
+    BRV0    _RO_absY,, Inc, IF, OP1                 -- Read Mem Ptr Lo
+_EOR_imm:
+    BMW0    _Imm,, Inc, IF, OP1                     -- Read Immediate Operand
+_EOR_absY:
+    BRV0    _RO_absY,, Inc, IF, OP1                 -- Read Mem Ptr Lo
+_ADC_imm:
+    BMW0    _Imm,, Inc, IF, OP1                     -- Read Immediate Operand
+_ADC_absY:
+    BRV0    _RO_absY,, Inc, IF, OP1                 -- Read Mem Ptr Lo
+_BIT_imm:
+    BMW0    _Imm,, Inc, IF, OP1                     -- Read Immediate Operand
+_STA_absY:
+    BRV0    _WO_absY,, Inc, IF, OP1                 -- Read Mem Ptr Lo
+_LDA_imm:
+    BMW0    _Imm,, Inc, IF, OP1                     -- Read Immediate Operand
+_LDA_absY:
+    BRV0    _RO_absY,, Inc, IF, OP1                 -- Read Mem Ptr Lo
+_CMP_imm:
+    BMW0    _Imm,, Inc, IF, OP1                     -- Read Immediate Operand
+_CMP_absY:
+    BRV0    _RO_absY,, Inc, IF, OP1                 -- Read Mem Ptr Lo
+_SBC_imm:
+    BMW0    _Imm,, Inc, IF, OP1                     -- Read Immediate Operand
+_SBC_absY:
+    BRV0    _RO_absY,, Inc, IF, OP1                 -- Read Mem Ptr Lo
+--------------------------------------------------------------------------------
+-- Row A : 0x0A-0xFA
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_ASL_A:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Arithmetic Shift A Left
+_INC_A
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Increment A
+_ROL_A:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Rotate A Left
+_DEC_A:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Decrement A
+_LSR_A:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Logical Shift A Right
+_PHY:
+    BMW0    _Psh,SMD, Psh, WR, ALU, WE_R            -- Push Y (SIZ ? Hi : Lo)
+_ROR_A:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Rotate A Right
+_PLY:
+    BMW0    _Pop,MOD, Pop, RD, OP1                  -- Pop Y
+_TXA:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Transfer X to A
+_TXS:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Transfer X to S
+_TAX:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Transfer A to X
+_TSX:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Transfer S to X
+_DEX:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Decrement X
+_PHX:
+    BMW0    _Psh,SMD, Psh, WR, ALU, WE_R            -- Push X (SIZ ? Hi : Lo)
+_NOP:   -- the real NOP
+    BRV3    $,, Inc, IF, IR                         -- Skip True NOP Instruction
+_PLX:
+    BMW0    _Pop,MOD, Pop, RD, OP1                  -- Pop X
+--------------------------------------------------------------------------------
+-- Row B : 0x0B-0xFB
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_DUP_0B:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Duplicate TOS, Push NOS
+_SWP_1B:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Swap TOS & NOS
+_ROT_2B:
+    BRV3    $,, Inc, IF, IR, WE_R                   -- Rotate Register Stack
+_NXT_3B:
+    BRV0    _NEXT,, IPN, RD, OP1,,, IP1             -- Read FORTH Addrs Ptr Lo
+_PHI_4B:
+    BRV0    _PHI,MOD, Psh, WR, DOH, WE_R            -- Psh IP/W
+_INI_5B:
+    BRV3    $,, Inc, IF, IR,,, IP1                  -- Increment IP by 1
+_PLI_6B:
+    BRV0    _PLI,MOD, Pop, RD, OP1                  -- Pop IP/W
+_ENT_7B:
+    BRV0    _ENTER,SMD, Psh, WR, DOH, WE_R,, WP2    -- FORTH VM ENTER (DOCOL)
+_OSX_8B:
+    BRV1    $,, Inc, IF, IR                         -- Prefix 0 - OSX
+_IND_9B:
+    BRV1    $,, Inc, IF, IR                         -- Prefix 1 - IND
+_SIZ_AB:
+    BRV1    $,, Inc, IF, IR                         -- Prefix 2 - SIZ
+_ISZ_BB:
+    BRV1    $,, Inc, IF, IR                         -- Prefix 3 - ISZ
+_WAI_CB:
+    BMW     _WAI,, PC                               -- Wait for Interrupt
+_STP_DB:
+    BRV0    _STP,, PC                               -- Stop Processor Execution
+_OAX_EB:
+    BRV1    $,, Inc, IF, IR                         -- Prefix 4 - OAX
+_OAY_FB:
+    BRV1    $,, Inc, IF, IR                         -- Prefix 5 - OAY
+--------------------------------------------------------------------------------
+-- Row C : 0x0C-0xFC
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_TSB_abs:
+    BRV0    _RMW_abs,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_TRB_abs:
+    BRV0    _RMW_abs,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_BIT_abs:
+    BRV0    _RO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_BIT_absX:
+    BRV0    _RO_absX,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_JMP_abs:
+    BRV0    _Jmp_abs,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_XMA_spS:
+    BRV0    _XMA_sp,, Inc, IF, SGN                  -- Read Offset
+_JMP_absI:
+    BRV0    _Jmp_absI,, Inc, IF, OP1                -- Read Dst Ptr Lo
+_JMP_absXI:
+    BRV0    _Jmp_absXI,, Inc, IF, OP1               -- Read Dst Ptr Lo
+_STY_abs:
+    BRV0    _WO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_STZ_abs:
+    BRV0    _WO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_LDY_abs:
+    BRV0    _RO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_LDY_absX:
+    BRV0    _RO_absX,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_CPY_abs:
+    BRV0    _RO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_ADJ_DC:
+    BRV1    $,, Inc, IF, IR, WE_R                   -- Adjust stack pointer
+_CPX_abs:
+    BRV0    _RO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_PSH_abs:
+    BRV0    _PSH_abs,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+--------------------------------------------------------------------------------
+-- Row D : 0x0D-0xFD
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_ORA_abs:
+    BRV0    _RO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_ORA_absX:
+    BRV0    _RO_absX,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_ANL_abs:
+    BRV0    _RO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_ANL_absX:
+    BRV0    _RO_absX,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_EOR_abs:
+    BRV0    _RO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_EOR_absX:
+    BRV0    _RO_absX,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_ADC_abs:
+    BRV0    _RO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_ADC_absX:
+    BRV0    _RO_absX,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_STA_abs:
+    BRV0    _WO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_STA_absX:
+    BRV0    _WO_absX,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_LDA_abs:
+    BRV0    _RO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_LDA_absX:
+    BRV0    _RO_absX,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_CMP_abs:
+    BRV0    _RO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_CMP_absX:
+    BRV0    _RO_absX,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_SBC_abs:
+    BRV0    _RO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_SBC_absX:
+    BRV0    _RO_absX,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+--------------------------------------------------------------------------------
+-- Row E : 0x0E-0xFE
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_ASL_abs:
+    BRV0    _RMW_abs,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_ASL_absX:
+    BRV0    _RMW_absX,, Inc, IF, OP1                -- Read Dst Ptr Lo
+_ROL_abs:
+    BRV0    _RMW_abs,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_ROL_absX:
+    BRV0    _RMW_absX,, Inc, IF, OP1                -- Read Dst Ptr Lo
+_LSR_abs:
+    BRV0    _RMW_abs,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_LSR_absX:
+    BRV0    _RMW_absX,, Inc, IF, OP1                -- Read Dst Ptr Lo
+_ROR_abs:
+    BRV0    _RMW_abs,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_ROR_absX:
+    BRV0    _RMW_absX,, Inc, IF, OP1                -- Read Dst Ptr Lo
+_STX_abs:
+    BRV0    _WO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_STZ_absX:
+    BRV0    _WO_absX,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_LDX_abs:
+    BRV0    _RO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
+_LDX_absY:
+    BRV0    _RO_absY,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_DEC_abs:
+    BRV0    _RMW_abs,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_DEC_absX:
+    BRV0    _RMW_absX,, Inc, IF, OP1                -- Read Dst Ptr Lo
+_INC_abs:
+    BRV0    _RMW_abs,, Inc, IF, OP1                 -- Read Dst Ptr Lo
+_INC_absX:
+    BRV0    _RMW_absX,, Inc, IF, OP1                -- Read Dst Ptr Lo
+--------------------------------------------------------------------------------
+-- Row F : 0x0F-0xFF IP-relative (with IP autoincrement)
+--  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+--------------------------------------------------------------------------------
+_ORA_ip:
+    BMW2    _RO_ipI,, Inc, IF, SGN                  -- Read bp Offset
+_ASL_ip:
+    BRV0    _RMW_ip,, Inc, IF, SGN                  -- Read bp Offset
+_ANL_ip:
+    BMW2    _RO_ipI,, Inc, IF, SGN                  -- Read bp Offset
+_ROL_ip:
+    BRV0    _RMW_ip,, Inc, IF, SGN                  -- Read bp Offset
+_EOR_ip:
+    BMW2    _RO_ipI,, Inc, IF, SGN                  -- Read bp Offset
+_LSR_ip:
+    BRV0    _RMW_ip,, Inc, IF, SGN                  -- Read bp Offset
+_ADD_ip:
+    BMW2    _RO_ipI,, Inc, IF, SGN                  -- Read bp Offset
+_ROR_ip:
+    BRV0    _RMW_ip,, Inc, IF, SGN                  -- Read bp Offset
+_STA_ip:
+    BMW2    _WO_ipI,, Inc, IF, SGN                  -- Read bp Offset
+_TSB_ip:
+    BRV0    _RMW_ip,, Inc, IF, SGN                  -- Read bp Offset
+_LDA_ip:
+    BMW2    _RO_ipI,, Inc, IF, SGN                  -- Read bp Offset
+_TRB_ip:
+    BRV0    _RMW_ip,, Inc, IF, SGN                  -- Read bp Offset
+_CMP_ip:
+    BMW2    _RO_ipI,, Inc, IF, SGN                  -- Read bp Offset
+_DEC_ip:
+    BRV0    _RMW_ip,, Inc, IF, SGN                  -- Read bp Offset
+_SUB_ip:
+    BMW2    _RO_ipI,, Inc, IF, SGN                  -- Read bp Offset
+_INC_ip:
+    BRV0    _RMW_ip,, Inc, IF, SGN                  -- Read bp Offset
+--------------------------------------------------------------------------------
+--  End of Instruction Decode Table
+--------------------------------------------------------------------------------
+
+_Last:  .org 512
+
+_end:

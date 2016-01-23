@@ -1,0 +1,103 @@
+// BMM LOC annotation file.
+//
+// Release 10.1i - Data2MEM K.39, build 1.5.7 Nov 8, 2007
+// Copyright (c) 1995-2015 Xilinx, Inc.  All rights reserved.
+//
+// Created on 11/25/15 06:46 pm
+//
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// Unnamed 405 PPC processor, ID 0, memory map.
+//
+///////////////////////////////////////////////////////////////////////////////
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// Address space 'RAM' 0x00000000:0x00003FFF (16 KB).
+//
+///////////////////////////////////////////////////////////////////////////////
+
+ADDRESS_SPACE RAM RAMB16 [0x00000000:0x00003FFF]
+    BUS_BLOCK
+        RAM/Mram_BRAM8 [7:7] LOC = X1Y7;
+        RAM/Mram_BRAM7 [6:6] LOC = X1Y6;
+        RAM/Mram_BRAM6 [5:5] LOC = X1Y5;
+        RAM/Mram_BRAM5 [4:4] LOC = X1Y4;
+        RAM/Mram_BRAM4 [3:3] LOC = X0Y7;
+        RAM/Mram_BRAM3 [2:2] LOC = X0Y6;
+        RAM/Mram_BRAM2 [1:1] LOC = X0Y5;
+        RAM/Mram_BRAM1 [0:0] LOC = X0Y4;
+    END_BUS_BLOCK;
+END_ADDRESS_SPACE;
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// Address space 'ROM0' 0x0000D000:0x0000DFFF (4 KB).
+//
+///////////////////////////////////////////////////////////////////////////////
+
+ADDRESS_SPACE ROM0 RAMB16 [0x0000D000:0x0000DFFF]
+    BUS_BLOCK
+        ROM0/Mram_BRAM2 [7:4] LOC = X0Y1;
+        ROM0/Mram_BRAM1 [3:0] LOC = X0Y0;
+    END_BUS_BLOCK;
+END_ADDRESS_SPACE;
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// Address space 'ROM1' 0x0000E000:0x0000EFFF (4 KB).
+//
+///////////////////////////////////////////////////////////////////////////////
+
+ADDRESS_SPACE ROM1 RAMB16 [0x0000E000:0x0000EFFF]
+    BUS_BLOCK
+        ROM1/Mram_BRAM2 [7:4] LOC = X1Y1;
+        ROM1/Mram_BRAM1 [3:0] LOC = X1Y0;
+    END_BUS_BLOCK;
+END_ADDRESS_SPACE;
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// Address space 'MON' 0x0000F000:0x0000FFFF (4 KB).
+//
+///////////////////////////////////////////////////////////////////////////////
+
+ADDRESS_SPACE MON RAMB16 [0x0000F000:0x0000FFFF]
+    BUS_BLOCK
+        MON/Mram_BRAM2 [7:4] LOC = X1Y3;
+        MON/Mram_BRAM1 [3:0] LOC = X1Y2;
+    END_BUS_BLOCK;
+END_ADDRESS_SPACE;
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// Address space 'UPGM' 0x00010000:0x000108FF (2 KB).
+//
+///////////////////////////////////////////////////////////////////////////////
+
+ADDRESS_SPACE UPGM RAMB18 [0x00010000:0x000108FF]
+    BUS_BLOCK
+        uP/Mrom__varindex0000 [35:0] LOC = X0Y2;
+    END_BUS_BLOCK;
+END_ADDRESS_SPACE;
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// Address space 'IDEC' 0x00020000:0x000208FF (2 KB).
+//
+///////////////////////////////////////////////////////////////////////////////
+
+ADDRESS_SPACE IDEC RAMB18 [0x00020000:0x000208FF]
+    BUS_BLOCK
+        uP/Mrom__varindex0001 [35:0] LOC = X0Y3;
+    END_BUS_BLOCK;
+END_ADDRESS_SPACE;
+

@@ -1,0 +1,94 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Block RAM Memory Map file: M65C02A MON - 4kB Memory
+//
+////////////////////////////////////////////////////////////////////////////////
+
+ADDRESS_SPACE MON RAMB16 [0x0000F000:0x0000FFFF]
+
+    BUS_BLOCK
+        MON/Mram_BRAM2 [7:4] LOC = X1Y3;
+        MON/Mram_BRAM1 [3:0] LOC = X1Y2;
+    END_BUS_BLOCK;
+
+END_ADDRESS_SPACE;
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Block RAM Memory Map file: M65C02A ROM1 - 4kB Memory
+//
+////////////////////////////////////////////////////////////////////////////////
+
+ADDRESS_SPACE ROM1 RAMB16 [0x0000E000:0x0000EFFF]
+
+    BUS_BLOCK
+        ROM1/Mram_BRAM2 [7:4] LOC = X1Y1;
+        ROM1/Mram_BRAM1 [3:0] LOC = X1Y0;
+    END_BUS_BLOCK;
+
+END_ADDRESS_SPACE;
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Block RAM Memory Map file: M65C02A ROM0 - 4kB Memory
+//
+////////////////////////////////////////////////////////////////////////////////
+
+ADDRESS_SPACE ROM0 RAMB16 [0x0000D000:0x0000DFFF]
+
+    BUS_BLOCK
+        ROM0/Mram_BRAM2 [7:4] LOC = X0Y1;
+        ROM0/Mram_BRAM1 [3:0] LOC = X0Y0;
+    END_BUS_BLOCK;
+
+END_ADDRESS_SPACE;
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Block RAM Memory Map file: M65C02A RAM - 16kB Memory
+//
+////////////////////////////////////////////////////////////////////////////////
+
+ADDRESS_SPACE RAM RAMB16 [0x00000000:0x00003FFF]
+
+    BUS_BLOCK
+        RAM/Mram_BRAM8 [7] LOC = X1Y7;
+        RAM/Mram_BRAM7 [6] LOC = X1Y6;
+        RAM/Mram_BRAM6 [5] LOC = X1Y5;
+        RAM/Mram_BRAM5 [4] LOC = X1Y4;
+        RAM/Mram_BRAM4 [3] LOC = X0Y7;
+        RAM/Mram_BRAM3 [2] LOC = X0Y6;
+        RAM/Mram_BRAM2 [1] LOC = X0Y5;
+        RAM/Mram_BRAM1 [0] LOC = X0Y4;
+    END_BUS_BLOCK;
+
+END_ADDRESS_SPACE;
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Block RAM Memory Map file: M65C02A uPgm - 512 x 36 Memory (2304 Bytes)
+//
+////////////////////////////////////////////////////////////////////////////////
+
+ADDRESS_SPACE UPGM RAMB18 [0x00010000:0x000108FF]
+
+    BUS_BLOCK
+        uP/Mrom__varindex0000 [35:0] LOC = X0Y2;
+    END_BUS_BLOCK;
+
+END_ADDRESS_SPACE;
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Block RAM Memory Map file: M65C02A IDec - 512 x 36 Memory (2304 Bytes) 
+//
+////////////////////////////////////////////////////////////////////////////////
+
+ADDRESS_SPACE IDEC RAMB18 [0x00020000:0x000208FF]
+
+    BUS_BLOCK
+        uP/Mrom__varindex0001 [35:0] LOC = X0Y3;
+    END_BUS_BLOCK;
+
+END_ADDRESS_SPACE;
+

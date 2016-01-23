@@ -1,0 +1,757 @@
+header
+Project: M65C02A_IDecode_ROMa
+File Revision: 0015
+Author(s): Michael A. Morris
+Description: M65C02A Instruction Decoder ROM
+endh
+
+--------------------------------------------------------------------------------
+--
+--  Copyright 2015 by Michael A. Morris, dba M. A. Morris & Associates
+--
+--  All rights reserved. The source code contained herein is publicly released
+--  under the terms and conditions of the GNU General Public License as conveyed
+--  in the license provided below.
+--
+--  This program is free software: you can redistribute it and/or modify it
+--  under the terms of the GNU General Public License as published by the Free
+--  Software Foundation, either version 3 of the License, or any later version.
+--
+--  This program is distributed in the hope that it will be useful, but WITHOUT
+--  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+--  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+--  more details.
+--
+--  You should have received a copy of the GNU General Public License along with
+--  this program.  If not, see <http://www.gnu.org/licenses/>, or write to
+--
+--  Free Software Foundation, Inc.
+--  51 Franklin Street, Fifth Floor
+--  Boston, MA  02110-1301 USA
+--
+--  Further, no use of this source code is permitted in any form or means
+--  without inclusion of this banner prominently in any derived works.
+--
+--  Michael A. Morris <morrisma_at_mchsi_dot_com>
+--  164 Raleigh Way
+--  Huntsville, AL 35811
+--  USA
+--
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- Revision History:
+--------------------------------------------------------------------------------
+--
+--  0001    15A03   MAM     Initial release.
+--
+--  0002    15G04   MAM     Updated to support LDA @IP+off and MOV instructions
+--
+--  0003    15G06   MAM     Modified code for CMP/CPX/CPY instructions in order
+--                          to indicate that CMP/CPX/CPY is being executed. In 
+--                          the 16-bit mode, this indicator will be used by the
+--                          ALU logic to change the condition code field from
+--                          one that sets NZC to one that sets all four: NVZC.
+--                          This will allow the M65C02A to support signed compa-
+--                          risons and allow conditional branches to branch on
+--                          signed and unsigned multi-flag tests.
+--
+--  0004    15G12   MAM     Restored BRK mode, and implemented MOV as a SPC
+--                          instruction using Opcode[5].
+--
+--  0005    15G31   MAM     Changed the RTI CCSel code from PSW to BRK. This is
+--                          used in the PSW logic to update the K bit only when
+--                          an RTI instruction is being performed. Thus, the
+--                          processor mode can only be changed from kernel to
+--                          user mode using a stack frame pulled from the stack
+--                          using an RTI instruction.
+--
+--  0006    15H02   MAM     Modified definition of RTI from VAL to SPC in order
+--                          to support change that will enable RTI to be used
+--                          swap from kernel to user mode at the conclusion of
+--                          the RTI instruction, i.e. on the fetch of the first
+--                          instruction following the ISR or the first instruc-
+--                          tion of a user mode process.
+--
+--  0007    15H03   MAM     Removed WS_P from the BRK instruction. With change
+--                          made in 0006, this write selection became redundant.
+--
+--  0008    15K12   MAM     Added signal XRSP as part of the FORTH VM so that X
+--                          is used for the stack when ENT/PHI/PLI instructions
+--                          are used and OSX is not set. When OSX and XRSP are
+--                          both set, the system stack will be used. This
+--                          feature can be enabled or disabled by the microcode
+--                          defined in this file.
+--
+--  0009    15K13   MAM     Changed the assigned opcode for MOV from $44 to $42.
+--                          Assigned the unused opcode at $44 to STA ip,I++ to
+--                          match the LDA ip,I++ opcode at $54. The new instruc-
+--                          tion uses the same addressing mode as LDA ip,I++, 
+--                          but stores the accumulator at the address specified
+--                          by IP and autoincrements IP. IND, SIZ, and ISZ pre-
+--                          fix instructions may be applied with the expected
+--                          indirection and size effects.
+--
+--  0010    15K25   MAM     Moved the JMP ip,I++ from $82 to $DC, replacing the
+--                          BSR rel16 instruction. BSR rel16 can be synthesized
+--                          using PSH #imm16; BRL rel16; with only a four cycle
+--                          penalty. Added ADC ip,I++ as $82. This instruction
+--                          expected to be used for computing IP-relative jumps
+--                          and branches.
+--
+--  0011    15L10   MAM     Replaced the JMP ip,I++ instruction because NXT 
+--                          faster and shorter. JMP ip,I++ replaced with an
+--                          instruction to adjust the system stack pointer. The
+--                          ADJ #imm16 add (w/o carry) the signed 16-bit imme-
+--                          diate value to Sk/Su. If OSX is asserted, the 16-
+--                          bit value is added to the X register. Modified the
+--                          ADC ip,I++ instruction to add without carry:
+--                          ADD ip,I++. This shortens the IP-relative branches
+--                          and jumps by one byte and one cycle.
+--
+--  0012    15L19   MAM     Modified ADJ instruction so it uses the Y register
+--                          instead of an immediate operand to adjust the system
+--                          or auxiliary stack pointers.
+--
+--  0013    15L30   MAM     Removed WRD flag for DUP, SWP, and ROT instructions.
+--
+--  0014    15L31   MAM     Replaced the Rockwell bit-oriented instructions in 
+--                          columns 7 and F with another set of instructions
+--                          intended to provide better stack-oriented processing
+--                          and to more fully support threaded code compilers
+--                          and interpreters. In column 7, the even entries are
+--                          duplicates of the corresponding entries in column 3.
+--                          Instead of BP-relative, the addressing mode is SP-
+--                          relative by default. (Prefixing with OSX results in 
+--                          same instruction from column 3 and vice-versa. This
+--                          modification is being made as a consequence of the
+--                          high use of SP-relative operations in the Pascal
+--                          compiler being targetted to the core.) The odd ele-
+--                          ments of column 7 implement BP-relative versions of
+--                          a number of RMW instructions: ASL/ROL/LSR/ROR, 
+--                          TSB/TRB, and DEC/INC. (While porting the Pascal com-
+--                          piler it was determined that incrementing/decrement-
+--                          ing array indices is a frequent requirement. Since
+--                          there is no BP-relative addressing mode for the DEC/
+--                          INC instructions, modifying the array index varia-
+--                          bles on the stack required some significant calcula-
+--                          tions. Given the support for nested procedures and
+--                          functions in Pascal, the majority of array opera-
+--                          tions are in procedures and functions which means
+--                          that the majority of array index variables are on 
+--                          the stack. Only array indices defined at the root
+--                          level can use the DEC/INC abs instructions of the 
+--                          core. All other array indices must be manipulated
+--                          using loads, register DEC/INC, and stores. Although
+--                          this is a straightforward instruction sequence, the
+--                          number of cycles required to perform this frequent
+--                          operation indicates that the M65C02A instruction set
+--                          needed to be modified and the Rockwell instructions
+--                          were the best instructions to replace since they are
+--                          not used at all by the compiler, and seldom used by
+--                          assembly language programmers.) Column F is devoted
+--                          to IP-relative (w/ autoincrement) instructions. The
+--                          set of instructions selected are those represented
+--                          in column 7 except that the addressing mode has been
+--                          changed. In addition, the ADC/SBC instructions are
+--                          modified to be ADD/SUB, so that CLC/SEC are not re-
+--                          quired. Extended precision arithmetic is supported
+--                          by the standard 6502/65C02 instruction set.
+--
+--  0015    16A05   MAM     Converted ADC/SBC sp,S to RMW where the left operand
+--                          is M and the right operand is A, and the result is
+--                          written back to M. This is expected to improve the
+--                          HLL performance of the core by operating directly on 
+--                          local variables found on the system stack either in
+--                          function/procedure stack frame (relative to BP) or 
+--                          in dynamically created variables used for expression
+--                          evaluation. Replaced BRL rel16 with XMA sp,S. XMA 
+--                          exchanges the accumulator with the addressed stack
+--                          element.
+--                          
+--
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- Mode Field
+--------------------------------------------------------------------------------
+
+VAL     .asm    0   -- Valid Instruction (not otherwise decoded)
+ADJ     .asm    1   -- ADJ Instruction
+COP     .asm    2   -- COP Instruction  (CO-Processor instruction           )
+BRK     .asm    3   -- BRK Instruction
+FTH     .asm    4   -- FORTH VM Instructions (Reserved for Future Use       )   
+SPC     .asm    5   -- Special Instructions  (See table below               ) 
+PFX     .asm    6   -- Prefix Instructions   (See table below               ) 
+WAI     .asm    7   -- WAI Instruction  (WAit for Interrupt                 )
+--
+--  One-hot encoding of the Opcode field for SPC mode instructions
+--
+--  {PSH, PHR, MOV, RTI, DUP, SWP, ROT, WRD}
+--
+--  PSH - Push Instructions         (PSH zp/abs/#imm16; PHA/PHX/PHY         )
+--  PHR - PHR Instruction           (PHR rel16                              )
+--  MOV - MOV Instruction
+--  RTI - RTI Instruction
+--  DUP - Register Stack DUPlicate  (16-bit only                            )
+--  SWP - Register Stack SWaP       (16-bit only                            )
+--  ROT - Register Stack ROTate     (16-bit only                            )
+--  WRD - Set 16-bit op size        (16-bit only                            )
+--
+--  One-hot encoding of the Opcode field for PFX mode instructions
+--
+--  {3'b0, iOSX, iOAY, iOAX, iSIZ, iIND}
+--
+--  iOSX - OSX Instruction          (Override S with X                      )
+--  iOAY - OAY Instruction          (Override A with Y                      )
+--  iOAX - OAX Instruction          (Override A with X                      )
+--  iSIZ - SIZ | ISZ Instructions   (Override Operand size: 8 => 16         )
+--  iIND - IND | ISZ Instructions   (Direct address => indirect address     )
+--
+--  One-hot encoding of the Opcode field for FORTH VM mode instructions
+--
+--  {NXT, ENT, PHI, PLI, XRSP, 2'b0, INI}
+--
+--  NXT  - FORTH VM NEXT
+--  ENT  - FORTH VM ENTER (DOCOLON)
+--  PHI  - FORTH VM Push IP/W => PS/RS
+--  PLI  - FORTH VM Pull IP/W <= PS/RS
+--  XRSP - FORTH VM Use X for Return Stack Pointer (RSP) ENT/PHI/PLI (OSX == 0)
+--  INI  - FORTH VM Increment IP/W
+--
+--------------------------------------------------------------------------------
+-- ROM ( output ) Field definitions
+--------------------------------------------------------------------------------
+
+Mode    .def    3   -- Instruction Class or Specific Instruction
+RMW     .def    1   -- Read-Modify-Write Instruction Type Field
+FU_Sel  .def    6   -- ALU Functional Unit Select (one-hot)
+ALU_OP  .def    2   -- ALU Operation
+QSel    .def    2   -- ALU Q Operand Select
+RSel    .def    2   -- ALU R Operand Select
+CSel    .def    2   -- ALU Arithmetic Unit Carry Input Select
+WSel    .def    3   -- ALU Register Write Select
+OSel    .def    3   -- ALU Register Output Select
+CCSel   .def    4   -- ALU Condition Code Operation
+Opcode  .def    8   -- Instruction Opcode, bit mask, etc.
+
+--------------------------------------------------------------------------------
+--  Constant definitions
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+--  ALU Functional Unit Select definitions
+
+LST     .equ    48  -- Select Load/Store/Transfer Functional Unit
+LU      .equ    40  -- Select Logic Unit (AND/ORA/EOR, BIT/TRB/TSB,
+                    --                    RMB/SMB/BBR/BBS,
+                    --                    SEC/CLC/SEI/CLI/SED/CLD/CLV
+SU      .equ    36  -- Select Shift/Rotate Unit (ASL/ROL/LSR/ROR)
+ADD     .equ    34  -- Select Decimal/Binary Adder (ADC/SBC)
+IDC     .equ    33  -- Select Bin. Add (INC/DEC/CMP/INX/DEX/CPX/INY/DEY/CPY) 
+
+--------------------------------------------------------------------------------
+--  General Definitions
+--------------------------------------------------------------------------------
+
+NOP     .equ    0   -- No operation and/or default operation
+XFR     .equ    0   -- No operation and/or default operation
+
+--------------------------------------------------------------------------------
+--  ALU Operation Field (ALU_Op) Definitions
+--------------------------------------------------------------------------------
+
+--  Logic Unit Operations
+
+AND     .equ    1   -- ALU <=  A & M;   N <= ALU[7]; Z <= ~|ALU;
+ORA     .equ    2   -- ALU <=  A | M;   N <= ALU[7]; Z <= ~|ALU;
+EOR     .equ    3   -- ALU <=  A ^ M;   N <= ALU[7]; Z <= ~|ALU;
+
+BIT     .equ    1   -- ALU <=  A & M;   N <= M[7]; V <= M[6]; Z <= ~|(A & M)
+-- BIT #imm         -- ALU <=  A & M;                         Z <= ~|(A & M)   
+TRB     .equ    0   -- ALU <= ~A & M;                         Z <= ~|(A & M)
+TSB     .equ    2   -- ALU <=  A | M;                         Z <= ~|(A & M)
+
+RMB     .equ    0   -- ALU <= ~K & M;  (K <= (1 << bit))
+SMB     .equ    2   -- ALU <=  K | M;  (K <= (1 << bit))
+BBR     .equ    1   -- ALU <=  K & M;  (K <= (1 << bit))
+BBS     .equ    1   -- ALU <=  K & M;  (K <= (1 << bit))
+
+CLC     .equ    0   -- ALU <= ~K & P;   C <= 0; (K <= 0x01)
+SEC     .equ    2   -- ALU <=  K | P;   C <= 1; (K <= 0x01)
+CLI     .equ    0   -- ALU <= ~K & P;   I <= 0; (K <= 0x04)
+SEI     .equ    2   -- ALU <=  K | P;   I <= 1; (K <= 0x04)
+CLD     .equ    0   -- ALU <= ~K & P;   D <= 0; (K <= 0x08)
+SED     .equ    2   -- ALU <=  K | P;   D <= 1; (K <= 0x08)
+CLV     .equ    0   -- ALU <= ~K & P;   V <= 0; (K <= 0x40)
+
+--  Shift Unit Operations (Note: for ASL/LSR, Ci <= 0; for ROL/ROR, Ci <= C)
+
+ASL     .equ    0   -- ALU <= {R[6:0],Ci};N <= ALU[7]; Z <= ~|ALU; C <= R[7]
+ROL     .equ    0   -- ALU <= {R[6:0],Ci};N <= ALU[7]; Z <= ~|ALU; C <= R[7]
+LSR     .equ    1   -- ALU <= {Ci,R[7:1]};N <= ALU[7]; Z <= ~|ALU; C <= R[0]
+ROR     .equ    1   -- ALU <= {Ci,R[7:1]} N <= ALU[7]; Z <= ~|ALU; C <= R[0]
+
+--  Arithmetic Unit Operations
+
+ADC     .equ    0   -- ALU <= Q +  M + C; N <= ALU[7]; Z <= ~|ALU;
+--                                        V <= OVF;    C <= COut;
+SBC     .equ    1   -- ALU <= Q + ~M + C; N <= ALU[7]; Z <= ~|ALU;
+--                                        V <= OVF;    C <= COut;
+INC     .equ    0   -- ALU <= Q +  K + 1; N <= ALU[7]; Z <= ~|ALU;
+DEC     .equ    1   -- ALU <= Q + ~K + 0; N <= ALU[7]; Z <= ~|ALU;
+CMP     .equ    3   -- ALU <= Q + ~M + 1; N <= ALU[7]; Z <= ~|ALU;
+--                                                     C <= COut;
+ADD     .equ    0   -- ALU <= Q +  M + 0; N <= ALU[7]; Z <= ~|ALU;
+--                                                     C <= COut;
+
+--------------------------------------------------------------------------------
+--  ALU Left (L/Q) Operand Select
+--------------------------------------------------------------------------------
+
+L_M     .equ    0   -- L <= M (default)
+L_K     .equ    1   -- L <= K
+L_P     .equ    2   -- L <= P
+L_A     .equ    3   -- L <= A
+
+Q_M     .equ    0   -- Q <= M (default)
+Q_X     .equ    1   -- Q <= X
+Q_Y     .equ    2   -- Q <= Y
+Q_A     .equ    3   -- Q <= A
+
+--------------------------------------------------------------------------------
+--  ALU Right (R) Operand Select
+--------------------------------------------------------------------------------
+
+R_M     .equ    0   -- R <= M (default)
+R_K     .equ    1   -- R <= K
+R_P     .equ    2   -- R <= P
+R_A     .equ    3   -- R <= A
+
+--------------------------------------------------------------------------------
+--  ALU Carry Input Multiplexer Select
+--------------------------------------------------------------------------------
+
+Ci_C    .equ    0   -- Ci <= C (default)
+Ci_0    .equ    1   -- Ci <= 0
+Ci_1    .equ    2   -- Ci <= 1
+Ci_S    .equ    3   -- Ci <= Q[7]
+
+--------------------------------------------------------------------------------
+--  ALU Register Write Select Definitions
+--------------------------------------------------------------------------------
+
+WS_X    .equ    1   -- Write X (Pre-Index Register)
+WS_Y    .equ    2   -- Write Y (Post-Index Register)
+WS_A    .equ    3   -- Write Accumulator (Binary)
+WS_R    .equ    4   -- Write Registers
+WS_S    .equ    5   -- Write S (Stack Pointer)
+WS_P    .equ    6   -- Write P (Processor Status Word)
+WS_M    .equ    7   -- Write M (ALU Output)
+
+--------------------------------------------------------------------------------
+--  ALU Register Output Select Definitions
+--------------------------------------------------------------------------------
+
+OS_X    .equ    1   -- ALU <= X
+OS_Y    .equ    2   -- ALU <= Y
+OS_A    .equ    3   -- ALU <= A
+OS_T    .equ    4   -- ALU <= Tmp (Operand Register 2)
+OS_S    .equ    5   -- ALU <= S   (Stack Pointer)
+OS_P    .equ    6   -- ALU <= P   (Processor Status Word)
+OS_M    .equ    7   -- ALU <= M   (Memory Data Input, Operand Register 1)
+
+--------------------------------------------------------------------------------
+--  Condition Code Operation/Output Select Definitions
+--      Note: CC_Out = 1 if (CCSel == 4'b0000)
+--------------------------------------------------------------------------------
+
+TRUE    .equ    0   -- CC_Out <=  1
+
+BRA     .equ    0   -- CC_Out <=  1
+--
+BCC     .equ    8   -- CC_Out <= ((SIZ) ?   ~C           : ~C); SIZ ? BLOS : BCC
+BCS     .equ    9   -- CC_Out <= ((SIZ) ?    C           :  C); SIZ ? BHI  : BCS
+BNE     .equ    10  -- CC_Out <= ((SIZ) ?  ~(C | Z)      : ~Z); SIZ ? BLO  : BNE
+BEQ     .equ    11  -- CC_Out <= ((SIZ) ?   (C | Z)      :  Z); SIZ ? BHIS : BEQ
+--
+BVC     .equ    12  -- CC_Out <= ((SIZ) ?  ~(N ^ V)      : ~V); SIZ ? BGE  : BVC
+BVS     .equ    13  -- CC_Out <= ((SIZ) ?   (N ^ V)      :  V); SIZ ? BLT  : BVS
+BPL     .equ    14  -- CC_OUT <= ((SIZ) ? ~((N ^ V) | Z) : ~N); SIZ ? BGT  : BPL
+BMI     .equ    15  -- CC_Out <= ((SIZ) ?  ((N ^ V) | Z) :  N); SIZ ? BLE  : BMI
+
+PSW     .equ    0   -- P <= ALU;
+BRK     .equ    1   -- P.4 <= 1 on push P during BRK; Set K on RTI
+Z       .equ    2   --                        Z <= ~|(A & M);
+NVZ     .equ    3   -- N <= M[7];  V <= M[6]; Z <= ~|(A & M);
+PHP     .equ    4   -- P.4 <= 1 on push P during PHP
+NZ      .equ    5   -- N <= ALU[7];           Z <= ~|ALU;
+NZC     .equ    6   -- N <= ALU[7];           Z <= ~|ALU; C <= COut;
+NVZC    .equ    7   -- N <= ALU[7]; V <= OV;  Z <= ~|ALU; C <= COut;
+
+--------------------------------------------------------------------------------
+-- Mask Settings
+--------------------------------------------------------------------------------
+
+K_0     .equ    1   -- Bit 0
+K_1     .equ    2   -- Bit 1
+K_2     .equ    4   -- Bit 2
+K_3     .equ    8   -- Bit 3
+K_4     .equ    16  -- Bit 4
+K_5     .equ    32  -- Bit 5
+K_6     .equ    64  -- Bit 6
+K_7     .equ    128 -- Bit 7
+
+K_C     .equ    1   -- Mask for P.C (Carry Flag)
+K_Z     .equ    2   -- Mask for P.Z (Zero Flag)
+K_I     .equ    4   -- Mask for P.I (Interrupt Mask)
+K_D     .equ    8   -- Mask for P.D (Decimal Mode Flag)
+K_B     .equ    16  -- Mask for P.B (BRK/PHP Flag)
+K_M     .equ    32  -- Mask for P.M (Unused bit - always 1)
+K_V     .equ    64  -- Mask for P.V (oVerflow Flag)
+K_N     .equ    128 -- Mask for P.N (Negative Flag)
+
+--------------------------------------------------------------------------------
+--
+--  Added annotations regarding the implementation of the various opcodes in re-
+--  lation to the various microprocessors. As currently defined in this file,
+--  the opcodes being decoded represent the instruction set of the original
+--  65C02. In other words, the non-NOP instructions are for the W65C02/G65SC02.
+--  In the right margin, opcodes that were added by these two processors to the
+--  base MOS6502A instruction set are marked with an asterisk (*).
+--  
+--  The instructions added by the Rockwell R65C02 are marked by an addition (+)
+--  symbol. The instructions added by WDC from the W65C816/W65C802 processor(s)
+--  are marked with an ampersand (&) symbol. The instructions marked by the
+--  octothorpe (#) symbol are unique to the M65C02A, and enhance the basic
+--  instruction set of the W65C02S. Several of the new M65C02A instructions are
+--  inspired by the W65C816 instruction set. However, there are several unique
+--  M65C02A instructions, which provide a significant improvement to the base
+--  instruction set.
+--
+--  The new instructions include the PSH/PHR, BRL rel16, and stack/base relative
+--  instructions from the 8/16-bit W65C816 microprocessor. In addition, unique
+--  to the M65C02A are a number of prefix instructions that provide an addi-
+--  tional level indirection to most of the base W65C02S instructions, and in-
+--  crease the size of the operation from 8 bits to 16 bits, and change the de-
+--  fault destination register for various instructions. In addition, there are
+--  M65C02A-specific instructions to manipulate the M65C02A-specific register
+--  stacks, instructions to implement a DTC/ITC FORTH VM, add support for a CO-
+--  Processor interface, and provide block moves.
+--
+--  The M65C02A instruction set starts with the instruction set of the 6502 ( ), 
+--  adds the 65C02 (*), adds the Rockwell (+), and the W65C816/W65C802 (&) in-
+--  structions. The resulting instruction set is equivalent to the instruction
+--  set of the WDC W65C02S microprocessor.
+--
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+_start:     .org    0
+
+--------------------------------------------------------------------------------
+
+    BRK     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BRK ,0x00  -- 00: BRK #imm
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BPL ,0x10  -- 10: BPL rel
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x20  -- 20: JSR abs
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BMI ,0x30  -- 30: BMI rel
+    SPC     0,LST,XFR,Q_M,R_M,Ci_C,WS_P,OS_M,BRK ,0x10  -- 40: RTI
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BVC ,0x50  -- 50: BVC rel
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x60  -- 60: RTS
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BVS ,0x70  -- 70: BVS rel
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BRA ,0x80  -- 80:*BRA rel
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BCC ,0x90  -- 90: BCC rel
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0xA0  -- A0: LDY #imm
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BCS ,0xB0  -- B0: BCS rel
+    VAL     0,IDC,CMP,Q_Y,R_M,Ci_1,WS_P,    ,NZC ,0xC0  -- C0: CPY #imm
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BNE ,0xD0  -- D0: BNE rel
+    VAL     0,IDC,CMP,Q_X,R_M,Ci_1,WS_P,    ,NZC ,0xE0  -- E0: CPX #imm
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BEQ ,0xF0  -- F0: BEQ rel
+
+--------------------------------------------------------------------------------
+
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x01  -- 01: ORA (zp,X)
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x11  -- 11: ORA (zp),Y
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x21  -- 21: ANL (zp,X)
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x31  -- 31: ANL (zp),Y
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x41  -- 41: EOR (zp,X)
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x51  -- 51: EOR (zp),Y
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x61  -- 61: ADC (zp,X)
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x71  -- 71: ADC (zp),Y
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x81  -- 81: STA (zp,X)
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x91  -- 91: STA (zp),Y
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xA1  -- A1: LDA (zp,X)
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xB1  -- B1: LDA (zp),Y
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xC1  -- C1: CMP (zp,X)
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xD1  -- D1: CMP (zp),Y
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xE1  -- E1: SBC (zp,X)
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xF1  -- F1: SBC (zp),Y
+
+--------------------------------------------------------------------------------
+ 
+    COP     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x02  -- 02:#COP #imm
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x12  -- 12:*ORA (zp)
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x22  -- 22:#JMP (zp)
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x32  -- 32:*ANL (zp)
+    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x42  -- 42: NOP
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x52  -- 52:*EOR (zp)
+    SPC     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x40  -- 62:#PHR rel16
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x72  -- 72:*ADC (zp)
+    SPC     0,   ,   ,   ,   ,    ,    ,    ,    ,0x20  -- 82:#MOV sm,dm
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x92  -- 92:*STA (zp)
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xA2  -- A2: LDX #imm
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xB2  -- B2:*LDA (zp)
+    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x01  -- C2:#PUL zp
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xD2  -- D2:*CMP (zp)
+    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x01  -- E2:#PUL abs
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xF2  -- F2:*SBC (zp)
+
+--------------------------------------------------------------------------------
+
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x03  -- 03:#ORA bp,B
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x13  -- 13:#ORA (bp,B),Y
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x23  -- 23:#ANL bp,B
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x33  -- 33:#ANL (bp,B),Y
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x43  -- 43:#EOR bp,B
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x53  -- 53:#EOR (bp,B),Y
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x63  -- 63:#ADC bp,B
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x73  -- 73:#ADC (bp,B),Y
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x83  -- 83:#STA bp,B
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x93  -- 93:#STA (bp,B),Y
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xA3  -- A3:#LDA bp,B
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xB3  -- B3:#LDA (bp,B),Y
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xC3  -- C3:#CMP bp,B
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xD3  -- D3:#CMP (bp,B),Y
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xE3  -- E3:#SBC bp,B
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xF3  -- F3:#SBC (bp,B),Y
+
+--------------------------------------------------------------------------------
+
+    VAL     1,LU ,TSB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x04  -- 04:*TSB zp
+    VAL     1,LU ,TRB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x14  -- 14:*TRB zp
+    VAL     0,LU ,BIT,L_A,R_M,Ci_C,WS_P,    ,NVZ ,0x24  -- 24: BIT zp
+    VAL     0,LU ,BIT,L_A,R_M,Ci_C,WS_P,    ,NVZ ,0x34  -- 34:*BIT zp,X
+    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x44  -- 44: NOP
+    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x54  -- 54: NOP
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x64  -- 64:*STZ zp
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x74  -- 74:*STZ zp,X
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_Y,    ,0x84  -- 84: STY zp
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_Y,    ,0x94  -- 94: STY zp,X
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0xA4  -- A4: LDY zp
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0xB4  -- B4: LDY zp,X
+    VAL     0,IDC,CMP,Q_Y,R_M,Ci_1,WS_P,    ,NZC ,0xC4  -- C4: CPY zp
+    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x81  -- D4:#PSH zp
+    VAL     0,IDC,CMP,Q_X,R_M,Ci_1,WS_P,    ,NZC ,0xE4  -- E4: CPX zp
+    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x81  -- F4:#PSH #imm16
+
+--------------------------------------------------------------------------------
+
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x05  -- 05: ORA zp
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x15  -- 15: ORA zp,X
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x25  -- 25: ANL zp
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x35  -- 35: ANL zp,X
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x45  -- 45: EOR zp
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x55  -- 55: EOR zp,X
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x65  -- 65: ADC zp
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x75  -- 75: ADC zp,X
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x85  -- 85: STA zp
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x95  -- 95: STA zp,X
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xA5  -- A5: LDA zp
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xB5  -- B5: LDA zp,X
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xC5  -- C5: CMP zp
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xD5  -- D5: CMP zp,X
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xE5  -- E5: SBC zp
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xF5  -- F5: SBC zp,X
+
+--------------------------------------------------------------------------------
+
+    VAL     1,SU ,ASL,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x06  -- 06: ASL zp
+    VAL     1,SU ,ASL,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x16  -- 16: ASL zp,X
+    VAL     1,SU ,ROL,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x26  -- 26: ROL zp
+    VAL     1,SU ,ROL,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x36  -- 36: ROL zp,X
+    VAL     1,SU ,LSR,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x46  -- 46: LSR zp
+    VAL     1,SU ,LSR,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x56  -- 56: LSR zp,X
+    VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x66  -- 66: ROR zp
+    VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x76  -- 76: ROR zp,X
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_X,    ,0x86  -- 86: STX zp
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_X,    ,0x96  -- 96: STX zp,Y
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xA6  -- A6: LDX zp
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xB6  -- B6: LDX zp,Y
+    VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- C6: DEC zp
+    VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- D6: DEC zp,X
+    VAL     1,IDC,INC,Q_M,R_K,Ci_1,WS_P,    ,NZ  ,0x00  -- E6: INC zp
+    VAL     1,IDC,INC,Q_M,R_K,Ci_1,WS_P,    ,NZ  ,0x00  -- F6: INC zp,X
+    
+--------------------------------------------------------------------------------
+
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x07  -- 07:#ORA sp,S
+    VAL     1,SU ,ASL,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x17  -- 17:#ASL bp,B
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x27  -- 27:#ANL sp,S
+    VAL     1,SU ,ROL,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x37  -- 37:#ROL bp,B
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x47  -- 47:#EOR sp,S
+    VAL     1,SU ,LSR,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x57  -- 57:#LSR bp,B
+    VAL     1,ADD,ADC,Q_M,R_A,Ci_C,WS_P,    ,NVZC,0x67  -- 67:#ADC sp,S
+    VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x77  -- 77:#ROR bp,B
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x87  -- 87:#STA sp,S
+    VAL     1,LU ,TSB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x97  -- 97:#TSB bp,B
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xA7  -- A7:#LDA sp,S
+    VAL     1,LU ,TRB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0xB7  -- B7:#TRB bp,B
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xC7  -- C7:#CMP sp,S
+    VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- D7:#DEC bp,B
+    VAL     1,ADD,SBC,Q_M,R_A,Ci_C,WS_P,    ,NVZC,0xE7  -- E7:#SBC sp,S
+    VAL     1,IDC,INC,Q_M,R_K,Ci_1,WS_P,    ,NZ  ,0x00  -- F7:#INC bp,B
+
+--------------------------------------------------------------------------------
+
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_P,PHP ,0x08  -- 08: PHP
+    VAL     0,LU ,CLC,L_K,R_P,Ci_C,WS_P,    ,PSW ,K_C   -- 18: CLC
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_P,OS_M,PSW ,0x28  -- 28: PLP
+    VAL     0,LU ,SEC,L_K,R_P,Ci_C,WS_P,    ,PSW ,K_C   -- 38: SEC
+    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x80  -- 48: PHA
+    VAL     0,LU ,CLI,L_K,R_P,Ci_C,WS_P,    ,PSW ,K_I   -- 58: CLI
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0x68  -- 68: PLA
+    VAL     0,LU ,SEI,L_K,R_P,Ci_C,WS_P,    ,PSW ,K_I   -- 78: SEI
+    VAL     0,IDC,DEC,Q_Y,R_K,Ci_0,WS_Y,    ,NZ  ,0x00  -- 88: DEY
+    VAL     0,LST,XFR,Q_A,R_M,Ci_C,WS_A,OS_Y,NZ  ,0x98  -- 98: TYA
+    VAL     0,LST,XFR,Q_A,R_M,Ci_C,WS_Y,OS_A,NZ  ,0xA8  -- A8: TAY
+    VAL     0,LU ,CLV,L_K,R_P,Ci_C,WS_P,    ,PSW ,K_V   -- B8: CLV
+    VAL     0,IDC,INC,Q_Y,R_K,Ci_1,WS_Y,    ,NZ  ,0x00  -- C8: INY
+    VAL     0,LU ,CLD,L_K,R_P,Ci_C,WS_P,    ,PSW ,K_D   -- D8: CLD
+    VAL     0,IDC,INC,Q_X,R_K,Ci_1,WS_X,    ,NZ  ,0x00  -- E8: INX
+    VAL     0,LU ,SED,L_K,R_P,Ci_C,WS_P,    ,PSW ,K_D   -- F8: SED
+
+--------------------------------------------------------------------------------
+
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x09  -- 09: ORA #imm
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x19  -- 19: ORA abs,Y
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x29  -- 29: ANL #imm
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x39  -- 39: ANL abs,Y
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x49  -- 49: EOR #imm
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x59  -- 59: EOR abs,Y
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x69  -- 69: ADC #imm
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x79  -- 79: ADC abs,Y
+    VAL     0,LU ,BIT,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x89  -- 89:*BIT #imm
+    VAL     0,LST,XFR,Q_A,R_M,Ci_C,    ,OS_A,    ,0x99  -- 99: STA abs,Y
+    VAL     0,LST,XFR,Q_A,R_M,Ci_C,WS_A,OS_M,NZ  ,0xA9  -- A9: LDA #imm
+    VAL     0,LST,XFR,Q_A,R_M,Ci_C,WS_A,OS_M,NZ  ,0xB9  -- B9: LDA abs,Y
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xC9  -- C9: CMP #imm
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xD9  -- D9: CMP abs,Y
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xE9  -- E9: SBC #imm
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xF9  -- F9: SBC abs,Y
+
+--------------------------------------------------------------------------------
+
+    VAL     0,SU ,ASL,Q_A,R_M,Ci_0,WS_A,    ,NZC ,0x0A  -- 0A: ASL A
+    VAL     0,IDC,INC,Q_A,R_K,Ci_1,WS_A,    ,NZ  ,0x00  -- 1A:*INC A
+    VAL     0,SU ,ROL,Q_A,R_M,Ci_C,WS_A,    ,NZC ,0x2A  -- 2A: ROL A
+    VAL     0,IDC,DEC,Q_A,R_K,Ci_0,WS_A,    ,NZ  ,0x00  -- 3A:*DEC A
+    VAL     0,SU ,LSR,Q_A,R_M,Ci_0,WS_A,    ,NZC ,0x4A  -- 4A: LSR A
+    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_Y,    ,0x80  -- 5A:*PHY
+    VAL     0,SU ,ROR,Q_A,R_M,Ci_C,WS_A,    ,NZC ,0x6A  -- 6A: ROR A
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0x7A  -- 7A:*PLY
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_X,NZ  ,0x8A  -- 8A: TXA
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_S,OS_X,    ,0x9A  -- 9A: TXS
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_A,NZ  ,0xAA  -- AA: TAX
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_S,NZ  ,0xBA  -- BA: TSX
+    VAL     0,IDC,DEC,Q_X,R_K,Ci_0,WS_X,    ,NZ  ,0x00  -- CA: DEX
+    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_X,    ,0x80  -- DA:*PHX
+    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xEA  -- EA: NOP
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xFA  -- FA:*PLX
+
+--------------------------------------------------------------------------------
+-- 0B...BB: 1 byte, 1 cycle
+    SPC     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x08  -- 0B:#DUP  -- DUP
+    SPC     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x04  -- 1B:#SWP  -- SWP/XCH
+    SPC     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x02  -- 2B:#ROT  -- ROT
+    FTH     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x80  -- 3B:#NXT  -- NeXT
+    FTH     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_T,    ,0x28  -- 4B:#PHI  -- Psh IP/W
+    FTH     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x01  -- 5B:#INI  -- Inc IP/W
+    FTH     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x18  -- 6B:#PLI  -- Pop IP/W
+    FTH     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_T,    ,0x48  -- 7B:#ENT  -- ENTer
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x10  -- 8B:#OSX  -- S <=> X
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x01  -- 9B:#IND  -- IND
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x02  -- AB:#SIZ  -- SIZ
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x03  -- BB:#ISZ  -- IND + SIZ
+    WAI     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xCB  -- CB:&WAI
+    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xDB  -- DB:&STP
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x04  -- EB:#OAX  -- A <=> X
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x08  -- FB:#OAY  -- A <=> Y
+
+--------------------------------------------------------------------------------
+
+    VAL     1,LU ,TSB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x0C  -- 0C:*TSB abs
+    VAL     1,LU ,TRB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x1C  -- 1C:*TRB abs
+    VAL     0,LU ,BIT,L_A,R_M,Ci_C,WS_P,    ,NVZ ,0x2C  -- 2C: BIT abs
+    VAL     0,LU ,BIT,L_A,R_M,Ci_C,WS_P,    ,NVZ ,0x3C  -- 3C:*BIT abs,X
+    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x4C  -- 4C: JMP abs
+    VAL     0,LST,XFR,Q_A,R_M,Ci_C,    ,OS_A,    ,0x5C  -- 5C:#XMA sp,S
+    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x6C  -- 6C: JMP (abs)
+    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x7C  -- 7C:*JMP (abs,X)
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_Y,    ,0x8C  -- 8C: STY abs
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x9C  -- 9C:*STZ abs
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0xAC  -- AC: LDY abs
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0xBC  -- BC: LDY abs,X
+    VAL     0,IDC,CMP,Q_Y,R_M,Ci_1,WS_P,    ,NZC ,0xCC  -- CC: CPY abs
+    ADJ     0,ADD,ADC,Q_X,R_K,Ci_0,WS_S,    ,NZC ,0xDC  -- DC:#ADJ
+    VAL     0,IDC,CMP,Q_X,R_M,Ci_1,WS_P,    ,NZC ,0xEC  -- EC: CPX abs
+    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x81  -- FC:#PSH abs
+
+--------------------------------------------------------------------------------
+
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x0D  -- 0D: ORA abs
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x1D  -- 1D: ORA abs,X
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x2D  -- 2D: ANL abs
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x3D  -- 3D: ANL abs,X
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x4D  -- 4D: EOR abs
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x5D  -- 5D: EOR abs,X
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x6D  -- 6D: ADC abs
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x7D  -- 7D: ADC abs,X
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x8D  -- 8D: STA abs
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x9D  -- 9D: STA abs,X
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xAD  -- AD: LDA abs
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xBD  -- BD: LDA abs,X
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xCD  -- CD: CMP abs
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xDD  -- DD: CMP abs,X
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xED  -- ED: SBC abs
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xFD  -- FD: SBC abs,X
+
+--------------------------------------------------------------------------------
+
+    VAL     1,SU ,ASL,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x0E  -- 0E: ASL abs
+    VAL     1,SU ,ASL,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x1E  -- 1E: ASL abs,X
+    VAL     1,SU ,ROL,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x2E  -- 2E: ROL abs
+    VAL     1,SU ,ROL,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x3E  -- 3E: ROL abs,X
+    VAL     1,SU ,LSR,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x4E  -- 4E: LSR abs
+    VAL     1,SU ,LSR,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x5E  -- 5E: LSR abs,X
+    VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x6E  -- 6E: ROR abs
+    VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x7E  -- 7E: ROR abs,X
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_X,    ,0x8E  -- 8E: STX abs
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x9E  -- 9E:*STZ abs,X
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xAE  -- AE: LDX abs
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xBE  -- BE: LDX abs,Y
+    VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- CE: DEC abs
+    VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- DE: DEC abs,X
+    VAL     1,IDC,INC,Q_M,R_K,Ci_1,WS_P,    ,NZ  ,0x00  -- EE: INC abs
+    VAL     1,IDC,INC,Q_M,R_K,Ci_1,WS_P,    ,NZ  ,0x00  -- FE: INC abs,X
+
+--------------------------------------------------------------------------------
+
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x0F  -- 0F:#ORA ip,I++
+    VAL     1,SU ,ASL,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x1F  -- 1F:#ASL ip,I++
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x2F  -- 2F:#ANL ip,I++
+    VAL     1,SU ,ROL,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x3F  -- 3F:#ROL ip,I++
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x4F  -- 4F:#EOR ip,I++
+    VAL     1,SU ,LSR,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x5F  -- 5F:#LSR ip,I++
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_0,WS_A,    ,NVZC,0x6F  -- 6F:#ADD ip,I++
+    VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x7F  -- 7F:#ROR ip,I++
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x8F  -- 8F:#STA ip,I++
+    VAL     1,LU ,TSB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x9F  -- 9F:#TSB ip,I++
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xAF  -- AF:#LDA ip,I++
+    VAL     1,LU ,TRB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0xBF  -- BF:#TRB ip,I++
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xCF  -- CF:#CMP ip,I++
+    VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- DF:#DEC ip,I++
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_1,WS_A,    ,NVZC,0xEF  -- EF:#SUB ip,I++
+    VAL     1,IDC,INC,Q_M,R_K,Ci_1,WS_P,    ,NZ  ,0x00  -- FF:#INC ip,I++
+
+--------------------------------------------------------------------------------
+
+_end:

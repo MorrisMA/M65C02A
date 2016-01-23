@@ -1,0 +1,155 @@
+Notes on Code Generator for M65C02A Pascal Compiler
+
+This compiler will be generated using the example provided by Ronald Mak in 
+his book: "Writing Compilers and Interpreters - An Applied Approach". The 
+Pascal interpreter and compiler provided are written in C. The compiler's code 
+generator produces Intel 8086 assembly language. Only a subset of the i8086 
+instruction set is used by the code generator.
+
+It the objective of this project to utilize the current code generator, and to 
+translate the i8086 instructions it generates into the equivalent instructions 
+or instruction sequences of the M65C02A. A later effort will produce a new 
+code generator that is optimized for the M65C02A.
+
+Although, the i8086 has a different architecture than the 6502/65C02 
+processors, the enhanced M65C02A actually has more registers than the i8086, 
+although the M65C02A registers are not directly addressable as they are in the 
+i8086.
+
+The i8086 is a generally an accumulator-memory machine like the M65C02A, 
+although it does support a limited number of register-register ALU operations 
+other than register copies or exchanges. The following diagram/table maps the 
+i8086 registers to the M65C02A registers:
+
+        i8086       M65C02A
+    AX {AH, AL}     A (TOS)
+    BX {BH, BL}     X (NOS)
+    CX {CH, CL}     Y (TOS)
+    DX {DH, DL}     A (NOS)
+    
+    SI              X (BOS)
+    DI              Y (NOS)
+    BP              X (TOS)
+    SP              S {SK | SU}
+    
+    CS                 -
+    DS                 -
+    ES                 -
+    SS                 -
+    
+    IP              PC
+    F               P
+    
+The M65C02A has several spare registers: A (BOS), Y (BOS), IP, and W. These 
+registers, ABOS, YBOS, and W, can be used for holding temporary values, and IP 
+can be used for another memory pointer (BX). Thus, although the 6502/65C02 
+processors provide poor target for Pascal (or C), the close mapping of the 
+M65C02A registers to those of the i8086 suggests that the M65C02A might prove 
+to be capable of efficiently implementing Pascal (or C) like the i8086.
+
+The Mak compiler's code generator utilizes the following instructions from the 
+i8086. The following table shows these instructions:
+
+    mov dst,src
+    rep movsb
+    lea dst,src
+    cmp dst,src
+    repe cmpsb
+    push src
+    pop dst
+    not dst
+    and dst,src
+    or dst,src
+    add dst,src
+    sub dst,src
+    imul src
+    idiv src
+    call dst
+    ret n
+    jmp dst
+    jl dst
+    jle dst
+    je dst
+    jne dst
+    jg dst
+    jge dst
+    
+Before getting into the discussions of the instruction mappings, it will be 
+necessary to discuss the some of the constraints of the i8086 processor and 
+how they apply to the register use and addressing employed by the Mak 
+compiler. Invariably, the capabilities of a processor's instruction set 
+influence the implementation of the code generator of a compiler. In addition, 
+it is also generally true that HLLs and their compilers generally target a 
+virtual machine model that does not require the use of many of the 
+instructions and addressing modes available. CISC processors like the i8086 
+and 6502/65C02 have complex addressing modes that most compilers cannot use. 
+The larger number and wider width of the i8086 registers means that it is 
+better matched to the needs of HLLs like C and Pascal than the 6502/65C02 
+processors with their fewer on-chip and narrower registers.
+
+The i8086 has four primary 16-bit registers: AX, BX, CX, and DX. These 
+registers may be accessed as high and low byte registers: {AH, AL}, {BH, BL}, 
+{CH, CL}, and {DH, DL.} AX functions as the accumulator, and is used for most 
+arithmetic, and logic operations. DX is the "data" register, and can also be 
+used in arithmetic and logic operations. As a register pair, {DX, AX} is used 
+as a combined 32-bit register for holding the results of the integer 
+multiplication and division instructions. BX is the "base" register. BX 
+functions as a pointer to memory and is used to access operands in memory 
+indirectly. BX can be combined with the SI ("Source Index") or DI 
+("Destination Index") index registers to form a memory operand address. CX is 
+a "count" register. It is used with iterative instructions such as movsb. All 
+of these registers can function as general purpose registers, and can be 
+copied or exchanged one to another.
+
+The i8086 also includes four additional 16-bit registers of interest: SI, DI, 
+BP, and SP. The SI and DI registers are source and destination index 
+registers, respectively, which are generally used with string and block 
+operations such as cmpsb and movsb, respectively. BP is the "base pointer". It 
+can be used as a general pointer register, but it is generally used as the 
+pointer for the stack frames of HLLs such as C and Pascal. SP is the "Stack 
+Pointer". SP points to the top element of the stack. (Note: this is unlike the 
+M65C02A system stack pointer S which points to the next free location on the 
+stack. It is for this reason that the base-relative addressing mode of the 
+M65C02A includes an automatic offset of 1. This makes the top element of the 
+stack accessible with an offset of 0 rather than 1.
+
+The destination of the unconditional jump or call instruction is generally an 
+absolute address. However, there is no explicit restriction on the addressing 
+modes that may be used with these instructions. The destination of the 
+conditional jump instructions are given by PC-relative 8-bit offset. 
+Therefore, when considering the source and destination addresses listed above, 
+src and dst can, in general, specify a register or memory. Registers can be 
+specified as 8-bit or 16-bit. Memory addresses can be specified in a number of 
+ways including: immediate, direct, indirect, base+index, register-relative, 
+and base-relative+index. The following list provides an example of these seven 
+addressing modes:
+
+    register:               mov AX,CX
+    immediate:              mov AL,$41
+    direct:                 mov WORD PTR $1234,AX
+    indirect:               mov [bx],AX
+    base+index:             mov AL,[BX+SI]
+    register-relative:      mov [BP+4],AX
+    base-relative+index:    mov [BX+DI],DX
+    
+A review of the code generated by the Mak compiler revealed that only a four 
+of the i8086 addressing modes are used:
+
+    register:               mov AX,CX
+    immediate:              mov AL,$41
+    direct:                 mov WORD PTR $1234,AX
+    indirect:               mov [bx],AX
+    register-relative:      mov [BP+4],AX
+
+Further, the operating registers were AX, and the register pair {DX, AX}. DX 
+is used in dual operand 16-bit ALU instructions, and as the extension register 
+for some 16/32-bit operations. The BX register is used for indirect 
+addressing, and as a temporary holding register for BP whenever the Pascal 
+static link is walked to find the correct stack frame. The CX register and the 
+SI and the DI registers are used for block moves and string comparisons. 
+Because the small memory model for the i8086 is used, the compiler does not 
+use the segment registers. The segment registers are initialized in the 
+program prolog, and not accessed thereafter.
+
+The following paragraphs will describe how the list of i8086 instructions used 
+by the Mak compiler are mapped to M65C02A instructions. 
