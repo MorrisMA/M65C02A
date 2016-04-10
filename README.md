@@ -99,10 +99,10 @@ processor provides the following enhancements to 6502/65C02 processors:
     (10)    M65C02A core allows the CMP/CPX/CPY instructions to set the V flag 
     when a 16-bit operation is being performed. The M65C02A core also implement 
     multi-flag conditional branches. The multi-flag conditional branches support 
-    four signed (multi-flag) conditional branches: Than (LT), Less Than or Equal (LE), Greater 
-    Than (GT), and Greater Than or Equal (GE). In addition, four unsigned (multi-flag)
-    conditional branches are supported: lower (LO), lower or same (LOS), higher 
-    (HI), and Higher or Same (HOS).
+    four signed (multi-flag) conditional branches: Than (LT), Less Than or Equal (LE),
+    Greater Than (GT), and Greater Than or Equal (GE). In addition, four unsigned
+    (multi-flag) conditional branches are supported: lower (LO), lower or same (LS),
+    higher (HI), and Higher or Same (HS).
     
     (11)    M65C02A core provides support for the implementation of virtual 
     machines (VMs) for threaded interpreter’s such FORTH. The M65C02A core’s IP 
@@ -156,9 +156,10 @@ processor provides the following enhancements to 6502/65C02 processors:
     accumulator addressing mode versions of the LSR A instruction. When LSR A is
     prefixed by IND or ISZ, the operation performed is an arithmetic right shift.
     Furthermore, this operation takes into consideration the state of the V flag
-    to correctly determine the sign bit. This feature enables compact implementations
-    of the Booth multiplication algorithm. With the appropriate register override
-    prefix instruction, the ASR operation can be applied to the X and Y registers.
+    to correctly determine the sign bit. This feature enables compact implementa-
+    tions of the Booth multiplication algorithm. With the appropriate register
+    override prefix instruction, the ASR operation can be applied to the X and Y
+    registers.
     
     (16)    M65C02A core provides transfers between IP and the ATOS: TAI, TIA,
     and XAI. XAI allows the exchange of IP and ATOS. These instructions are useful
@@ -167,9 +168,9 @@ processor provides the following enhancements to 6502/65C02 processors:
     addressing is useful in HLLs for implementing pointers.
     
     (17)    M65C02A core also provides two operations in the A register stack that
-    are particulary useful: byte swapping ATOS, and bit reversing ATOS. These operations
-    are provided when the IND prefix is applied to the SWP and ROT register stack
-    instructions, respectively.
+    are particulary useful: byte swapping ATOS, and bit reversing ATOS. These
+    operations are provided when the IND prefix is applied to the SWP and ROT
+    register stack instructions, respectively.
     
     (18)    M65C02A core implements a SP-relative (and BP-relative using the OSX
     prefix instruction) accumulator-memory exchange instruction. The M65C02A prefix
@@ -348,8 +349,8 @@ will be accessed.
 
 ##Register Stack Manipulation Instructions
 
-A unique feature of the M65C02A soft-core processor are the three level push-down
-stacks used to implement each of the three primary registers. Load and 
+A unique feature of the M65C02A soft-core processor are the three level push-
+down stacks used to implement each of the three primary registers. Load and 
 store operations do not automatically perform push and pop operations. This 
 behavior allows the M65C02A soft-core to seamlessly emulate the 6502/65C02 
 processors.
@@ -431,10 +432,10 @@ or hold operations.
 
 ##BP-Relative Addressing Mode Instructions
 
-The M65C02A introduces the base-pointer relative [bp,B] and post-indexed base-pointer
-relative indirect [(bp,B),Y] addressing modes. The M65C02A 
-base-pointer relative addressing modes is designed to support the stack frames 
-such as those used by programming languages such as C and Pascal. 
+The M65C02A introduces the base-pointer relative [bp,B] and post-indexed base-
+pointer relative indirect [(bp,B),Y] addressing modes. The M65C02A base-
+pointer relative addressing modes is designed to support the stack frames such 
+as those used by programming languages such as C and Pascal. 
 
 The base-pointer (B) is X, and the offset included in the instruction, bp, is 
 zero based; this makes the value on the top of the stack offset 0. Further, 
@@ -543,8 +544,8 @@ instructions have no affect on these instructions.
 ##FORTH VM Support
 
 The 6502/65C02 processors have long supported FORTH. The FORTH inner 
-interpreter can be implemented using the native instruction set. The 65C02-specific
-instructions and addressing modes can be used to implement a FORTH 
+interpreter can be implemented using the native instruction set. The 65C02-
+specific instructions and addressing modes can be used to implement a FORTH 
 interpreter slightly faster than an FORTH interpreter which only uses 6502 
 instructions and addressing modes.
 
