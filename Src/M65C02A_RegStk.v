@@ -90,6 +90,10 @@
 //                          fined as ISZ DUP, and writes T into A, and in the
 //                          FORTH VM, simultaneously writes A into IP.
 //
+//  2.20    16C31   MAM     Improved readability of the operations assigned to
+//                          TOS by adding an intermediate variable to implement
+//                          byte swap logic.
+//
 // Additional Comments:
 //
 //  This particular implementation is based on discrete registers, and limited
@@ -153,6 +157,9 @@ module M65C02A_RegStk #(
 //  Implementation
 //
 
+wire    [15:0] BSW;
+assign BSW = {TOS[7:0], TOS[15:8]};
+
 wire    [15:0] Rev;
 assign Rev = {TOS[ 0], TOS[ 1], TOS[ 2], TOS[ 3],
               TOS[ 4], TOS[ 5], TOS[ 6], TOS[ 7],
@@ -166,16 +173,16 @@ begin
     else
         if(Rdy & Valid)
             case({Sel, DUP, SWP, ROT})  // Note: controls are one-hot
-                4'b1000 : {TOS, NOS, BOS} <= #1 {D,   NOS, BOS};    // Load TOS
+                4'b1000 : {TOS, NOS, BOS} <= #1 {  D, NOS, BOS};    // Load TOS
                 4'b0100 : {TOS, NOS, BOS} <= #1 
-                          ((SIZ) ? {T,   NOS, BOS}                  // TIA
-                                 : {TOS, TOS, NOS});                // DUP Stk
+                            ((SIZ) ? {  T, NOS, BOS}                // TIA
+                                   : {TOS, TOS, NOS});              // DUP Stk
                 4'b0010 : {TOS, NOS, BOS} <= #1
-                          ((IND) ? {{TOS[7:0], TOS[15:8]}, NOS, BOS}// SWP TOS
-                                 : {NOS, TOS, BOS});                // SWP Stk
+                            ((IND) ? {BSW, NOS, BOS}                // SWP TOS
+                                   : {NOS, TOS, BOS});              // SWP Stk
                 4'b0001 : {TOS, NOS, BOS} <= #1
-                          ((IND) ? {Rev, NOS, BOS}                  // Rev TOS
-                                 : {NOS, BOS, TOS});                // ROT Stk
+                            ((IND) ? {Rev, NOS, BOS}                // Rev TOS
+                                   : {NOS, BOS, TOS});              // ROT Stk
                 default : {TOS, NOS, BOS} <= #1 {TOS, NOS, BOS};    // NOP
             endcase
 end
@@ -187,7 +194,7 @@ end
 //    else
 //        if(Rdy & Valid)
 //            case({Sel, DUP, SWP, ROT})  // Note: controls are one-hot
-//                4'b1000 : {TOS, NOS, BOS} <= #1 {D,   NOS, BOS};  // Load TOS
+//                4'b1000 : {TOS, NOS, BOS} <= #1 {  D, NOS, BOS};  // Load TOS
 //                4'b0100 : {TOS, NOS, BOS} <= #1 {TOS, TOS, NOS};  // DUP
 //                4'b0010 : {TOS, NOS, BOS} <= #1 {NOS, TOS, BOS};  // SWP
 //                4'b0001 : {TOS, NOS, BOS} <= #1 {NOS, BOS, TOS};  // ROT

@@ -83,7 +83,7 @@
 //  1.30    15K25   MAM     Added DUP and A to interface, and added additional
 //                          internal multiplexer in order to enable IP <= A. 
 //                          Rename and renumbered some of the local parameters
-//                          to add IP <= A as on operation replacing the unused
+//                          to add IP <= A as an operation replacing the unused
 //                          IP += 2 operation. Renamed internal busses A and B
 //                          to X and Y in order to bring in A.
 //

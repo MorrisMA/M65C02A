@@ -139,6 +139,17 @@
 //                          instructions without modifying the mode and opcode
 //                          fields of the instruction decode ROM.
 //
+//  1.50    16D10   MAM     Modified the instruction mode decode to support a
+//                          second special instruction group. Within this group
+//                          are located the ADJ instruction, and the selects
+//                          that allow IND prefix instruction enable the imple-
+//                          mentation of a true arithmetic left shift instruc-
+//                          tion using ASL (for 8/16-bit) and ROL for >16-bit,
+//                          and an arithmetic right shft instruction using LSR.
+//                          In addition, this new special instruction group
+//                          allows enabling INC/DEC A to set the carry flag in
+//                          order to support simple extended precision counters.
+//
 // Additional Comments:
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -299,11 +310,11 @@ localparam  pIntMsk  = 2;               // Bit number of Interrupt mask bit in P
 
 localparam  pMd_WAI  = 7;               // WAI Instruction
 localparam  pMd_PFX  = 6;               // Prefix Operations
-localparam  pMd_SPC  = 5;               // Special Operations: PHW xxx/PHR rel16
+localparam  pMd_SPC1 = 5;               // Special 1 Operations
 localparam  pMd_FTH  = 4;               // FORTH VM Operations
 localparam  pMd_BRK  = 3;               // BRK Instruction
 localparam  pMd_COP  = 2;               // COP Instruction
-localparam  pMd_ADJ  = 1;               // ADJ Instruction
+localparam  pMd_SPC2 = 1;               // Special 2 Operations
 localparam  pMd_VAL  = 0;               // Valid Instructions
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -313,7 +324,8 @@ localparam  pMd_VAL  = 0;               // Valid Instructions
 
 wire    [2:0] Mode;                     // Instruction Mode
 
-wire    VAL;                            // Mode Decode for VALid
+wire    VAL;                            // Mode Decode for Mode 7: VALid
+wire    SPC2;                           // Mode Decode for Mode 7: SPeCial 2
 
 wire    PSH;                            // Mode Decode for PHW/PHA/PHX/PHY
 wire    PHR;                            // Mode Decode for PHR
@@ -324,10 +336,16 @@ wire    SWP;                            // Mode decode for SWP
 wire    ROT;                            // Mode decode for ROT
 wire    WRD;                            // Mode Decode for 16-bit Ops
 
+wire    ASR;                            // Mode Decode for Arithmetic Right Shft
+wire    VEN;                            // Mode Decode for Arithmetic Left Shift
+wire    CEN;                            // Mode Decode for Enable C for INC/DEC 
+
 wire    NXT;                            // Mode Decode for NXT
 wire    ENT;                            // Mode Decode for ENT
 wire    PHI;                            // Mode Decode for PHI
 wire    PLI;                            // Mode Decode for PLI
+wire    RSPX;                           // Mode Decode for Default RSP
+//
 wire    INI;                            // Mode Decode for INI
 
 wire    iOSX;                           // Mode Decode for OSX
@@ -474,15 +492,9 @@ end
 
 //  Implement the Branch Address Field Multiplexer for Instruction Decode
 
-always @(*)
-begin
-    case(Via)
-        pBRV1   : BA <= {{pBA_Fill{BRV1}}, DI[3:0], DI[7:4]};
-        pBRV3   : BA <= ((Int) ? pInt_Hndlr
-                               : {{pBA_Fill{BRV3}}, DI[3:0], DI[7:4]});
-        default : BA <= {{pBA_Fill{1'b0}}, uP_BA};
-    endcase
-end
+always @(*) BA <= ((Done) ? ((Int & SC) ? pInt_Hndlr
+                                        : {{pBA_Fill{1'b1}}, DI[3:0], DI[7:4]})
+                          : {{pBA_Fill{1'b0}}, uP_BA});
 
 //  Assign Test Input Signals
 
@@ -586,9 +598,7 @@ end
 //  Instruction Register
 //       Load IR from DI | uP_BA 
 
-//assign CE_IR  = (BRV1 | (BRV3 & ~Int) | (Sel_BA & DI_Op[3])) & Rdy;
 assign CE_IR  = (BRV1 | (BRV3 & ~Int)) & Rdy;
-//assign IDEC_A = ((Sel_BA) ? {uP_BA[3:0], uP_BA[7:4]} : {DI[3:0], DI[7:4]}); 
 assign IDEC_A = ((Sel_BA) ? 8'h1A : {DI[3:0], DI[7:4]}); 
 
 always @(posedge Clk)
@@ -596,8 +606,6 @@ begin
     if(Rst | BRV2)
         rIR <= #1 pNOP;
     else if(CE_IR)   // IR: {uP_BA,  DI}
-        //rIR <= #1 ((Sel_BA) ? uP_BA : DI);
-        //rIR <= #1 ((Sel_BA) ? 8'hA1 : DI);
         rIR <= #1 OP_DI;
 end
 
@@ -606,7 +614,6 @@ assign STP = (rIR == pSTP);
 //  Assign Internal Registers
 
 assign IR = rIR;
-//assign M  = {OP2, OP1};
 assign M  = ((COP_En) ? COP_DO : {OP2, OP1});
 
 //  Co-Processor Interface
@@ -670,18 +677,15 @@ assign WAI  = (Mode == pMd_WAI);    // Instruction is WAI (Mode = 7)
 
 assign PFX  = (Mode == pMd_PFX);    // Prefix Instructions (Mode = 6)
 
-//assign PFX7 = (PFX) & Opcode[7];    // Unused - Reserved for Future Use
-//assign PFX6 = (PFX) & Opcode[6];    // Unused - Reserved for Future Use
-//assign PFX5 = (PFX) & Opcode[5];    // Unused - Reserved for Future Use
 assign iOSX = (PFX) & Opcode[4];    // Instruction is OSX
 assign iOAY = (PFX) & Opcode[3];    // Instruction is OAY
 assign iOAX = (PFX) & Opcode[2];    // Instruction is OAX
 assign iSIZ = (PFX) & Opcode[1];    // Instruction is SIZ | ISZ
 assign iIND = (PFX) & Opcode[0];    // Instruction is IND | ISZ
 
-//  Special Instruction Mode Decodes
+//  Special 1 Instruction Mode Decodes
 
-assign SPC  = (Mode == pMd_SPC);    // Special Instructions (Mode = 5)
+assign SPC  = (Mode == pMd_SPC1);   // Special 1 Instructions (Mode = 5)
 
 assign PSH  = (SPC) & Opcode[7];    // PHW zp/abs/#imm; PHA/PHX/PHY
 assign PHR  = (SPC) & Opcode[6];    // PHR rel16
@@ -692,6 +696,16 @@ assign SWP  = (SPC) & Opcode[2];    // Accumulator Stack SWaP      (16-bit only)
 assign ROT  = (SPC) & Opcode[1];    // Accumulator Stack ROTate    (16-bit only)
 assign WRD  = (SPC) & Opcode[0] | (COP_En & COP_SIZ); // Set 16-bit op size
 
+//  Special 2 Instruction Mode Decodes
+
+assign SPC2 = (Mode == pMd_SPC2);   // Special 2 Instructions (Mode = 1)
+
+assign ADJ  = (SPC2) & Opcode[7] & BRV3;        // Adjust S: S <= S + Y
+//
+assign ASR  = (SPC2) & Opcode[2] & BRV3 & IND;  // Change LSR to ASR 
+assign VEN  = (SPC2) & Opcode[1] & BRV3 & IND;  // Enable V for ASL/ROL A
+assign CEN  = (SPC2) & Opcode[0] & BRV3 & IND;  // Enable C for INC/DEC A
+
 //  FORTH VM Instruction Mode Decodes 
 
 assign FTH  = (Mode == pMd_FTH);    // FORTH VM Instructions (Mode = 4)
@@ -701,15 +715,13 @@ assign ENT  = (FTH) & Opcode[6];    // FORTH VM ENTER (DOCOLON)
 assign PHI  = (FTH) & Opcode[5];    // FORTH VM Push IP/W => RS
 assign PLI  = (FTH) & Opcode[4];    // FORTH VM Pull IP/W <= RS
 assign RSPX = (FTH) & Opcode[3];    // FORTH VM Use X for ENT/PHI/PLI if ~OSX
-//assign FTH2 = (FTH) & Opcode[2];    // Unused - Reserved for Future Use
-//assign FTH1 = (FTH) & Opcode[1];    // Unused - Reserved for Future Use
+//
 assign INI  = (FTH) & Opcode[0];    // FORTH VM Increment IP/W
 
-//  Remaining Mode Decodes: Mode = {3, 2, 1, 0}
+//  Remaining Mode Decodes: Mode = {3, 2, 0}
 
 assign BRK  = (Mode == pMd_BRK);    // Current Instruction is BRK     (Mode = 3)
 assign COP  = (Mode == pMd_COP);    // Current Instruction is COP     (Mode = 2)
-assign ADJ  = (Mode == pMd_ADJ);    // Current Instruction is ADJ     (Mode = 1)
 assign VAL  = (Mode == pMd_VAL);    // Current Instruction is Valid   (Mode = 0)
 
 //  Define Core Operating Mode
@@ -753,13 +765,13 @@ assign Kernel = (P[pMode] | ((BRV2 | rBRV2 | RTI) & ~Done));
 always @(posedge Clk)
 begin
     if(Rst)
-        {OSX, OAY, OAX, SIZ, IND} <= #1 0;                  // Initialize FFs
+        {OAY, OAX, SIZ, IND, OSX} <= #1 0;                  // Initialize FFs
     else if(CE_IR) begin
+        OSX <= #1 ((PFX) ? iOSX | OSX & ~iOAX         : 0); // IR == 0x8B
         IND <= #1 ((PFX) ? iIND | IND                 : 0); // IR == 0x9B | 0xBB
         SIZ <= #1 ((PFX) ? iSIZ | SIZ                 : 0); // IR == 0xAB | 0xBB
         OAX <= #1 ((PFX) ? iOAX | OAX & ~iOSX & ~iOAY : 0); // IR == 0xEB
         OAY <= #1 ((PFX) ? iOAY | OAY &         ~iOAX : 0); // IR == 0xFB
-        OSX <= #1 ((PFX) ? iOSX | OSX & ~iOAX & ~iOAY : 0); // IR == 0x8B
     end
 end
 
@@ -889,6 +901,9 @@ M65C02A_ALUv2   ALUv2 (
                     .Stk_Op(Stk_Op),    // M65C02A ALU Aux Stack Ptr Ops
                     
                     .ADJ(ADJ),          // M65C02A Stack Adjust Instruction
+                    .ASR(ASR),          // M65C02A Arithmetic Right Shift Enable
+                    .VEN(VEN),          // M65C02A Arithmetic Left Shift Enable
+                    .CEN(CEN),          // M65C02A Enable C for INC/DEC A
 
                     .FU_Sel(FU_Sel[4:0]),   // M65C02A ALU Functional Unit Sel
                     .Op(Op),            // M65C02A ALU Operation Select
@@ -899,7 +914,7 @@ M65C02A_ALUv2   ALUv2 (
                     .OSel(OSel),        // M65C02A ALU Output Register Select
                     .CCSel(CCSel),      // M65C02A ALU Condition Code Select
                     
-                    .K(Opcode),         // M65C02A ALU Rockwell Instruction Mask
+                    .K(((SPC2) ? 8'b0 : Opcode)),   // M65C02A K Bus Input
                     .T(VM),             // M65C02A ALU FORTH VM Register Input
                     .M(M),              // M65C02A ALU Memory Operand Input
 

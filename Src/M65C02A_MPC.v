@@ -213,11 +213,11 @@ assign MPC_Rst = (Rst | dRst);
 
 //  Implement Return Stack
 
-reg [(pAddrWidth - 1):0] A;             // 1 Deep LIFO Stack Register
+reg [(pAddrWidth - 1):0] A;     // 1 Deep LIFO Stack Register
 
 generate
-    if(pMPC_Stk) begin  //  Implement 4-Level LIFO Stack
-        reg [(pAddrWidth - 1):0] A, B, C, D;    // 4 Deep LIFO Stack Registers
+    if(pMPC_Stk) begin                          // Implement 4-Level LIFO Stack
+        reg [(pAddrWidth - 1):0] B, C, D;       // 4 Deep LIFO Stack Registers
         
         always @(posedge Clk)
         begin
@@ -229,7 +229,7 @@ generate
                 else if(I == pRTS)
                     {A, B, C, D} <= #1 {B, C, D, {pAddrWidth{1'b0}}};
         end
-    end else begin      //  Implement 1-Level LIFO Stack
+    end else begin                              // Implement 1-Level LIFO Stack
         always @(posedge Clk)
         begin
             if(MPC_Rst)

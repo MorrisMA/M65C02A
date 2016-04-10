@@ -79,14 +79,24 @@
 //                          calculation is not performed, and the virtual ad-
 //                          dress is the address sum provided.
 //
+//  1.5     16C31   MAM     Modified the Ci input to the address generator to
+//                          be either NA_Op[0] or NA_Op[3] based on the OSX flag
+//                          setting. If OSX is true, the swapping of X & S makes
+//                          S the index register for any addressing mode indexed
+//                          by X. By changing the input to Ci based on OSX, S is
+//                          incremented by 1, with the result that {OP2, OP1} is
+//                          a zero-based offset into the stack area. This is
+//                          consistent with the base pointer and stack pointer
+//                          relative addressing modes supported by the core.
+//
 // Additional Comments: 
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 module M65C02A_AddrGen #(
-    parameter pDef_Page = 1,         // Default System Stack in Page 1
-    parameter pSk_Rst   = 2,         // Initialize Sk to support saving PC and P
-    parameter pSu_Rst   = 255        // Initialize Su to top of user stack
+    parameter pDef_Page = 1,        // Default System Stack in Page 1
+    parameter pSk_Rst   = 2,        // Initialize Sk to support saving PC and P
+    parameter pSu_Rst   = 255       // Initialize Su to top of user stack
 )(
     input   Rst,                    // System Reset
     input   Clk,                    // System Clock
@@ -204,7 +214,7 @@ assign Sel_X   = ((OSX) ? NA_Op[6] : NA_Op[3]);    // if OSX then swap X & S
 assign Sel_Y   = NA_Op[2];
 assign Sel_Abs = NA_Op[1];
 //
-assign Ci      = NA_Op[0];
+assign Ci      = ((OSX) ? (NA_Op[3] | NA_Op[0]) : NA_Op[0]);
 //
 assign Ld_MAR  = ~(NA_Op[6] & ~Sel_Abs);
 

@@ -85,6 +85,10 @@
 //                          tion, which allows direct adjustment of the system
 //                          or auxiliary stack pointers.
 //
+//  1.40    16D10   MAM     Added support for arithmetic right shift, arithmetic
+//                          left shift, and enabled carry for INC/DEC A (when
+//                          preceded by IND prefix).
+//
 // Additional Comments:
 //
 //  This module provides a means for controlling the M65C02A's ALU module to
@@ -198,6 +202,9 @@ module M65C02A_ALUv2 (
     input   [1:0] Stk_Op,   // Stack Pointer Operation: NOP, POP, PUSH
     
     input   ADJ,            // Stack Pointer Adjust Instruction Input
+    input   ASR,            // Enable Arithmetic Right Shift Operation
+    input   VEN,            // Enable true Arithmetic Left Shift Operation
+    input   CEN,            // Enable C for INC/DEC A Instructions
     
     //  ALU Ports
     
@@ -264,6 +271,7 @@ localparam pR_K  = 2'd1;    // R <= K - from Opcode field of IDEC
 
 localparam pCi_C = 2'd0;    // Ci <= C
 localparam pCi_0 = 2'd1;    // Ci <= 0
+localparam pCi_Q = 2'd3;    // Ci <= Q[7]; (Arithmetic Right Shift)
 
 //  WSel  - (Register) Write Select (Controls PSAYX Register Write Enables)
 
@@ -279,6 +287,7 @@ localparam pOS_M = 3'd7;    // ALU_DO <= M ({OP2, OP1})
 
 localparam pNE   = 4'd10;   // Set CC_Out if Not Equal to Zero  (Z Clear)
 localparam pNZ   = 4'd5;    // Set N and Z flags from ALU Output
+localparam pNZC  = 4'd6;    // Set N, Z, and C flags during INC/DEC A Opds
 localparam pNVZC = 4'd7;    // Set N, V, Z, and C flags during 16-bit IDC Ops
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -317,15 +326,16 @@ assign Stk_OpX = ((MOV) ? ((uMCntl[1]) ? SrcMode : 0)
 assign iSIZ    = ((MOV) ? 1 : SIZ);
 assign iK      = ((MOV) ? 0 : K  );
 
-assign iFU_Sel = ((MOV) ? ((uMCntl[0]) ? pIDC  : pLST)  : FU_Sel);
-assign iOp     = ((MOV) ? ((uMCntl[0]) ? pDEC  : pINC)  : Op    );
-assign iQSel   = ((MOV) ? ((uMCntl[0]) ? pQ_A  : pQ_M)  : QSel  );
-assign iRSel   = ((MOV) ? ((uMCntl[0]) ? pR_K  : pR_M)  : RSel  );
-assign iCSel   = ((MOV) ? ((uMCntl[0]) ? pCi_0 : pCi_C) : CSel  );
-assign iWSel   = ((MOV) ? ((uMCntl[0]) ? pWS_A : pWS_0) : WSel  );
-assign iOSel   = ((MOV) ? ((uMCntl[0]) ? pOS_A : pOS_M) : OSel  );
-assign iCCSel  = ((MOV) ? ((uMCntl[0]) ? pNZ   : pNE  )
-                        : ((SIZ & CMP) ? pNVZC : CCSel)         );
+assign iFU_Sel = ((MOV) ? ((uMCntl[0])       ? pIDC  : pLST)  : FU_Sel        );
+assign iOp     = ((MOV) ? ((uMCntl[0])       ? pDEC  : pINC)  : Op            );
+assign iQSel   = ((MOV) ? ((uMCntl[0])       ? pQ_A  : pQ_M)  : QSel          );
+assign iRSel   = ((MOV) ? ((uMCntl[0])       ? pR_K  : pR_M)  : RSel          );
+assign iCSel   = ((MOV) ? ((uMCntl[0])       ? pCi_0 : pCi_C                 )
+                        : ((ASR)             ? pCi_Q : CSel                  ));
+assign iWSel   = ((MOV) ? ((uMCntl[0])       ? pWS_A : pWS_0) : WSel          );
+assign iOSel   = ((MOV) ? ((uMCntl[0])       ? pOS_A : pOS_M) : OSel          );
+assign iCCSel  = ((MOV) ? ((uMCntl[0])       ? pNZ   : pNE                   )
+                        : ((SIZ & CMP | VEN) ? pNVZC : ((CEN) ? pNZC : CCSel)));         
 
 M65C02A_ALU    ALU (
                     .Rst(Rst),          // System Reset
@@ -370,7 +380,7 @@ M65C02A_ALU    ALU (
                     .OSel(iOSel),       // M65C02A ALU Output Register Select
                     .CCSel(iCCSel),     // M65C02A ALU Condition Code Select
                     
-                    .K(iK),             // M65C02A ALU Rockwell Instruction Mask
+                    .K(iK),             // M65C02A ALU Auxiliary Constant Input
                     .T(T),              // M65C02A ALU FORTH VM Register Input
                     .M(M),              // M65C02A ALU Memory Operand Input
 

@@ -59,7 +59,7 @@
 //  performance. Provisions are included in the module to allow the module to be
 //  expanded to support Kernel/User mode and access controls for virtual memory.
 //  The present implementation only supports a simple mapping from virtual to
-//  physical address, but is does allow the total address space to be expanded
+//  physical address, but it does allow the total address space to be expanded
 //  to more than 4MB.
 //
 //  The 16-bit mapping register is defined by the following structure:
@@ -72,7 +72,7 @@
 //  Rsvd[2:0]   : reserved for future use as access controls for each segment
 //
 //  The uppermost three bits are currently not implemented. There are plans to
-//  modify the M65C02 core to support Kernel/User mode and potentially virtual
+//  modify the M65C02A core to support Kernel/User mode and potentially virtual
 //  memory. These three bits are reserved for this purpose at this time in order
 //  that a future MMU module can be dropped into the design without any signifi-
 //  cant changes required to the implementation of the M65C02A microprocessor.

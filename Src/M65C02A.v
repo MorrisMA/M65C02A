@@ -138,6 +138,8 @@
 //                          watchdog timers in order to prevent the core from
 //                          halting execution for extended periods of time.
 //
+//  1.30    15C030  MAM     Simplified the IO_Sel decoder.
+//
 // Additional Comments:
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -532,29 +534,32 @@ assign RE  = IO_Op[1];
 //  Implement I/O Decode for Internal Functions
 //      I/O page is only mapped in the Kernel mode
 
-assign IO_Page  = Kernel & (&VA[15:8]); // 0xFF00:FFFF
+assign IO_Page = Kernel & (&VA[15:8]);          // 0xFF00:FFFF
+assign IO_Hi   = (IO_Page & VA[7]);
 
 always @(*)
 begin
-    case({IO_Page, VA[7:3]})
-        6'b110000 : IO_Sel <= 6'b0_0001_0;  // COM0 : 0xFF80:FF87
-        6'b110001 : IO_Sel <= 6'b0_0010_0;  // COM1 : 0xFF88:FF8F
-        6'b110010 : IO_Sel <= 6'b0_0100_0;  // SPI0 : 0xFF90:FF97
-        6'b110011 : IO_Sel <= 6'b0_1000_0;  // MMU  : 0xFF98:FF9F
-        6'b110100 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFA0:FFA7 Usr[ 3: 0]
-        6'b110101 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFA8:FFAF Usr[ 7: 4]
-        6'b110110 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFB0:FFB7 Usr[11: 8]
-        6'b110111 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFB8:FFBF Usr[15:12]
-        6'b111000 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFC0:FFC7 Krn[ 3: 0]
-        6'b111001 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFC8:FFCF Krn[ 7: 4]
-        6'b111010 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFD0:FFD7 Krn[11: 8]
-        6'b111011 : IO_Sel <= 6'b1_0000_0;  // MAP  : 0xFFD8:FFDF Krn[15:12]
-        6'b111100 : IO_Sel <= 6'b0_0000_1;  // VEC  : 0xFFE0:FFE7
-        6'b111101 : IO_Sel <= 6'b0_0000_1;  // VEC  : 0xFFE8:FFEF
-        6'b111110 : IO_Sel <= 6'b0_0000_1;  // VEC  : 0xFFF0:FFF7
-        6'b111111 : IO_Sel <= 6'b0_0000_1;  // VEC  : 0xFFF8:FFFF
-        default   : IO_Sel <= 6'b0_0000_0;
-    endcase
+    if(IO_Hi)
+        case(VA[6:3])
+            4'b0000 : IO_Sel <= 6'b0_0001_0;    // COM0 : 0xFF80:FF87
+            4'b0001 : IO_Sel <= 6'b0_0010_0;    // COM1 : 0xFF88:FF8F
+            4'b0010 : IO_Sel <= 6'b0_0100_0;    // SPI0 : 0xFF90:FF97
+            4'b0011 : IO_Sel <= 6'b0_1000_0;    // MMU  : 0xFF98:FF9F
+            4'b0100 : IO_Sel <= 6'b1_0000_0;    // MAP  : 0xFFA0:FFA7 Usr[ 3: 0]
+            4'b0101 : IO_Sel <= 6'b1_0000_0;    // MAP  : 0xFFA8:FFAF Usr[ 7: 4]
+            4'b0110 : IO_Sel <= 6'b1_0000_0;    // MAP  : 0xFFB0:FFB7 Usr[11: 8]
+            4'b0111 : IO_Sel <= 6'b1_0000_0;    // MAP  : 0xFFB8:FFBF Usr[15:12]
+            4'b1000 : IO_Sel <= 6'b1_0000_0;    // MAP  : 0xFFC0:FFC7 Krn[ 3: 0]
+            4'b1001 : IO_Sel <= 6'b1_0000_0;    // MAP  : 0xFFC8:FFCF Krn[ 7: 4]
+            4'b1010 : IO_Sel <= 6'b1_0000_0;    // MAP  : 0xFFD0:FFD7 Krn[11: 8]
+            4'b1011 : IO_Sel <= 6'b1_0000_0;    // MAP  : 0xFFD8:FFDF Krn[15:12]
+            4'b1100 : IO_Sel <= 6'b0_0000_1;    // VEC  : 0xFFE0:FFE7
+            4'b1101 : IO_Sel <= 6'b0_0000_1;    // VEC  : 0xFFE8:FFEF
+            4'b1110 : IO_Sel <= 6'b0_0000_1;    // VEC  : 0xFFF0:FFF7
+            4'b1111 : IO_Sel <= 6'b0_0000_1;    // VEC  : 0xFFF8:FFFF
+        endcase
+    else
+        IO_Sel <= 6'b0_0000_0;
 end
 
 assign {Sel_MAP, Sel_MMU, Sel_SPI0, Sel_COM1, Sel_COM0, Sel_VEC} = IO_Sel;
