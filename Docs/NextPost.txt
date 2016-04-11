@@ -1,9 +1,0 @@
-The following diagram provides a view of the M65C02A microcomputer that I've using to test the core. Neither the external memory interface nor the timer module are fully developed at this time; the external memory interface has been used for debug rather than for test programs. All programs written to date use the internal block RAMs as shown in the diagram.
-[attachment=4]M65C02A Microcomputer Block Diagram.JPG[/attachment]
-The following two diagrams provide the Programming Model views for the M65C02A core in the 6502/65C02 compatibility mode and the extended capabilities mode.
-[attachment=3]M65C02A Programming Model - Compatibility View.JPG[/attachment]
-[attachment=2]M65C02A Programming Model - Extended Capabilities View.JPG[/attachment]
-Finally, the following image provides a block diagram of the M65C02A core logic.
-[attachment=1]M65C02A Core Block Diagram.JPG[/attachment]
-I continue to work on a comprehensive MS Word User Guide, but I've attached the document in its current form for those who may be interested. A lot of work remains. I've edited, re-edited large sections of the document. It's surprising how difficult writing a clear and coherent user guide for the M65C02A has been and continues to be. Virtually every time I open the document, I find something that needs to be added, clarified, or simply deleted. A lot more remains to be added, and I'll be working on that while I turn my attention to porting fig-FORTH, EhBasic, and possibly developing a simulator for the M65C02A.
-[attachment=0]1004-0900b Reference Manual for M65C02A Synthesizable Microprogrammed Processor Core.pdf[/attachment]
