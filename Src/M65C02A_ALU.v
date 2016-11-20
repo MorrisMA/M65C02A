@@ -292,6 +292,10 @@
 //                          wise, IND is an address modifier for the RMW LSR 
 //                          instruction.
 //
+//  1.60    16I19   MAM     Reverted the ADJ instruction to use an immediate 
+//                          operand. Removed O multiplexer, and reset E multi-
+//                          plexer to K and M instead of O and M.
+//
 // Additional Comments:
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -493,17 +497,13 @@ assign En_DU  = En &  (FU_Sel[1] &  D);               // Decimal Adder
 
 assign Valid = ~|FU_Sel;
 
-//  A Multiplexer - Used to implement ALU Source Register Overrides
+//  B Multiplexer - Used to implement ALU Source Register Overrides
 
 assign B = ((OAX) ? X : ((OAY) ? Y : A));
 
-//  X Multiplexer - Used to implement ALU Source Register Overrides
+//  J Multiplexer - Used to implement ALU Source Register Overrides
 
 assign J = ((ADJ) ? ((OSX) ? X : S) : ((OSX) ? S : X));
-
-//  K Multiplexer - Used to implement Stack Adjust Instruction
-
-assign O = ((ADJ) ? Y : K);
 
 //  LU (Left Operand) Multiplexer
 //      00: L = M; 01: L = K;
@@ -525,7 +525,7 @@ assign Q = ((QSel[1]) ? U : W);
 //      00: R = M; 01: R = K;
 //      10: R = P; 11: R = A;
 
-assign E = ((RSel[0]) ? O : M);     // ? K : M; INC/DEC, ADC/SBC/CMP
+assign E = ((RSel[0]) ? K : M);     // ? K : M; INC/DEC, ADC/SBC/CMP
 assign F = ((RSel[0]) ? B : P);     // ? A : P; INC/DEC, CLC/.../CLV
 assign R = ((RSel[1]) ? F : E);
 
@@ -537,7 +537,7 @@ begin
         2'b00 : Ci <= C;            // ADC/SBC/ROL/ROR
         2'b01 : Ci <= 0;            // DEC/ASL/LSR
         2'b10 : Ci <= 1;            // INC/CMP         
-        2'b11 : Ci <= Q[7];         // ASR (Reserved for future use)
+        2'b11 : Ci <= N;            // ASR (Reserved for future use)
     endcase
 end
 
@@ -830,7 +830,7 @@ M65C02A_PSW     PSW (
                     .ALU_N(ALU_N),
 
                     .LU_Z(LU_Z),
-                    .M(M[7:6]),
+                    .M(((SIZ) ? M[15:14] : M[7:6])),
 
                     .DO(DO),
 

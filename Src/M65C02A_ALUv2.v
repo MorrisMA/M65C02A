@@ -99,7 +99,7 @@
 //  TOS of register of the A register stack. These three registers are expected
 //  to be initialized to 16-bit values. The operating mode of the instruction is
 //  provided by an 8-bit operand which follows the MOV op-code. The MOV sm,dm
-//  instruction is represented by an opcode, 0x44, followed by a single imme-
+//  instruction is represented by an opcode, 0x82, followed by a single imme-
 //  diate operand byte that encodes the source and destination modes. The source
 //  and destination pointers, X and Y, respectively, may be held, incremented,
 //  or decremented. The MSB of the mode byte determines if the MOV instruction
@@ -110,8 +110,8 @@
 //  transfer cycle. This behavior is defined in order to allow a conditional
 //  branch instruction to be used to continue the transfers until the count
 //  register is zero. This implementation choice allows a block move operation
-//  to be interruptable without requiring that the MOV microsequence to be
-//  interruptable, which allows considerable savings in the complexity and logic
+//  to be interruptable without requiring the MOV microsequence to be interrup-
+//  table, which allows considerable savings in the complexity and logic 
 //  required to achieve interruptable block move operations at the programmer's
 //  discretion.
 //
@@ -141,11 +141,11 @@
 //  appropriate mode bits held in OP2. If OP2[7] is set, the CC status is forced
 //  to 0 so that the instruction terminates after a single transfer cycle.
 //
-//  The MOV instruction, requires four cycles. One cycle is required to fetch
-//  and decode the instruction opcode. Another cycle is required to load the 
-//  instruction mode operand into OP2. One cycle is required to read the source
-//  into OP1, and another is needed to store OP1 to the destination. If the
-//  block version of the MOV instruction is used, the last two cycles are
+//  The MOV instruction requires a minimum of four cycles. One cycle is required
+//  to fetch and decode the instruction opcode. Another cycle is required to
+//  load the instruction mode operand into OP2. One cycle is required to read
+//  the source into OP1, and another is needed to store OP1 to the destination.
+//  If the block version of the MOV instruction is used, the last two cycles are
 //  repeated until the count register is decremented to zero (0).
 //
 //  The uMCntl field is used to control the MOV instruction operation. uMCntl[2]
@@ -271,7 +271,6 @@ localparam pR_K  = 2'd1;    // R <= K - from Opcode field of IDEC
 
 localparam pCi_C = 2'd0;    // Ci <= C
 localparam pCi_0 = 2'd1;    // Ci <= 0
-localparam pCi_Q = 2'd3;    // Ci <= Q[7]; (Arithmetic Right Shift)
 
 //  WSel  - (Register) Write Select (Controls PSAYX Register Write Enables)
 
@@ -330,8 +329,7 @@ assign iFU_Sel = ((MOV) ? ((uMCntl[0])       ? pIDC  : pLST)  : FU_Sel        );
 assign iOp     = ((MOV) ? ((uMCntl[0])       ? pDEC  : pINC)  : Op            );
 assign iQSel   = ((MOV) ? ((uMCntl[0])       ? pQ_A  : pQ_M)  : QSel          );
 assign iRSel   = ((MOV) ? ((uMCntl[0])       ? pR_K  : pR_M)  : RSel          );
-assign iCSel   = ((MOV) ? ((uMCntl[0])       ? pCi_0 : pCi_C                 )
-                        : ((ASR)             ? pCi_Q : CSel                  ));
+assign iCSel   = ((MOV) ? ((uMCntl[0])       ? pCi_0 : pCi_C) : CSel          );
 assign iWSel   = ((MOV) ? ((uMCntl[0])       ? pWS_A : pWS_0) : WSel          );
 assign iOSel   = ((MOV) ? ((uMCntl[0])       ? pOS_A : pOS_M) : OSel          );
 assign iCCSel  = ((MOV) ? ((uMCntl[0])       ? pNZ   : pNE                   )

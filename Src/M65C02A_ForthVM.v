@@ -67,7 +67,7 @@
 //
 //  1.00    15A03   MAM     Initial release
 //
-//  1.10    14F29   MAM     Added an enable signal in order to make use of the
+//  1.10    15F29   MAM     Added an enable signal in order to make use of the
 //                          3-bit VMCntl microprogram field for implementing 
 //                          the M65C02A MOV instruction. The enable is combined
 //                          with the Rdy signal to qualify updates to the IP and

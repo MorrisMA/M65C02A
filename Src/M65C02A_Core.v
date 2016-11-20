@@ -145,7 +145,7 @@
 //                          that allow IND prefix instruction enable the imple-
 //                          mentation of a true arithmetic left shift instruc-
 //                          tion using ASL (for 8/16-bit) and ROL for >16-bit,
-//                          and an arithmetic right shft instruction using LSR.
+//                          and an arithmetic right shift instruction using LSR.
 //                          In addition, this new special instruction group
 //                          allows enabling INC/DEC A to set the carry flag in
 //                          order to support simple extended precision counters.
@@ -155,6 +155,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 module M65C02A_Core #(
+    parameter pSIZ          = 1'b0, // Default value of SIZ prefix flag
+    
     parameter pAddrWidth    = 8'd9, // MPC Address Width
     parameter pMPC_Stk      = 8'd0, // MPC Stack Select: 0 - 1 Lvl; 1 - 4 Lvl
     parameter pRst_Addrs    = 8'd0, // MPC Reset Address
@@ -546,9 +548,9 @@ assign NA_Op  = uPL[19:11];     // Next Address Operation (9)
 assign IO_Op  = uPL[10: 9];     // IO Operation Control (2)
 assign DI_Op  = uPL[ 8: 5];     // DI Demultiplexer Control (4)
 assign DO_Op  = uPL[ 8: 5];     // DO Multiplexer Control (4) (same as DI_Op)
-assign Reg_WE = uPL[ 4];        // Register Write Enable Field (1)
-assign ISR    = uPL[ 3];        // Set to clr D and set I & M on interrupts (1)
-assign uMCntl = uPL[2:0];       // General Micro-Machine Control Field (3)
+assign Reg_WE = uPL[    4];     // Register Write Enable Field (1)
+assign ISR    = uPL[    3];     // Set to clr D and set I & M on interrupts (1)
+assign uMCntl = uPL[ 2: 0];     // General Micro-Machine Control Field (3)
 
 //  Decode uPCntl Field
 
@@ -762,16 +764,33 @@ assign Kernel = (P[pMode] | ((BRV2 | rBRV2 | RTI) & ~Done));
 //  the CE_IR following a non-prefix instruction the PFX mode indicator will not
 //  be set, so all prefix flags will be reset.
 
+//always @(posedge Clk)
+//begin
+//    if(Rst)
+//        {OAY, OAX, SIZ, IND, OSX} <= #1 0;                  // Initialize FFs
+//    else if(CE_IR) begin
+//        OSX <= #1 ((PFX) ? iOSX | OSX & ~iOAX         : 0); // IR == 8B
+//        IND <= #1 ((PFX) ? iIND | IND                 : 0); // IR == 9B | BB
+//        SIZ <= #1 ((PFX) ? iSIZ | SIZ                 : 0); // IR == AB | BB
+//        OAX <= #1 ((PFX) ? iOAX | OAX & ~iOSX & ~iOAY : 0); // IR == EB
+//        OAY <= #1 ((PFX) ? iOAY | OAY &         ~iOAX : 0); // IR == FB
+//    end
+//end
+
 always @(posedge Clk)
 begin
-    if(Rst)
-        {OAY, OAX, SIZ, IND, OSX} <= #1 0;                  // Initialize FFs
-    else if(CE_IR) begin
-        OSX <= #1 ((PFX) ? iOSX | OSX & ~iOAX         : 0); // IR == 0x8B
-        IND <= #1 ((PFX) ? iIND | IND                 : 0); // IR == 0x9B | 0xBB
-        SIZ <= #1 ((PFX) ? iSIZ | SIZ                 : 0); // IR == 0xAB | 0xBB
-        OAX <= #1 ((PFX) ? iOAX | OAX & ~iOSX & ~iOAY : 0); // IR == 0xEB
-        OAY <= #1 ((PFX) ? iOAY | OAY &         ~iOAX : 0); // IR == 0xFB
+    if(Rst) begin
+        OSX <= #1 0;                  // Initialize FFs
+        IND <= #1 0;
+        SIZ <= #1 pSIZ;
+        OAX <= #1 0;
+        OAY <= #1 0;
+    end else if(CE_IR) begin
+        OSX <= #1 ((PFX) ? iOSX | OSX & ~iOAX         : 0);     // IR == 8B
+        IND <= #1 ((PFX) ? iIND | IND                 : 0);     // IR == 9B | BB
+        SIZ <= #1 ((PFX) ? ((pSIZ ^ iSIZ) | SIZ)      : pSIZ);  // IR == AB | BB
+        OAX <= #1 ((PFX) ? iOAX | OAX & ~iOSX & ~iOAY : 0);     // IR == EB
+        OAY <= #1 ((PFX) ? iOAY | OAY &         ~iOAX : 0);     // IR == FB
     end
 end
 

@@ -145,6 +145,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 module M65C02A #(
+    parameter pSIZ            = 1'b0,       // Default value for SIZ prefix flag
+    
     parameter pDef_Page       = 8'h1,       // Default System Stack Pointer Page
     parameter pSk_Rst         = 8'h2,       // Kernel Stack Pointer Default 
     parameter pSu_Rst         = 8'hFF,      // User Stack Pointer Default 
@@ -441,6 +443,7 @@ M65C02A_IntHndlr    IntHndlr (
 assign Wait = Int_Wait | Ext_Wait;          // Combine int and ext Wait signals
 
 M65C02A_Core    #(
+                    .pSIZ(pSIZ),                    // M65C02A Default SIZ flag
                     .pDef_Page(pDef_Page),          // M65C02A Default SP Page
                     .pSk_Rst(pSk_Rst),              // M65C02A Sk Default
                     .pSu_Rst(pSu_Rst),              // M65C02A Su Default
@@ -516,7 +519,7 @@ assign RE  = IO_Op[1];
 //                             Total RAM/ROM: (28 kB - 14 BRAMs
 //
 //  Internal ROM space includes the I/O page. The I/O page is 0xFF00:FFFF;
-//  The nWP input disable writes in the range 0xD000:FEFF. Writes in the I/O
+//  The nWP input disables writes in the range 0xD000:FEFF. Writes in the I/O
 //  page are not inhibited by the nWP input. The result is that the top 32
 //  locations of the BRAMs contain the interrupt/trap vector table, and it may
 //  be modified by the programmer.
@@ -813,7 +816,7 @@ UART    #(
             .RxIdle()
         );
         
-assign CPU_DI   = ((Sel_COM0) ? COM0_DO  : 0);       
+assign CPU_DI = ((Sel_COM0) ? COM0_DO  : 0);       
 
 assign COM0_nRTS = ~COM0_RTS;
 assign COM0_CTS  = ~COM0_nCTS;

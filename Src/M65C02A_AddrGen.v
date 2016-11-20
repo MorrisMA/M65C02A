@@ -180,12 +180,12 @@ wire    CE_PC;                      // Program Counter Clock Enable
 // Rel:  9'b0_1000_001_0;   // NA <= PC  + {OP2,OP1} + 1; MAR <= PC + Rel16
 // Psh:  9'b0_0100_000_0;   // NA <= S               + 0;
 // Pop:  9'b0_0100_000_1;   // NA <= S               + 1;
-// BPN:  9'b0_0000_101_1;   // NA <= BP  + {OP2,OP1} + 1;
+// SPM:  9'b0_0100_001_1;   // NA <= S   + {OP2,OP1} + 1;
+// BPM:  9'b0_0000_101_1;   // NA <= BP  + {OP2,OP1} + 1;
 // IPN:  9'b0_0010_000_0;   // NA <= IP              + 0;
-// IPM:  9'b0_0010_001_0;   // NA <= IP  + {OP2,OP1} + 0;
-// DPN:  9'b0_0000_001_0;   // NA <=       {OP2,OP1} + 0;
-// DPX:  9'b0_0000_101_0;   // NA <= X   + {OP2,OP1} + 0;
-// DPY:  9'b0_0000_011_0;   // NA <= Y   + {OP2,OP1} + 0;
+// ZPM:  9'b0_0000_001_0;   // NA <=       {OP2,OP1} + 0;
+// ZPX:  9'b0_0000_101_0;   // NA <= X   + {OP2,OP1} + 0;
+// ZPY:  9'b0_0000_011_0;   // NA <= Y   + {OP2,OP1} + 0;
 // LDA:  9'b0_0000_001_0;   // NA <=       {OP2,OP1} + 0;
 // LDAX: 9'b0_0000_101_0;   // NA <= X   + {OP2,OP1} + 0;
 // LDAY: 9'b0_0000_011_0;   // NA <= Y   + {OP2,OP1} + 0;
@@ -200,14 +200,13 @@ wire    CE_PC;                      // Program Counter Clock Enable
 //          code, then OP2 is loaded with the sign extension of the operand be-
 //          ing loaded into OP1. These two load operations are what allow  
 //          {OP2, OP1} to be used as a zero page pointer, or an absolute memory
-//          pointer, or an 8-bit relative displacement, or a 16-bit relative
-//          displacement.
+//          pointer, or a signed 8-bit/16-bit relative displacement.
 
 assign Ld_PC   = NA_Op[8];
 //
 assign Sel_PC  = NA_Op[7];          // JMP/JSR/Bcc/BRL/RTS/RTI
 assign Sel_SP  = ((OSX) ? NA_Op[3] : NA_Op[6]);    // if OSX then swap X & S
-assign Sel_IP  = NA_Op[5];          // IP-relative with autoincrement: ,I++
+assign Sel_IP  = NA_Op[5];          // IP-relative w/ autoincrement: ip,I++
 assign Sel_MAR = NA_Op[4];          // Sequential memory access/PHR
 //
 assign Sel_X   = ((OSX) ? NA_Op[6] : NA_Op[3]);    // if OSX then swap X & S

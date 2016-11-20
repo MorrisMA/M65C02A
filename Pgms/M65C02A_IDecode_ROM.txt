@@ -1,13 +1,13 @@
 header
 Project: M65C02A_IDecode_ROMa
-File Revision: 0015
+File Revision: 0019
 Author(s): Michael A. Morris
-Description: M65C02A Instruction Decoder ROM
+Description: M65C02A Instruction Decoder - HLL-optimized Instruction Set
 endh
 
 --------------------------------------------------------------------------------
 --
---  Copyright 2015 by Michael A. Morris, dba M. A. Morris & Associates
+--  Copyright 2015-2016 by Michael A. Morris, dba M. A. Morris & Associates
 --
 --  All rights reserved. The source code contained herein is publicly released
 --  under the terms and conditions of the GNU General Public License as conveyed
@@ -56,7 +56,7 @@ endh
 --                          risons and allow conditional branches to branch on
 --                          signed and unsigned multi-flag tests.
 --
---  0004    15G12   MAM     Restored BRK mode, and implemented MOV as a SPC
+--  0004    15G12   MAM     Restored BRK mode, and implemented MOV as a SPC1
 --                          instruction using Opcode[5].
 --
 --  0005    15G31   MAM     Changed the RTI CCSel code from PSW to BRK. This is
@@ -66,7 +66,7 @@ endh
 --                          user mode using a stack frame pulled from the stack
 --                          using an RTI instruction.
 --
---  0006    15H02   MAM     Modified definition of RTI from VAL to SPC in order
+--  0006    15H02   MAM     Modified definition of RTI from VAL to SPC1 in order
 --                          to support change that will enable RTI to be used
 --                          swap from kernel to user mode at the conclusion of
 --                          the RTI instruction, i.e. on the fetch of the first
@@ -168,7 +168,42 @@ endh
 --                          evaluation. Replaced BRL rel16 with XMA sp,S. XMA 
 --                          exchanges the accumulator with the addressed stack
 --                          element.
---                          
+--
+--  0016    16D09   MAM     Rearranged instruction table to match M65C02B sheet.
+--                          New arrangement attempts to normalize the instruc-
+--                          tion length to that of the original 6502/65C02 co-
+--                          lumn in which the new instruction is placed. IOW,
+--                          the new single byte instructions are placed in a co-
+--                          lumn which is composed of single byte instructions
+--                          of the original 6502/65C02. New two/three byte 
+--                          instructions are placed in columns in which the ori-
+--                          ginal 6502/65C02 two/three byte instructions were
+--                          defined.
+--
+--  0017    16D10   MAM     Modified the Mode fields to add support for several
+--                          special instructions enabled by the IND prefix. The 
+--                          dedicated ADJ mode was converted to SPC2, and the
+--                          ADJ instruction included in the decode space created
+--                          by the change. In addition, with IND prefixed to the
+--                          ASL/ROL A instructions, an arithmetic left shift 
+--                          that sets the V flag was enabled. With IND prefixed
+--                          to the LSR instruction, an arithmetic right shift
+--                          instruction was enabled by shifting Q[7] instead of
+--                          a logic zero. Finally, when prefixed by IND, the 
+--                          INC/DEC A instructions will now set the C flag.
+--
+--  0018    16I27   MAM     Modified the decode table to match that in the uPgm.
+--                          Implemented the ADJ #imm instruction, and added NZ
+--                          CCSel code to the PUL zp, PUL abs instructions.
+--
+--  0019    16K12   MAM     Modified the decode table to match the latest defi-
+--                          nition provided in the Excel spreadsheet. Changed
+--                          the implementation of the PSH/PUL zp/abs/#imm
+--                          instructions to require the SIZ prefix instruction
+--                          in order to perform 16-bit push/pull operations.
+--                          Modified CCSel control field for the ADJ #imm
+--                          instruction to NUL so that the flags in PSW are not
+--                          affected.
 --
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
@@ -176,19 +211,19 @@ endh
 --------------------------------------------------------------------------------
 
 VAL     .asm    0   -- Valid Instruction (not otherwise decoded)
-ADJ     .asm    1   -- ADJ Instruction
+SPC2    .asm    1   -- Special 2 Instructions  (See table below             )
 COP     .asm    2   -- COP Instruction  (CO-Processor instruction           )
 BRK     .asm    3   -- BRK Instruction
-FTH     .asm    4   -- FORTH VM Instructions (Reserved for Future Use       )   
-SPC     .asm    5   -- Special Instructions  (See table below               ) 
+FTH     .asm    4   -- FORTH VM Instructions      
+SPC1    .asm    5   -- Special 1 Instructions  (See table below             ) 
 PFX     .asm    6   -- Prefix Instructions   (See table below               ) 
 WAI     .asm    7   -- WAI Instruction  (WAit for Interrupt                 )
 --
---  One-hot encoding of the Opcode field for SPC mode instructions
+--  One-hot encoding of the Opcode field for SPC1 mode instructions
 --
 --  {PSH, PHR, MOV, RTI, DUP, SWP, ROT, WRD}
 --
---  PSH - Push Instructions         (PSH zp/abs/#imm16; PHA/PHX/PHY         )
+--  PSH - Push Instructions         (PSH zp/abs/#imm; PHA/PHX/PHY           )
 --  PHR - PHR Instruction           (PHR rel16                              )
 --  MOV - MOV Instruction
 --  RTI - RTI Instruction
@@ -196,6 +231,16 @@ WAI     .asm    7   -- WAI Instruction  (WAit for Interrupt                 )
 --  SWP - Register Stack SWaP       (16-bit only                            )
 --  ROT - Register Stack ROTate     (16-bit only                            )
 --  WRD - Set 16-bit op size        (16-bit only                            )
+--
+--  One-hot encoding of the Opcode field for SPC2 mode instructions
+--
+--  {ADJ, Rsvd[6:3], ASR, CEN, VEN}
+--
+--  ADJ - Adjust S: S <= S + {OP2, OP1}
+--
+--  ASR - Enable Arithmetic Right Shift using LSR A: C_In <= Q[7]
+--  CEN - Enable Carry for INC/DEC A
+--  VEN - Enable V for ASL/ROL A
 --
 --  One-hot encoding of the Opcode field for PFX mode instructions
 --
@@ -246,7 +291,7 @@ LU      .equ    40  -- Select Logic Unit (AND/ORA/EOR, BIT/TRB/TSB,
                     --                    RMB/SMB/BBR/BBS,
                     --                    SEC/CLC/SEI/CLI/SED/CLD/CLV
 SU      .equ    36  -- Select Shift/Rotate Unit (ASL/ROL/LSR/ROR)
-ADD     .equ    34  -- Select Decimal/Binary Adder (ADC/SBC)
+ADD     .equ    34  -- Select Decimal/Binary Adder (ADC/SBC, ADD/SUB, ADJ)
 IDC     .equ    33  -- Select Bin. Add (INC/DEC/CMP/INX/DEX/CPX/INY/DEY/CPY) 
 
 --------------------------------------------------------------------------------
@@ -428,15 +473,15 @@ K_N     .equ    128 -- Mask for P.N (Negative Flag)
 --  M65C02A instructions, which provide a significant improvement to the base
 --  instruction set.
 --
---  The new instructions include the PSH/PHR, BRL rel16, and stack/base relative
---  instructions from the 8/16-bit W65C816 microprocessor. In addition, unique
---  to the M65C02A are a number of prefix instructions that provide an addi-
---  tional level indirection to most of the base W65C02S instructions, and in-
---  crease the size of the operation from 8 bits to 16 bits, and change the de-
---  fault destination register for various instructions. In addition, there are
---  M65C02A-specific instructions to manipulate the M65C02A-specific register
---  stacks, instructions to implement a DTC/ITC FORTH VM, add support for a CO-
---  Processor interface, and provide block moves.
+--  The new instructions include the PSH zp/abs/imm16, PHR rel16, PUL zp/abs, 
+--  and stack/base relative instructions from the 8/16-bit W65C816 micropro-
+--  cessor. In addition, unique to the M65C02A are a number of prefix instruc-
+--  tions that provide indirection to most of the base W65C02S instructions, and
+--  increase the size of the operation from 8 bits to 16 bits, and change the 
+--  default destination register for various instructions. In addition, there 
+--  are M65C02A-specific instructions to manipulate the M65C02A-specific regis-
+--  ter stacks, instructions to implement a DTC/ITC FORTH VM, add support for a 
+--  CO-Processor interface, and provide block moves.
 --
 --  The M65C02A instruction set starts with the instruction set of the 6502 ( ), 
 --  adds the 65C02 (*), adds the Rockwell (+), and the W65C816/W65C802 (&) in-
@@ -454,7 +499,7 @@ _start:     .org    0
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BPL ,0x10  -- 10: BPL rel
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x20  -- 20: JSR abs
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BMI ,0x30  -- 30: BMI rel
-    SPC     0,LST,XFR,Q_M,R_M,Ci_C,WS_P,OS_M,BRK ,0x10  -- 40: RTI
+    SPC1    0,LST,XFR,Q_M,R_M,Ci_C,WS_P,OS_M,BRK ,0x10  -- 40: RTI
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BVC ,0x50  -- 50: BVC rel
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x60  -- 60: RTS
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BVS ,0x70  -- 70: BVS rel
@@ -490,39 +535,39 @@ _start:     .org    0
  
     COP     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x02  -- 02:#COP #imm
     VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x12  -- 12:*ORA (zp)
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x22  -- 22:#JMP (zp)
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_0,WS_A,    ,NVZC,0x42  -- 22:#ADD ip,I++
     VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x32  -- 32:*ANL (zp)
-    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x42  -- 42: NOP
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0xD4  -- 42:#STA ip,I++
     VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x52  -- 52:*EOR (zp)
-    SPC     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x40  -- 62:#PHR rel16
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xE4  -- 62:#LDA ip,I++
     VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x72  -- 72:*ADC (zp)
-    SPC     0,   ,   ,   ,   ,    ,    ,    ,    ,0x20  -- 82:#MOV sm,dm
+    SPC1    0,   ,   ,   ,   ,    ,    ,    ,    ,0x20  -- 82:#MOV #imm
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x92  -- 92:*STA (zp)
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xA2  -- A2: LDX #imm
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xB2  -- B2:*LDA (zp)
-    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x01  -- C2:#PUL zp
+    SPC2    0,ADD,ADC,Q_X,R_M,Ci_0,WS_S,    ,    ,0x80  -- C2:#ADJ #imm
     VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xD2  -- D2:*CMP (zp)
-    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x01  -- E2:#PUL abs
+    SPC1    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x80  -- E2:#PSH #imm
     VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xF2  -- F2:*SBC (zp)
-
+    
 --------------------------------------------------------------------------------
 
-    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x03  -- 03:#ORA bp,B
-    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x13  -- 13:#ORA (bp,B),Y
-    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x23  -- 23:#ANL bp,B
-    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x33  -- 33:#ANL (bp,B),Y
-    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x43  -- 43:#EOR bp,B
-    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x53  -- 53:#EOR (bp,B),Y
-    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x63  -- 63:#ADC bp,B
-    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x73  -- 73:#ADC (bp,B),Y
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x83  -- 83:#STA bp,B
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x93  -- 93:#STA (bp,B),Y
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xA3  -- A3:#LDA bp,B
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xB3  -- B3:#LDA (bp,B),Y
-    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xC3  -- C3:#CMP bp,B
-    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xD3  -- D3:#CMP (bp,B),Y
-    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xE3  -- E3:#SBC bp,B
-    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xF3  -- F3:#SBC (bp,B),Y
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x03  -- 03:#ORA sp,S
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x13  -- 13:#ORA (sp,S),Y
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x23  -- 23:#ANL sp,S
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x33  -- 33:#ANL (sp,S),Y
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x43  -- 43:#EOR sp,S
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x53  -- 53:#EOR (sp,S),Y
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x63  -- 63:#ADC sp,S
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x73  -- 73:#ADC (sp,S),Y
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x83  -- 83:#STA sp,S
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x93  -- 93:#STA (sp,S),Y
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xA3  -- A3:#LDA sp,S
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xB3  -- B3:#LDA (sp,S),Y
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xC3  -- C3:#CMP sp,S
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xD3  -- D3:#CMP (sp,S),Y
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xE3  -- E3:#SBC sp,S
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xF3  -- F3:#SBC (sp,S),Y
 
 --------------------------------------------------------------------------------
 
@@ -530,8 +575,8 @@ _start:     .org    0
     VAL     1,LU ,TRB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x14  -- 14:*TRB zp
     VAL     0,LU ,BIT,L_A,R_M,Ci_C,WS_P,    ,NVZ ,0x24  -- 24: BIT zp
     VAL     0,LU ,BIT,L_A,R_M,Ci_C,WS_P,    ,NVZ ,0x34  -- 34:*BIT zp,X
-    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x44  -- 44: NOP
-    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x54  -- 54: NOP
+    VAL     0,LST,XFR,Q_A,R_M,Ci_C,    ,OS_A,    ,0x42  -- 44:#XMA sp,S
+    VAL     0,   ,   ,   ,   ,    ,    ,    ,    ,0x82  -- 54:#NOP
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x64  -- 64:*STZ zp
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x74  -- 74:*STZ zp,X
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_Y,    ,0x84  -- 84: STY zp
@@ -539,9 +584,9 @@ _start:     .org    0
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0xA4  -- A4: LDY zp
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0xB4  -- B4: LDY zp,X
     VAL     0,IDC,CMP,Q_Y,R_M,Ci_1,WS_P,    ,NZC ,0xC4  -- C4: CPY zp
-    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x81  -- D4:#PSH zp
+    SPC1    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x80  -- D4:#PSH zp
     VAL     0,IDC,CMP,Q_X,R_M,Ci_1,WS_P,    ,NZC ,0xE4  -- E4: CPX zp
-    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x81  -- F4:#PSH #imm16
+    SPC1    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,NZ  ,0x00  -- F4:#PUL zp
 
 --------------------------------------------------------------------------------
 
@@ -583,21 +628,21 @@ _start:     .org    0
     
 --------------------------------------------------------------------------------
 
-    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x07  -- 07:#ORA sp,S
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x07  -- 07:#ORA bp,B
     VAL     1,SU ,ASL,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x17  -- 17:#ASL bp,B
-    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x27  -- 27:#ANL sp,S
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x27  -- 27:#ANL bp,B
     VAL     1,SU ,ROL,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x37  -- 37:#ROL bp,B
-    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x47  -- 47:#EOR sp,S
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x47  -- 47:#EOR bp,B
     VAL     1,SU ,LSR,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x57  -- 57:#LSR bp,B
-    VAL     1,ADD,ADC,Q_M,R_A,Ci_C,WS_P,    ,NVZC,0x67  -- 67:#ADC sp,S
+    VAL     1,ADD,ADC,Q_M,R_A,Ci_C,WS_P,    ,NVZC,0x67  -- 67:#ADC bp,B
     VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x77  -- 77:#ROR bp,B
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x87  -- 87:#STA sp,S
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x87  -- 87:#STA bp,B
     VAL     1,LU ,TSB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x97  -- 97:#TSB bp,B
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xA7  -- A7:#LDA sp,S
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xA7  -- A7:#LDA bp,B
     VAL     1,LU ,TRB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0xB7  -- B7:#TRB bp,B
-    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xC7  -- C7:#CMP sp,S
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xC7  -- C7:#CMP bp,B
     VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- D7:#DEC bp,B
-    VAL     1,ADD,SBC,Q_M,R_A,Ci_C,WS_P,    ,NVZC,0xE7  -- E7:#SBC sp,S
+    VAL     1,ADD,SBC,Q_M,R_A,Ci_C,WS_P,    ,NVZC,0xE7  -- E7:#SBC bp,B
     VAL     1,IDC,INC,Q_M,R_K,Ci_1,WS_P,    ,NZ  ,0x00  -- F7:#INC bp,B
 
 --------------------------------------------------------------------------------
@@ -606,7 +651,7 @@ _start:     .org    0
     VAL     0,LU ,CLC,L_K,R_P,Ci_C,WS_P,    ,PSW ,K_C   -- 18: CLC
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_P,OS_M,PSW ,0x28  -- 28: PLP
     VAL     0,LU ,SEC,L_K,R_P,Ci_C,WS_P,    ,PSW ,K_C   -- 38: SEC
-    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x80  -- 48: PHA
+    SPC1    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x80  -- 48: PHA
     VAL     0,LU ,CLI,L_K,R_P,Ci_C,WS_P,    ,PSW ,K_I   -- 58: CLI
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0x68  -- 68: PLA
     VAL     0,LU ,SEI,L_K,R_P,Ci_C,WS_P,    ,PSW ,K_I   -- 78: SEI
@@ -640,12 +685,12 @@ _start:     .org    0
 
 --------------------------------------------------------------------------------
 
-    VAL     0,SU ,ASL,Q_A,R_M,Ci_0,WS_A,    ,NZC ,0x0A  -- 0A: ASL A
-    VAL     0,IDC,INC,Q_A,R_K,Ci_1,WS_A,    ,NZ  ,0x00  -- 1A:*INC A
-    VAL     0,SU ,ROL,Q_A,R_M,Ci_C,WS_A,    ,NZC ,0x2A  -- 2A: ROL A
-    VAL     0,IDC,DEC,Q_A,R_K,Ci_0,WS_A,    ,NZ  ,0x00  -- 3A:*DEC A
-    VAL     0,SU ,LSR,Q_A,R_M,Ci_0,WS_A,    ,NZC ,0x4A  -- 4A: LSR A
-    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_Y,    ,0x80  -- 5A:*PHY
+    SPC2    0,SU ,ASL,Q_A,R_M,Ci_0,WS_A,    ,NZC ,0x0A  -- 0A: ASL A
+    SPC2    0,IDC,INC,Q_A,R_K,Ci_1,WS_A,    ,NZ  ,0x00  -- 1A:*INC A
+    SPC2    0,SU ,ROL,Q_A,R_M,Ci_C,WS_A,    ,NZC ,0x2A  -- 2A: ROL A
+    SPC2    0,IDC,DEC,Q_A,R_K,Ci_0,WS_A,    ,NZ  ,0x00  -- 3A:*DEC A
+    SPC2    0,SU ,LSR,Q_A,R_M,Ci_0,WS_A,    ,NZC ,0x04  -- 4A: LSR A
+    SPC1    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_Y,    ,0x80  -- 5A:*PHY
     VAL     0,SU ,ROR,Q_A,R_M,Ci_C,WS_A,    ,NZC ,0x6A  -- 6A: ROR A
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0x7A  -- 7A:*PLY
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_X,NZ  ,0x8A  -- 8A: TXA
@@ -653,15 +698,15 @@ _start:     .org    0
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_A,NZ  ,0xAA  -- AA: TAX
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_S,NZ  ,0xBA  -- BA: TSX
     VAL     0,IDC,DEC,Q_X,R_K,Ci_0,WS_X,    ,NZ  ,0x00  -- CA: DEX
-    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_X,    ,0x80  -- DA:*PHX
+    SPC1    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_X,    ,0x80  -- DA:*PHX
     VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xEA  -- EA: NOP
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xFA  -- FA:*PLX
 
 --------------------------------------------------------------------------------
 -- 0B...BB: 1 byte, 1 cycle
-    SPC     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x08  -- 0B:#DUP  -- DUP
-    SPC     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x04  -- 1B:#SWP  -- SWP/XCH
-    SPC     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x02  -- 2B:#ROT  -- ROT
+    SPC1    0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x08  -- 0B:#DUP  -- DUP
+    SPC1    0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x04  -- 1B:#SWP  -- SWP/XCH
+    SPC1    0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x02  -- 2B:#ROT  -- ROT
     FTH     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x80  -- 3B:#NXT  -- NeXT
     FTH     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_T,    ,0x28  -- 4B:#PHI  -- Psh IP/W
     FTH     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x01  -- 5B:#INI  -- Inc IP/W
@@ -683,7 +728,7 @@ _start:     .org    0
     VAL     0,LU ,BIT,L_A,R_M,Ci_C,WS_P,    ,NVZ ,0x2C  -- 2C: BIT abs
     VAL     0,LU ,BIT,L_A,R_M,Ci_C,WS_P,    ,NVZ ,0x3C  -- 3C:*BIT abs,X
     VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x4C  -- 4C: JMP abs
-    VAL     0,LST,XFR,Q_A,R_M,Ci_C,    ,OS_A,    ,0x5C  -- 5C:#XMA sp,S
+    SPC1    0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x40  -- 5C:#PHR rel16
     VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x6C  -- 6C: JMP (abs)
     VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x7C  -- 7C:*JMP (abs,X)
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_Y,    ,0x8C  -- 8C: STY abs
@@ -691,9 +736,9 @@ _start:     .org    0
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0xAC  -- AC: LDY abs
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0xBC  -- BC: LDY abs,X
     VAL     0,IDC,CMP,Q_Y,R_M,Ci_1,WS_P,    ,NZC ,0xCC  -- CC: CPY abs
-    ADJ     0,ADD,ADC,Q_X,R_K,Ci_0,WS_S,    ,NZC ,0xDC  -- DC:#ADJ
+    SPC1    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x80  -- DC:#PSH abs
     VAL     0,IDC,CMP,Q_X,R_M,Ci_1,WS_P,    ,NZC ,0xEC  -- EC: CPX abs
-    SPC     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x81  -- FC:#PSH abs
+    SPC1    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,NZ  ,0x00  -- FC:#PUL abs
 
 --------------------------------------------------------------------------------
 
@@ -741,11 +786,11 @@ _start:     .org    0
     VAL     1,SU ,ROL,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x3F  -- 3F:#ROL ip,I++
     VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x4F  -- 4F:#EOR ip,I++
     VAL     1,SU ,LSR,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x5F  -- 5F:#LSR ip,I++
-    VAL     0,ADD,ADC,Q_A,R_M,Ci_0,WS_A,    ,NVZC,0x6F  -- 6F:#ADD ip,I++
+    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x6F  -- 6F:#NOP
     VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x7F  -- 7F:#ROR ip,I++
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x8F  -- 8F:#STA ip,I++
+    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x8F  -- 8F:#NOP
     VAL     1,LU ,TSB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x9F  -- 9F:#TSB ip,I++
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xAF  -- AF:#LDA ip,I++
+    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xAF  -- AF:#NOP
     VAL     1,LU ,TRB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0xBF  -- BF:#TRB ip,I++
     VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xCF  -- CF:#CMP ip,I++
     VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- DF:#DEC ip,I++
