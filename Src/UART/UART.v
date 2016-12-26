@@ -113,8 +113,8 @@ module UART #(
 
     parameter pTF_Depth = 0,            // Tx FIFO Depth: 2**(TF_Depth + 4)
     parameter pRF_Depth = 0,            // Rx FIFO Depth: 2**(RF_Depth + 4)
-    parameter pTF_Init  = "Src/UART_TF_16.coe", // Tx FIFO Memory Initialization
-    parameter pRF_Init  = "Src/UART_RF_16.coe"  // Rx FIFO Memory Initialization
+    parameter pTF_Init  = "Pgms/UART_TF_16.coe",// Tx FIFO Memory Initialization
+    parameter pRF_Init  = "Pgms/UART_RF_16.coe" // Rx FIFO Memory Initialization
 )(
     input   Rst,                        // System Reset
     input   Clk,                        // System Clock
@@ -570,9 +570,9 @@ UART_TXSM   XMT (
                 .CE_16x(CE_16x), 
                 
                 .Len(Len), 
-                .NumStop(NumStop), 
                 .ParEn(ParEn), 
                 .Par(Par),
+                .StartDly(5'b0),
                 
                 .TF_RE(RE_THR), 
                 .THR(THR), 

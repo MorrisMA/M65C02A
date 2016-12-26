@@ -1,0 +1,414 @@
+---------------------- 9/27/2016 9:35:32 PM ------------------------
+ 
+-- Instructions --
+0x0000 INV   INV     .asm    0   -- Invalid/Unused Instructions
+0x0001 VAL   VAL     .asm    1   -- Valid Instruction (not otherwise decoded)
+0x0002 COP   COP     .asm    2   -- COP Instruction (CO-Processor trap, software trap)
+0x0003 XCE   XCE     .asm    3   -- XCE Instruction (eXchange Carry and Emulation flags)
+0x0004 MMU   MMU     .asm    4   -- MMU Instruction (Memory Management Unit load/write)
+0x0005 BRK   BRK     .asm    5   -- BRK Instruction (BReaK execution, software trap)
+0x0006 STP   STP     .asm    6   -- STP Instruction (SToP processor)
+0x0007 WAI   WAI     .asm    7   -- WAI Instruction (WAit for Interrupt)
+ 
+-- Equates --
+0x0030 LST     .equ    48  -- Select Load/Store/Transfer Functional Unit
+0x0028 LU      .equ    40  -- Select Logic Unit (AND/ORA/EOR, BIT/TRB/TSB,
+0x0024 SU      .equ    36  -- Select Shift/Rotate Unit (ASL/ROL/LSR/ROR)
+0x0022 ADD     .equ    34  -- Select Decimal/Binary Adder (ADC/SBC)
+0x0021 IDC     .equ    33  -- Select Bin. Add (INC/DEC/CMP/INX/DEX/CPX/INY/DEY/CPY) 
+0x0000 NOP     .equ    0   -- No operation and/or default operation
+0x0000 XFR     .equ    0   -- No operation and/or default operation
+0x0001 AND     .equ    1   -- ALU <=  A & M;   N <= ALU[7]; Z <= ~|ALU;
+0x0002 ORA     .equ    2   -- ALU <=  A | M;   N <= ALU[7]; Z <= ~|ALU;
+0x0003 EOR     .equ    3   -- ALU <=  A ^ M;   N <= ALU[7]; Z <= ~|ALU;
+0x0001 BIT     .equ    1   -- ALU <=  A & M;   N <= M[7]; V <= M[6]; Z <= ~|(A & M)
+0x0000 TRB     .equ    0   -- ALU <= ~A & M;                         Z <= ~|(A & M)
+0x0002 TSB     .equ    2   -- ALU <=  A | M;                         Z <= ~|(A & M)
+0x0000 RMB     .equ    0   -- ALU <= ~K & M;  (K <= (1 << bit))
+0x0002 SMB     .equ    2   -- ALU <=  K | M;  (K <= (1 << bit))
+0x0001 BBR     .equ    1   -- ALU <=  K & M;  (K <= (1 << bit))
+0x0001 BBS     .equ    1   -- ALU <=  K & M;  (K <= (1 << bit))
+0x0000 CLC     .equ    0   -- ALU <= ~K & P;   C <= 0; (K <= 0x01)
+0x0002 SEC     .equ    2   -- ALU <=  K | P;   C <= 1; (K <= 0x01)
+0x0000 CLI     .equ    0   -- ALU <= ~K & P;   I <= 0; (K <= 0x04)
+0x0002 SEI     .equ    2   -- ALU <=  K | P;   I <= 1; (K <= 0x04)
+0x0000 CLD     .equ    0   -- ALU <= ~K & P;   D <= 0; (K <= 0x08)
+0x0002 SED     .equ    2   -- ALU <=  K | P;   D <= 1; (K <= 0x08)
+0x0000 CLV     .equ    0   -- ALU <= ~K & P;   V <= 0; (K <= 0x40)
+0x0000 REP     .equ    0   -- ALU <= ~M & P;   P <= ALU   
+0x0002 SEP     .equ    2   -- ALU <=  M | P;   P <= ALU
+0x0000 ASL     .equ    0   -- ALU <= {R[6:0],Ci};N <= ALU[7]; Z <= ~|ALU; C <= R[7]
+0x0000 ROL     .equ    0   -- ALU <= {R[6:0],Ci};N <= ALU[7]; Z <= ~|ALU; C <= R[7]
+0x0001 LSR     .equ    1   -- ALU <= {Ci,R[7:1]};N <= ALU[7]; Z <= ~|ALU; C <= R[0]
+0x0001 ROR     .equ    1   -- ALU <= {Ci,R[7:1]} N <= ALU[7]; Z <= ~|ALU; C <= R[0]
+0x0000 ADC     .equ    0   -- ALU <= Q +  M + C; N <= ALU[7]; Z <= ~|ALU;
+0x0001 SBC     .equ    1   -- ALU <= Q + ~M + C; N <= ALU[7]; Z <= ~|ALU;
+0x0000 INC     .equ    0   -- ALU <= Q +  0 + 1; N <= ALU[7]; Z <= ~|ALU;
+0x0001 DEC     .equ    1   -- ALU <= Q + ~0 + 0; N <= ALU[7]; Z <= ~|ALU;
+0x0001 CMP     .equ    1   -- ALU <= Q + ~M + 1; N <= ALU[7]; Z <= ~|ALU;
+0x0000 L_M     .equ    0   -- L <= M (default)
+0x0001 L_A     .equ    1   -- L <= A
+0x0002 L_K     .equ    2   -- L <= K
+0x0003 L_P     .equ    3   -- L <= P
+0x0000 Q_M     .equ    0   -- Q <= M (default)
+0x0001 Q_A     .equ    1   -- Q <= A
+0x0002 Q_X     .equ    2   -- Q <= X
+0x0003 Q_Y     .equ    3   -- Q <= Y
+0x0000 R_M     .equ    0   -- R <= M (default)
+0x0001 R_A     .equ    1   -- R <= A
+0x0002 R_Z     .equ    2   -- R <= K
+0x0003 R_P     .equ    3   -- R <= P
+0x0000 Ci_C    .equ    0   -- Ci <= C (default)
+0x0001 Ci_S    .equ    1   -- Ci <= Q[7]
+0x0002 Ci_0    .equ    2   -- Ci <= 0
+0x0003 Ci_1    .equ    3   -- Ci <= 1
+0x0001 WS_A    .equ    1   -- Write Accumulator (Binary)
+0x0002 WS_X    .equ    2   -- Write X (Pre-Index Register)
+0x0003 WS_Y    .equ    3   -- Write Y (Post-Index Register)
+0x0004 WS_R    .equ    4   -- Write Registers
+0x0005 WS_S    .equ    5   -- Write S (Stack Pointer)
+0x0006 WS_P    .equ    6   -- Write P (Processor Status Word)
+0x0007 WS_M    .equ    7   -- Write M (ALU Output)
+0x0001 OS_A    .equ    1   -- ALU <= A
+0x0002 OS_X    .equ    2   -- ALU <= X
+0x0003 OS_Y    .equ    3   -- ALU <= Y
+0x0004 OS_T    .equ    4   -- ALU <= Tmp (Operand Register 2)
+0x0005 OS_S    .equ    5   -- ALU <= S   (Stack Pointer)
+0x0006 OS_P    .equ    6   -- ALU <= P   (Processor Status Word)
+0x0007 OS_M    .equ    7   -- ALU <= M   (Memory Data Input, Operand Register 1)
+0x0000 TRUE    .equ    0   -- CC_Out <=  1
+0x0000 BRA     .equ    0   -- CC_Out <=  1
+0x0008 BCC     .equ    8   -- CC_Out <= ~C;
+0x0009 BCS     .equ    9   -- CC_Out <=  C;
+0x000A BNE     .equ    10  -- CC_Out <= ~Z;
+0x000B BEQ     .equ    11  -- CC_Out <=  Z;
+0x000C BVC     .equ    12  -- CC_Out <= ~V;
+0x000D BVS     .equ    13  -- CC_Out <=  V;
+0x000E BPL     .equ    14  -- CC_OUT <= ~N;
+0x000F BMI     .equ    15  -- CC_Out <=  N;
+0x0000 PSW     .equ    0   -- P <= ALU;
+0x0001 BRK     .equ    1   -- P.4 <= 1 on push P during BRK
+0x0002 Z       .equ    2   --                        Z <= ~|(A & M);
+0x0003 NVZ     .equ    3   -- N <= M[7];  V <= M[6]; Z <= ~|(A & M);
+0x0004 PHP     .equ    4   -- P.4 <= 1 on push P during PHP
+0x0005 NZ      .equ    5   -- N <= ALU[7];           Z <= ~|ALU;
+0x0006 NZC     .equ    6   -- N <= ALU[7];           Z <= ~|ALU; C <= COut;
+0x0007 NVZC    .equ    7   -- N <= ALU[7]; V <= OV;  Z <= ~|ALU; C <= COut;
+0x0001 K_0     .equ    1   -- Bit 0
+0x0002 K_1     .equ    2   -- Bit 1
+0x0004 K_2     .equ    4   -- Bit 2
+0x0008 K_3     .equ    8   -- Bit 3
+0x0010 K_4     .equ    16  -- Bit 4
+0x0020 K_5     .equ    32  -- Bit 5
+0x0040 K_6     .equ    64  -- Bit 6
+0x0080 K_7     .equ    128 -- Bit 7
+0x0001 K_C     .equ    1   -- Mask for P.C (Carry Flag)
+0x0002 K_Z     .equ    2   -- Mask for P.Z (Zero Flag)
+0x0004 K_I     .equ    4   -- Mask for P.I (Interrupt Mask)
+0x0008 K_D     .equ    8   -- Mask for P.D (Decimal Mode Flag)
+0x0010 K_B     .equ    16  -- Mask for P.B (BRK/PHP Flag)
+0x0020 K_M     .equ    32  -- Mask for P.M (Unused bit - always 1)
+0x0040 K_V     .equ    64  -- Mask for P.V (oVerflow Flag)
+0x0080 K_N     .equ    128 -- Mask for P.N (Negative Flag)
+ 
+-- Defines --
+0x0003 Mode    .def    3   -- Instruction Class or Specific Instruction
+0x0001 RMW     .def    1   -- Read-Modify-Write Instruction Type Field
+0x0006 FU_Sel  .def    6   -- ALU Functional Unit Select (one-hot)
+0x0002 ALU_OP  .def    2   -- ALU Operation
+0x0002 QSel    .def    2   -- ALU Q Operand Select
+0x0002 RSel    .def    2   -- ALU R Operand Select
+0x0002 CSel    .def    2   -- ALU Arithmetic Unit Carry Input Select
+0x0003 WSel    .def    3   -- ALU Register Write Select
+0x0003 OSel    .def    3   -- ALU Register Output Select
+0x0004 CCSel   .def    4   -- ALU Condition Code Operation
+0x0008 Opcode  .def    8   -- Instruction Opcode, bit mask, etc.
+ 
+-- Labels --
+0x0000 _start
+0x0100 _end
+ 
+File  Prog     
+Line  Line   Opcode                                Line
+0343 0x0000 _start: .org 0
+0345  --------------------------------------------------------------------------------
+0347 0x0000  C003010A BRK 0,LST,XFR,Q_M,R_M,Ci_C,WS_P, ,BRK ,0x00 -- 00: BRK #imm
+0348 0x0001  C0000E12 VAL 0,LST,XFR,Q_M,R_M,Ci_C, , ,BPL ,0x10 -- 10: BPL rel
+0349 0x0002  C0000022 VAL 0,LST,XFR,Q_M,R_M,Ci_C, , , ,0x20 -- 20: JSR abs
+0350 0x0003  C0000F32 VAL 0,LST,XFR,Q_M,R_M,Ci_C, , ,BMI ,0x30 -- 30: BMI rel
+0351 0x0004  C0037042 VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_P,OS_M,PSW ,0x40 -- 40: RTI
+0352 0x0005  C0000C52 VAL 0,LST,XFR,Q_M,R_M,Ci_C, , ,BVC ,0x50 -- 50: BVC rel
+0353 0x0006  C0000062 VAL 0,LST,XFR,Q_M,R_M,Ci_C, , , ,0x60 -- 60: RTS
+0354 0x0007  C0000D72 VAL 0,LST,XFR,Q_M,R_M,Ci_C, , ,BVS ,0x70 -- 70: BVS rel
+0355 0x0008  C0000082 VAL 0,LST,XFR,Q_M,R_M,Ci_C, , ,BRA ,0x80 -- 80:*BRA rel
+0356 0x0009  C0000892 VAL 0,LST,XFR,Q_M,R_M,Ci_C, , ,BCC ,0x90 -- 90: BCC rel
+0357 0x000A  C001F5A2 VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ ,0xA0 -- A0: LDY #imm
+0358 0x000B  C00009B2 VAL 0,LST,XFR,Q_M,R_M,Ci_C, , ,BCS ,0xB0 -- B0: BCS rel
+0359 0x000C  85CF06C2 VAL 0,IDC,CMP,Q_Y,R_M,Ci_1,WS_P, ,NZC ,0xC0 -- C0: CPY #imm
+0360 0x000D  C0000AD2 VAL 0,LST,XFR,Q_M,R_M,Ci_C, , ,BNE ,0xD0 -- D0: BNE rel
+0361 0x000E  858F06E2 VAL 0,IDC,CMP,Q_X,R_M,Ci_1,WS_P, ,NZC ,0xE0 -- E0: CPX #imm
+0362 0x000F  C0000BF2 VAL 0,LST,XFR,Q_M,R_M,Ci_C, , ,BEQ ,0xF0 -- F0: BEQ rel
+0364  --------------------------------------------------------------------------------
+0366 0x0010  A2408503 VAL 0,LU ,ORA,L_A,R_M,Ci_C,WS_A, ,NZ ,0x01 -- 01: ORA (dp,X)
+0367 0x0011  A2408513 VAL 0,LU ,ORA,L_A,R_M,Ci_C,WS_A, ,NZ ,0x11 -- 11: ORA (dp),Y
+0368 0x0012  A1408523 VAL 0,LU ,AND,L_A,R_M,Ci_C,WS_A, ,NZ ,0x21 -- 21: AND (dp,X)
+0369 0x0013  A1408533 VAL 0,LU ,AND,L_A,R_M,Ci_C,WS_A, ,NZ ,0x31 -- 31: AND (dp),Y
+0370 0x0014  A3408543 VAL 0,LU ,EOR,L_A,R_M,Ci_C,WS_A, ,NZ ,0x41 -- 41: EOR (dp,X)
+0371 0x0015  A3408553 VAL 0,LU ,EOR,L_A,R_M,Ci_C,WS_A, ,NZ ,0x51 -- 51: EOR (dp),Y
+0372 0x0016  88408763 VAL 0,ADD,ADC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0x61 -- 61: ADC (dp,X)
+0373 0x0017  88408773 VAL 0,ADD,ADC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0x71 -- 71: ADC (dp),Y
+0374 0x0018  C0001083 VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_A, ,0x81 -- 81: STA (dp,X)
+0375 0x0019  C0001093 VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_A, ,0x91 -- 91: STA (dp),Y
+0376 0x001A  C000F5A3 VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ ,0xA1 -- A1: LDA (dp,X)
+0377 0x001B  C000F5B3 VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ ,0xB1 -- B1: LDA (dp),Y
+0378 0x001C  854F06C3 VAL 0,IDC,CMP,Q_A,R_M,Ci_1,WS_P, ,NZC ,0xC1 -- C1: CMP (dp,X)
+0379 0x001D  854F06D3 VAL 0,IDC,CMP,Q_A,R_M,Ci_1,WS_P, ,NZC ,0xD1 -- D1: CMP (dp),Y
+0380 0x001E  894087E3 VAL 0,ADD,SBC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0xE1 -- E1: SBC (dp,X)
+0381 0x001F  894087F3 VAL 0,ADD,SBC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0xF1 -- F1: SBC (dp),Y
+0383  --------------------------------------------------------------------------------
+0384  -- 02, 22, 42, 62, 82, A2, C2, E2 - NOP: 2 bytes, 2 cycles
+0385 0x0020  00000002 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x02 -- 02:#NOP (COP #imm)
+0386 0x0021  A2408514 VAL 0,LU ,ORA,L_A,R_M,Ci_C,WS_A, ,NZ ,0x12 -- 12:*ORA (dp)
+0387 0x0022  00000022 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x22 -- 22:#NOP(JSR (sp,S),Y)
+0388 0x0023  A1408534 VAL 0,LU ,AND,L_A,R_M,Ci_C,WS_A, ,NZ ,0x32 -- 32:*AND (dp)
+0389 0x0024  00000042 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x42 -- 42:#NOP (JSR (dp),Y)
+0390 0x0025  A3408554 VAL 0,LU ,EOR,L_A,R_M,Ci_C,WS_A, ,NZ ,0x52 -- 52:*EOR (dp)
+0391 0x0026  00000062 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x62 -- 62:#NOP(JMP (sp,S),Y)
+0392 0x0027  88408774 VAL 0,ADD,ADC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0x72 -- 72:*ADC (dp)
+0393 0x0028  00000082 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x82 -- 82:#NOP (JMP (dp),Y)
+0394 0x0029  C0001094 VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_A, ,0x92 -- 92:*STA (dp)
+0395 0x002A  C00175A4 VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ ,0xA2 -- A2: LDX #imm
+0396 0x002B  C000F5B4 VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ ,0xB2 -- B2:*LDA (dp)
+0397 0x002C  000000C2 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xC2 -- C2:#NOP (REP #imm)
+0398 0x002D  854F06D4 VAL 0,IDC,CMP,Q_A,R_M,Ci_1,WS_P, ,NZC ,0xD2 -- D2:*CMP (dp)
+0399 0x002E  000000E2 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xE2 -- E2:#NOP (SEP #imm)
+0400 0x002F  894087F4 VAL 0,ADD,SBC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0xF2 -- F2:*SBC (dp)
+0402  --------------------------------------------------------------------------------
+0403  -- 03...F3 - NOP: 1 byte, 1 cycle
+0404 0x0030  00000003 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x03 -- 03:#NOP (ORA sp,S)
+0405 0x0031  00000013 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x13 -- 13:#NOP(ORA (sp,S),Y)
+0406 0x0032  00000023 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x23 -- 23:#NOP (AND sp,S)
+0407 0x0033  00000033 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x33 -- 33:#NOP(AND (sp,S),Y)
+0408 0x0034  00000043 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x43 -- 43:#NOP (EOR sp,S)
+0409 0x0035  00000053 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x53 -- 53:#NOP(EOR (sp,S),Y)
+0410 0x0036  00000063 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x63 -- 63:#NOP (ADC sp,S)
+0411 0x0037  00000073 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x73 -- 73:#NOP(ADC (sp,S),Y)
+0412 0x0038  00000083 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x83 -- 83:#NOP (STA sp,S)
+0413 0x0039  00000093 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x93 -- 93:#NOP(STA (sp,S),Y)
+0414 0x003A  000000A3 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xA3 -- A3:#NOP (LDA sp,S)
+0415 0x003B  000000B3 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xB3 -- B3:#NOP(LDA (sp,S),Y)
+0416 0x003C  000000C3 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xC3 -- C3:#NOP (CMP sp,S)
+0417 0x003D  000000D3 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xD3 -- D3:#NOP(CMP (sp,S),Y)
+0418 0x003E  000000E3 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xE3 -- E3:#NOP (SBC sp,S)
+0419 0x003F  000000F3 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xF3 -- F3:#NOP(SBC (sp,S),Y)
+0421  --------------------------------------------------------------------------------
+0422  -- 44 - NOP: 2 bytes, 3 cycles; 54, D4, F4 - NOP: 2 bytes, 4 cycles
+0423 0x0040  A2430207 VAL 1,LU ,TSB,L_A,R_M,Ci_C,WS_P, ,Z ,0x04 -- 04:*TSB dp
+0424 0x0041  A0430217 VAL 1,LU ,TRB,L_A,R_M,Ci_C,WS_P, ,Z ,0x14 -- 14:*TRB dp
+0425 0x0042  A1430326 VAL 0,LU ,BIT,L_A,R_M,Ci_C,WS_P, ,NVZ ,0x24 -- 24: BIT dp
+0426 0x0043  A1430336 VAL 0,LU ,BIT,L_A,R_M,Ci_C,WS_P, ,NVZ ,0x34 -- 34:*BIT dp,X
+0427 0x0044  00000044 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x44 -- 44:^NOP (MVP sp,S)
+0428 0x0045  00000054 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x54 -- 54:^NOP (MVN sp,S)
+0429 0x0046  C0000066 VAL 0,LST,XFR,Q_M,R_M,Ci_C, , , ,0x64 -- 64:*STZ dp
+0430 0x0047  C0000076 VAL 0,LST,XFR,Q_M,R_M,Ci_C, , , ,0x74 -- 74:*STZ dp,X
+0431 0x0048  C0003086 VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_Y, ,0x84 -- 84: STY dp
+0432 0x0049  C0003096 VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_Y, ,0x94 -- 94: STY dp,X
+0433 0x004A  C001F5A6 VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ ,0xA4 -- A4: LDY dp
+0434 0x004B  C001F5B6 VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ ,0xB4 -- B4: LDY dp,X
+0435 0x004C  85CF06C6 VAL 0,IDC,CMP,Q_Y,R_M,Ci_1,WS_P, ,NZC ,0xC4 -- C4: CPY dp
+0436 0x004D  000000D4 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xD4 -- D4:#NOP (PEI dp)
+0437 0x004E  858F06E6 VAL 0,IDC,CMP,Q_X,R_M,Ci_1,WS_P, ,NZC ,0xE4 -- E4: CPX dp
+0438 0x004F  000000F4 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xF4 -- F4:#NOP (PEA abs)
+0440  --------------------------------------------------------------------------------
+0442 0x0050  A2408507 VAL 0,LU ,ORA,L_A,R_M,Ci_C,WS_A, ,NZ ,0x05 -- 05: ORA dp
+0443 0x0051  A2408517 VAL 0,LU ,ORA,L_A,R_M,Ci_C,WS_A, ,NZ ,0x15 -- 15: ORA dp,X
+0444 0x0052  A1408527 VAL 0,LU ,AND,L_A,R_M,Ci_C,WS_A, ,NZ ,0x25 -- 25: AND dp
+0445 0x0053  A1408537 VAL 0,LU ,AND,L_A,R_M,Ci_C,WS_A, ,NZ ,0x35 -- 35: AND dp,X
+0446 0x0054  A3408547 VAL 0,LU ,EOR,L_A,R_M,Ci_C,WS_A, ,NZ ,0x45 -- 45: EOR dp
+0447 0x0055  A3408557 VAL 0,LU ,EOR,L_A,R_M,Ci_C,WS_A, ,NZ ,0x55 -- 55: EOR dp,X
+0448 0x0056  88408767 VAL 0,ADD,ADC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0x65 -- 65: ADC dp
+0449 0x0057  88408777 VAL 0,ADD,ADC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0x75 -- 75: ADC dp,X
+0450 0x0058  C0001087 VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_A, ,0x85 -- 85: STA dp
+0451 0x0059  C0001097 VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_A, ,0x95 -- 95: STA dp,X
+0452 0x005A  C000F5A7 VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ ,0xA5 -- A5: LDA dp
+0453 0x005B  C000F5B7 VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ ,0xB5 -- B5: LDA dp,X
+0454 0x005C  854F06C7 VAL 0,IDC,CMP,Q_A,R_M,Ci_1,WS_P, ,NZC ,0xC5 -- C5: CMP dp
+0455 0x005D  854F06D7 VAL 0,IDC,CMP,Q_A,R_M,Ci_1,WS_P, ,NZC ,0xD5 -- D5: CMP dp,X
+0456 0x005E  894087E7 VAL 0,ADD,SBC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0xE5 -- E5: SBC dp
+0457 0x005F  894087F7 VAL 0,ADD,SBC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0xF5 -- F5: SBC dp,X
+0459  --------------------------------------------------------------------------------
+0461 0x0060  900B0609 VAL 1,SU ,ASL,Q_M,R_M,Ci_0,WS_P, ,NZC ,0x06 -- 06: ASL dp
+0462 0x0061  900B0619 VAL 1,SU ,ASL,Q_M,R_M,Ci_0,WS_P, ,NZC ,0x16 -- 16: ASL dp,X
+0463 0x0062  90030629 VAL 1,SU ,ROL,Q_M,R_M,Ci_C,WS_P, ,NZC ,0x26 -- 26: ROL dp
+0464 0x0063  90030639 VAL 1,SU ,ROL,Q_M,R_M,Ci_C,WS_P, ,NZC ,0x36 -- 36: ROL dp,X
+0465 0x0064  910B0649 VAL 1,SU ,LSR,Q_M,R_M,Ci_0,WS_P, ,NZC ,0x46 -- 46: LSR dp
+0466 0x0065  910B0659 VAL 1,SU ,LSR,Q_M,R_M,Ci_0,WS_P, ,NZC ,0x56 -- 56: LSR dp,X
+0467 0x0066  91030669 VAL 1,SU ,ROR,Q_M,R_M,Ci_C,WS_P, ,NZC ,0x66 -- 66: ROR dp
+0468 0x0067  91030679 VAL 1,SU ,ROR,Q_M,R_M,Ci_C,WS_P, ,NZC ,0x76 -- 76: ROR dp,X
+0469 0x0068  C0002088 VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_X, ,0x86 -- 86: STX dp
+0470 0x0069  C0002098 VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_X, ,0x96 -- 96: STX dp,Y
+0471 0x006A  C00175A8 VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ ,0xA6 -- A6: LDX dp
+0472 0x006B  C00175B8 VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ ,0xB6 -- B6: LDX dp,Y
+0473 0x006C  852B0503 VAL 1,IDC,DEC,Q_M,R_Z,Ci_0,WS_P, ,NZ ,0x00 -- C6: DEC dp
+0474 0x006D  852B0503 VAL 1,IDC,DEC,Q_M,R_Z,Ci_0,WS_P, ,NZ ,0x00 -- D6: DEC dp,X
+0475 0x006E  842F0503 VAL 1,IDC,INC,Q_M,R_Z,Ci_1,WS_P, ,NZ ,0x00 -- E6: INC dp
+0476 0x006F  842F0503 VAL 1,IDC,INC,Q_M,R_Z,Ci_1,WS_P, ,NZ ,0x00 -- F6: INC dp,X
+0478  --------------------------------------------------------------------------------
+0479  -- 07...F7 - NOP: 1 byte, 1 cycle
+0480 0x0070  00000007 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x07 -- 07:+NOP (RMB0 dp)
+0481 0x0071  00000017 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x17 -- 17:+NOP (RMB1 dp)
+0482 0x0072  00000027 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x27 -- 27:+NOP (RMB2 dp)
+0483 0x0073  00000037 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x37 -- 37:+NOP (RMB3 dp)
+0484 0x0074  00000047 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x47 -- 47:+NOP (RMB4 dp)
+0485 0x0075  00000057 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x57 -- 57:+NOP (RMB5 dp)
+0486 0x0076  00000067 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x67 -- 67:+NOP (RMB6 dp)
+0487 0x0077  00000077 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x77 -- 77:+NOP (RMB7 dp)
+0488 0x0078  00000087 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x87 -- 87:+NOP (SMB0 dp)
+0489 0x0079  00000097 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x97 -- 97:+NOP (SMB1 dp)
+0490 0x007A  000000A7 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xA7 -- A7:+NOP (SMB2 dp)
+0491 0x007B  000000B7 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xB7 -- B7:+NOP (SMB3 dp)
+0492 0x007C  000000C7 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xC7 -- C7:+NOP (SMB4 dp)
+0493 0x007D  000000D7 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xD7 -- D7:+NOP (SMB5 dp)
+0494 0x007E  000000E7 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xE7 -- E7:+NOP (SMB6 dp)
+0495 0x007F  000000F7 INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xF7 -- F7:+NOP (SMB7 dp)
+0497  --------------------------------------------------------------------------------
+0499 0x0080  C000640A VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_P,PHP ,0x08 -- 08: PHP
+0500 0x0081  A0B30003 VAL 0,LU ,CLC,L_K,R_P,Ci_C,WS_P, ,PSW ,K_C -- 18: CLC
+0501 0x0082  C003702A VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_P,OS_M,PSW ,0x28 -- 28: PLP
+0502 0x0083  A2B30003 VAL 0,LU ,SEC,L_K,R_P,Ci_C,WS_P, ,PSW ,K_C -- 38: SEC
+0503 0x0084  C000104A VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_A, ,0x48 -- 48: PHA
+0504 0x0085  A0B30006 VAL 0,LU ,CLI,L_K,R_P,Ci_C,WS_P, ,PSW ,K_I -- 58: CLI
+0505 0x0086  C000F56A VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ ,0x68 -- 68: PLA
+0506 0x0087  A2B30006 VAL 0,LU ,SEI,L_K,R_P,Ci_C,WS_P, ,PSW ,K_I -- 78: SEI
+0507 0x0088  85E98502 VAL 0,IDC,DEC,Q_Y,R_Z,Ci_0,WS_Y, ,NZ ,0x00 -- 88: DEY
+0508 0x0089  C040B59A VAL 0,LST,XFR,Q_A,R_M,Ci_C,WS_A,OS_Y,NZ ,0x98 -- 98: TYA
+0509 0x008A  C04195AA VAL 0,LST,XFR,Q_A,R_M,Ci_C,WS_Y,OS_A,NZ ,0xA8 -- A8: TAY
+0510 0x008B  A0B30042 VAL 0,LU ,CLV,L_K,R_P,Ci_C,WS_P, ,PSW ,K_V -- B8: CLV
+0511 0x008C  84ED8502 VAL 0,IDC,INC,Q_Y,R_Z,Ci_1,WS_Y, ,NZ ,0x00 -- C8: INY
+0512 0x008D  A0B3000A VAL 0,LU ,CLD,L_K,R_P,Ci_C,WS_P, ,PSW ,K_D -- D8: CLD
+0513 0x008E  84AD0502 VAL 0,IDC,INC,Q_X,R_Z,Ci_1,WS_X, ,NZ ,0x00 -- E8: INX
+0514 0x008F  A2B3000A VAL 0,LU ,SED,L_K,R_P,Ci_C,WS_P, ,PSW ,K_D -- F8: SED
+0516  --------------------------------------------------------------------------------
+0518 0x0090  A240850B VAL 0,LU ,ORA,L_A,R_M,Ci_C,WS_A, ,NZ ,0x09 -- 09: ORA #imm
+0519 0x0091  A240851B VAL 0,LU ,ORA,L_A,R_M,Ci_C,WS_A, ,NZ ,0x19 -- 19: ORA abs,Y
+0520 0x0092  A140852B VAL 0,LU ,AND,L_A,R_M,Ci_C,WS_A, ,NZ ,0x29 -- 29: AND #imm
+0521 0x0093  A140853B VAL 0,LU ,AND,L_A,R_M,Ci_C,WS_A, ,NZ ,0x39 -- 39: AND abs,Y
+0522 0x0094  A340854B VAL 0,LU ,EOR,L_A,R_M,Ci_C,WS_A, ,NZ ,0x49 -- 49: EOR #imm
+0523 0x0095  A340855B VAL 0,LU ,EOR,L_A,R_M,Ci_C,WS_A, ,NZ ,0x59 -- 59: EOR abs,Y
+0524 0x0096  8840876B VAL 0,ADD,ADC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0x69 -- 69: ADC #imm
+0525 0x0097  8840877B VAL 0,ADD,ADC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0x79 -- 79: ADC abs,Y
+0526 0x0098  A143028B VAL 0,LU ,BIT,L_A,R_M,Ci_C,WS_P, ,Z ,0x89 -- 89:*BIT #imm
+0527 0x0099  C040109B VAL 0,LST,XFR,Q_A,R_M,Ci_C, ,OS_A, ,0x99 -- 99: STA abs,Y
+0528 0x009A  C040F5AB VAL 0,LST,XFR,Q_A,R_M,Ci_C,WS_A,OS_M,NZ ,0xA9 -- A9: LDA #imm
+0529 0x009B  C040F5BB VAL 0,LST,XFR,Q_A,R_M,Ci_C,WS_A,OS_M,NZ ,0xB9 -- B9: LDA abs,Y
+0530 0x009C  854F06CB VAL 0,IDC,CMP,Q_A,R_M,Ci_1,WS_P, ,NZC ,0xC9 -- C9: CMP #imm
+0531 0x009D  854F06DB VAL 0,IDC,CMP,Q_A,R_M,Ci_1,WS_P, ,NZC ,0xD9 -- D9: CMP abs,Y
+0532 0x009E  894087EB VAL 0,ADD,SBC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0xE9 -- E9: SBC #imm
+0533 0x009F  894087FB VAL 0,ADD,SBC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0xF9 -- F9: SBC abs,Y
+0535  --------------------------------------------------------------------------------
+0537 0x00A0  9048860C VAL 0,SU ,ASL,Q_A,R_M,Ci_0,WS_A, ,NZC ,0x0A -- 0A: ASL A
+0538 0x00A1  846C8502 VAL 0,IDC,INC,Q_A,R_Z,Ci_1,WS_A, ,NZ ,0x00 -- 1A:*INC A
+0539 0x00A2  9040862C VAL 0,SU ,ROL,Q_A,R_M,Ci_C,WS_A, ,NZC ,0x2A -- 2A: ROL A
+0540 0x00A3  85688502 VAL 0,IDC,DEC,Q_A,R_Z,Ci_0,WS_A, ,NZ ,0x00 -- 3A:*DEC A
+0541 0x00A4  9148864C VAL 0,SU ,LSR,Q_A,R_M,Ci_0,WS_A, ,NZC ,0x4A -- 4A: LSR A
+0542 0x00A5  C000305C VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_Y, ,0x5A -- 5A:*PHY
+0543 0x00A6  9140866C VAL 0,SU ,ROR,Q_A,R_M,Ci_C,WS_A, ,NZC ,0x6A -- 6A: ROR A
+0544 0x00A7  C001F57C VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ ,0x7A -- 7A:*PLY
+0545 0x00A8  C000A58C VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_X,NZ ,0x8A -- 8A: TXA
+0546 0x00A9  C002A09C VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_S,OS_X, ,0x9A -- 9A: TXS
+0547 0x00AA  C00115AC VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_A,NZ ,0xAA -- AA: TAX
+0548 0x00AB  C00155BC VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_S,NZ ,0xBA -- BA: TSX
+0549 0x00AC  85A90502 VAL 0,IDC,DEC,Q_X,R_Z,Ci_0,WS_X, ,NZ ,0x00 -- CA: DEX
+0550 0x00AD  C00020DC VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_X, ,0xDA -- DA:*PHX
+0551 0x00AE  000000EC VAL 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xEA -- EA: NOP
+0552 0x00AF  C00175FC VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ ,0xFA -- FA:*PLX
+0554  --------------------------------------------------------------------------------
+0555  -- 0B...FB - NOP: 1 byte, 1 cycle
+0556 0x00B0  0000000B INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x0B -- 0B:^NOP (---) (PHD)
+0557 0x00B1  0000001B INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x1B -- 1B:#NOP (---) (TAS)
+0558 0x00B2  0000002B INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x2B -- 2B:^NOP (---) (PLD)
+0559 0x00B3  0000003B INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x3B -- 3B:#NOP (---) (TSA)
+0560 0x00B4  0000004B INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x4B -- 4B:^NOP (MMU) (SAX)
+0561 0x00B5  0000005B INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x5B -- 5B:^NOP (---) (TBD)
+0562 0x00B6  0000006B INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x6B -- 6B:^NOP (---) (SAY)
+0563 0x00B7  0000007B INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x7B -- 7B:^NOP (---) (TDB)
+0564 0x00B8  0000008B INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x8B -- 8B:^NOP (PHB)
+0565 0x00B9  0000009B INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x9B -- 9B:#NOP (TXY)
+0566 0x00BA  000000AB INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xAB -- AB:^NOP (PLB)
+0567 0x00BB  000000BB INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xBB -- BB:#NOP (TYX)
+0568 0x00BC  000000D9 WAI 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xCB -- CB:&NOP (WAI)
+0569 0x00BD  000000E7 STP 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xDB -- DB:&NOP (STP)
+0570 0x00BE  000000EB INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xEB -- EB:^NOP (---) (XAB)
+0571 0x00BF  000000FB INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xFB -- FB:^NOP (XCE)
+0573  --------------------------------------------------------------------------------
+0574  -- 5C - NOP: 3 bytes, 8 cycles; DC, FC - NOP: 3 bytes, 4 cycles
+0575 0x00C0  A243020F VAL 1,LU ,TSB,L_A,R_M,Ci_C,WS_P, ,Z ,0x0C -- 0C:*TSB abs
+0576 0x00C1  A043021F VAL 1,LU ,TRB,L_A,R_M,Ci_C,WS_P, ,Z ,0x1C -- 1C:*TRB abs
+0577 0x00C2  A143032E VAL 0,LU ,BIT,L_A,R_M,Ci_C,WS_P, ,NVZ ,0x2C -- 2C: BIT abs
+0578 0x00C3  A143033E VAL 0,LU ,BIT,L_A,R_M,Ci_C,WS_P, ,NVZ ,0x3C -- 3C:*BIT abs,X
+0579 0x00C4  0000004E VAL 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x4C -- 4C: JMP abs
+0580 0x00C5  0000005C INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x5C -- 5C:#NOP (JMP (abs),Y)
+0581 0x00C6  0000006E VAL 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x6C -- 6C: JMP (abs)
+0582 0x00C7  0000007E VAL 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x7C -- 7C:*JMP (abs,X)
+0583 0x00C8  C000308E VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_Y, ,0x8C -- 8C: STY abs
+0584 0x00C9  C000009E VAL 0,LST,XFR,Q_M,R_M,Ci_C, , , ,0x9C -- 9C:*STZ abs
+0585 0x00CA  C001F5AE VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ ,0xAC -- AC: LDY abs
+0586 0x00CB  C001F5BE VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ ,0xBC -- BC: LDY abs,X
+0587 0x00CC  85CF06CE VAL 0,IDC,CMP,Q_Y,R_M,Ci_1,WS_P, ,NZC ,0xCC -- CC: CPY abs
+0588 0x00CD  000000DC INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xDC -- DC:#NOP (JSR (abs),Y)
+0589 0x00CE  858F06EE VAL 0,IDC,CMP,Q_X,R_M,Ci_1,WS_P, ,NZC ,0xEC -- EC: CPX abs
+0590 0x00CF  000000FC INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xFC -- FC:#NOP (JSR (abs,X))
+0592  --------------------------------------------------------------------------------
+0594 0x00D0  A240850F VAL 0,LU ,ORA,L_A,R_M,Ci_C,WS_A, ,NZ ,0x0D -- 0D: ORA abs
+0595 0x00D1  A240851F VAL 0,LU ,ORA,L_A,R_M,Ci_C,WS_A, ,NZ ,0x1D -- 1D: ORA abs,X
+0596 0x00D2  A140852F VAL 0,LU ,AND,L_A,R_M,Ci_C,WS_A, ,NZ ,0x2D -- 2D: AND abs
+0597 0x00D3  A140853F VAL 0,LU ,AND,L_A,R_M,Ci_C,WS_A, ,NZ ,0x3D -- 3D: AND abs,X
+0598 0x00D4  A340854F VAL 0,LU ,EOR,L_A,R_M,Ci_C,WS_A, ,NZ ,0x4D -- 4D: EOR abs
+0599 0x00D5  A340855F VAL 0,LU ,EOR,L_A,R_M,Ci_C,WS_A, ,NZ ,0x5D -- 5D: EOR abs,X
+0600 0x00D6  8840876F VAL 0,ADD,ADC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0x6D -- 6D: ADC abs
+0601 0x00D7  8840877F VAL 0,ADD,ADC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0x7D -- 7D: ADC abs,X
+0602 0x00D8  C000108F VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_A, ,0x8D -- 8D: STA abs
+0603 0x00D9  C000109F VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_A, ,0x9D -- 9D: STA abs,X
+0604 0x00DA  C000F5AF VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ ,0xAD -- AD: LDA abs
+0605 0x00DB  C000F5BF VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ ,0xBD -- BD: LDA abs,X
+0606 0x00DC  854F06CF VAL 0,IDC,CMP,Q_A,R_M,Ci_1,WS_P, ,NZC ,0xCD -- CD: CMP abs
+0607 0x00DD  854F06DF VAL 0,IDC,CMP,Q_A,R_M,Ci_1,WS_P, ,NZC ,0xDD -- DD: CMP abs,X
+0608 0x00DE  894087EF VAL 0,ADD,SBC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0xED -- ED: SBC abs
+0609 0x00DF  894087FF VAL 0,ADD,SBC,Q_A,R_M,Ci_C,WS_A, ,NVZC,0xFD -- FD: SBC abs,X
+0611  --------------------------------------------------------------------------------
+0613 0x00E0  900B0611 VAL 1,SU ,ASL,Q_M,R_M,Ci_0,WS_P, ,NZC ,0x0E -- 0E: ASL abs
+0614 0x00E1  900B0621 VAL 1,SU ,ASL,Q_M,R_M,Ci_0,WS_P, ,NZC ,0x1E -- 1E: ASL abs,X
+0615 0x00E2  90030631 VAL 1,SU ,ROL,Q_M,R_M,Ci_C,WS_P, ,NZC ,0x2E -- 2E: ROL abs
+0616 0x00E3  90030641 VAL 1,SU ,ROL,Q_M,R_M,Ci_C,WS_P, ,NZC ,0x3E -- 3E: ROL abs,X
+0617 0x00E4  910B0651 VAL 1,SU ,LSR,Q_M,R_M,Ci_0,WS_P, ,NZC ,0x4E -- 4E: LSR abs
+0618 0x00E5  910B0661 VAL 1,SU ,LSR,Q_M,R_M,Ci_0,WS_P, ,NZC ,0x5E -- 5E: LSR abs,X
+0619 0x00E6  91030671 VAL 1,SU ,ROR,Q_M,R_M,Ci_C,WS_P, ,NZC ,0x6E -- 6E: ROR abs
+0620 0x00E7  91030681 VAL 1,SU ,ROR,Q_M,R_M,Ci_C,WS_P, ,NZC ,0x7E -- 7E: ROR abs,X
+0621 0x00E8  C0002090 VAL 0,LST,XFR,Q_M,R_M,Ci_C, ,OS_X, ,0x8E -- 8E: STX abs
+0622 0x00E9  C00000A0 VAL 0,LST,XFR,Q_M,R_M,Ci_C, , , ,0x9E -- 9E:*STZ abs,X
+0623 0x00EA  C00175B0 VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ ,0xAE -- AE: LDX abs
+0624 0x00EB  C00175C0 VAL 0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ ,0xBE -- BE: LDX abs,Y
+0625 0x00EC  852B0503 VAL 1,IDC,DEC,Q_M,R_Z,Ci_0,WS_P, ,NZ ,0x00 -- CE: DEC abs
+0626 0x00ED  852B0503 VAL 1,IDC,DEC,Q_M,R_Z,Ci_0,WS_P, ,NZ ,0x00 -- DE: DEC abs,X
+0627 0x00EE  842F0503 VAL 1,IDC,INC,Q_M,R_Z,Ci_1,WS_P, ,NZ ,0x00 -- EE: INC abs
+0628 0x00EF  842F0503 VAL 1,IDC,INC,Q_M,R_Z,Ci_1,WS_P, ,NZ ,0x00 -- FE: INC abs,X
+0630  --------------------------------------------------------------------------------
+0631  -- 0F...FF - NOP: 1 byte, 1 cycle
+0632 0x00F0  0000000F INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x0F -- 0F:+NOP (BBR0 dp,rel)
+0633 0x00F1  0000001F INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x1F -- 1F:+NOP (BBR1 dp,rel)
+0634 0x00F2  0000002F INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x2F -- 2F:+NOP (BBR2 dp,rel)
+0635 0x00F3  0000003F INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x3F -- 3F:+NOP (BBR3 dp,rel)
+0636 0x00F4  0000004F INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x4F -- 4F:+NOP (BBR4 dp,rel)
+0637 0x00F5  0000005F INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x5F -- 5F:+NOP (BBR5 dp,rel)
+0638 0x00F6  0000006F INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x6F -- 6F:+NOP (BBR6 dp,rel)
+0639 0x00F7  0000007F INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x7F -- 7F:+NOP (BBR7 dp,rel)
+0640 0x00F8  0000008F INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x8F -- 8F:+NOP (BBS0 dp,rel)
+0641 0x00F9  0000009F INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0x9F -- 9F:+NOP (BBS1 dp,rel)
+0642 0x00FA  000000AF INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xAF -- AF:+NOP (BBS2 dp,rel)
+0643 0x00FB  000000BF INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xBF -- BF:+NOP (BBS3 dp,rel)
+0644 0x00FC  000000CF INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xCF -- CF:+NOP (BBS4 dp,rel)
+0645 0x00FD  000000DF INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xDF -- DF:+NOP (BBS5 dp,rel)
+0646 0x00FE  000000EF INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xEF -- EF:+NOP (BBS6 dp,rel)
+0647 0x00FF  000000FF INV 0,NOP,NOP,Q_M,R_M,Ci_C, , , ,0xFF -- FF:+NOP (BBS7 dp,rel)
+0649  --------------------------------------------------------------------------------
+0651 0x0100 _end:

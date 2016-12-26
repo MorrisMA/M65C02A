@@ -299,7 +299,6 @@ wire    IRQ_Msk;                // M65C02A Core interrupt mask
 wire    LE_Int;                 // M65C02A Core Int latch enable - hold Int/Vec 
 wire    VP;                     // M65C02A Core interrupt vector pull 
 wire    Done;                   // M65C02A Core instruction complete/fetch
-wire    [2:0] Mode;             // M65C02A Core instruction mode
 wire    RMW;                    // M65C02A Core Read-Modify-Write indicator
 wire    Wait;                   // M65C02A Core Microcycle Wait Request Input
 wire    Rdy;                    // M65C02A Core Microcycle Complete Output
@@ -308,29 +307,12 @@ wire    [15:0] VA;              // M65C02A Core Address Output
 wor     [ 7:0] CPU_DI;          // M65C02A Core Data Input
 wire    [ 7:0] CPU_DO;          // M65C02A Core Data Output
 
-wire    [15:0] X;               // M65C02A Core Processor X Index Register 
-wire    [15:0] Y;               // M65C02A Core Processor Y Index Register 
-wire    [15:0] A;               // M65C02A Core Processor Accumulator Register 
-wire    [15:0] IP;              // M65C02A Core Processor FORTH VM IP Register
-wire    [15:0] W;               // M65C02A Core Processor FORTH VM W  Register
-wire    [ 7:0] P;               // M65C02A Core Processor Status Word Register 
-wire    [15:0] S;               // M65C02A Core Processor System Stack Ptr Reg 
-wire    [15:0] M;               // M65C02A Core Processor Memory Operand Reg 
-
-wire    [ 7:0] IR;              // M65C02A Core Processor Instruction Register 
-
 wire    WE, RE;                 // M65C02A Core Decoded IO Operations
 
 wire    Kernel;                 // M65C02A Core Operating Mode
 
-wire    ADJ;                    // M65C02A Core Decoded ADJ instruction
-wire    COP;                    // M65C02A Core Decoded COP instruction
 wire    BRK;                    // M65C02A Core Decoded BRK instruction
-wire    PFX;                    // M65C02A Core Decoded PreFiX instructions
-wire    PHR;                    // M65C02A Core Decoded PHR instruction
-wire    PHW;                    // M65C02A Core Decoded PHW instructions
-wire    WAI;                    // M65C02A Core Decoded WAI instruction
-wire    STP;                    // M65C02A Core Decoded STP instruction
+wire    SPC;                    // M65C02A Core Decoded SPC instruction
 
 wire    IO_Page;                // IO Page Decode
 reg     [5:0] IO_Sel;           // IO Selects: Vec, MAP, MMU, SPI0, COM0, COM1
@@ -455,7 +437,6 @@ M65C02A_Core    #(
                     .Clk(Clk),              // System Clock
                     
                     .IRQ_Msk(IRQ_Msk),      // M65C02A Core Interrupt Mask
-                    .xIRQ(IRQ),             // M65C02A Core Extrn Interrupt Flag
                     .Int(Int),              // M65C02A Core Interrupt Request
                     .Vector(Vector),        // M65C02A Core Interrupt Vector
                     .LE_Int(LE_Int),        // M65C02A Core Latch Enable Int/Vec
@@ -466,14 +447,12 @@ M65C02A_Core    #(
 
                     .Kernel(Kernel),        // M65C02A Core Operating Mode
 
-                    .ADJ(ADJ),              // M65C02A Core ADJ Instruction
-                    .COP(COP),              // M65C02A Core COP Instruction
+                    .ADJ(),                 // M65C02A Core ADJ Instruction
+                    .COP(),                 // M65C02A Core COP Instruction
                     .BRK(BRK),              // M65C02A Core BRK Instruction
-                    .FTH(FTH),              // M65C02A Core ForthVM Instructions
-                    .PFX(PFX),              // M65C02A Core Prefix Instructions
+                    .FTH(),                 // M65C02A Core ForthVM Instructions
+                    .PFX(),                 // M65C02A Core Prefix Instructions
                     .SPC(SPC),              // M65C02A Core Special Instructions
-                    .WAI(WAI),              // M65C02A Core WAI Instruction
-                    .STP(STP),              // M65C02A Core STP Instruction
                     
                     .Done(Done),            // M65C02A Core Instruction Complete
                     .SC(),                  // M65C02A Core Single Cycle Flag
@@ -493,16 +472,16 @@ M65C02A_Core    #(
                     .OAY(),                 // M65C02A Core Op(A) <=> Op(Y)
                     .OSX(),                 // M65C02A Core Op(S) <=> Op(X)
                     
-                    .X(X),                  // M65C02A Core X Index Register
-                    .Y(Y),                  // M65C02A Core Y Index Register
-                    .A(A),                  // M65C02A Core Accumulator Register
-                    .IP(IP),                // M65C02A Core FORTH VM IP Register
-                    .W(W),                  // M65C02A Core FORTH VM W  Register
-                    .P(P),                  // M65C02A Core P Register
-                    .S(S),                  // M65C02A Core S Register
-                    .M(M),                  // M65C02A Core Memory Operand Regs.
+                    .X(),                   // M65C02A Core X Index Register
+                    .Y(),                   // M65C02A Core Y Index Register
+                    .A(),                   // M65C02A Core Accumulator Register
+                    .IP(),                  // M65C02A Core FORTH VM IP Register
+                    .W(),                   // M65C02A Core FORTH VM W  Register
+                    .P(),                   // M65C02A Core P Register
+                    .S(),                   // M65C02A Core S Register
+                    .M(),                   // M65C02A Core Memory Operand Regs.
                     
-                    .IR(IR)                 // M65C02A Core Instruction Register
+                    .IR()                   // M65C02A Core Instruction Register
                 );
 
 //  Decode Core Control Signals
@@ -838,6 +817,6 @@ assign XA   =  PA[19:16];
 assign AB   =  PA[15: 0];
 assign DB   = ((WE) ? CPU_DO : CPU_DI);
 
-assign nCS2 = ~STP;
+assign nCS2 = ~SPC;
 
 endmodule

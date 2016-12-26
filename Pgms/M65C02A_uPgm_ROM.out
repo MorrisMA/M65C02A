@@ -1,0 +1,1838 @@
+---------------------- 12/25/2016 3:49:33 PM ------------------------
+ 
+-- Instructions --
+0x0000  RTS   RTS         .asm    0       -- Return from Subroutine
+0x0001  BSR   BSR         .asm    1       -- Branch to subroutine
+0x0002 FTCH   FTCH        .asm    2       -- Fetch next instruction
+0x0003  BMW   BMW         .asm    3       -- Branch multi-way
+0x0004 BRV0   BRV0        .asm    4       -- Branch via 0
+0x0005 BRV1   BRV1        .asm    5       -- Branch via 1
+0x0006 BRV2   BRV2        .asm    6       -- Branch via 2
+0x0007 BRV3   BRV3        .asm    7       -- Branch via 3
+0x0008 BTH0   BTH0        .asm    8       -- Branch if T0 is high
+0x0009 BTH1   BTH1        .asm    9       -- Branch if T1 is high
+0x000A BTH2   BTH2        .asm    10      -- Branch if T2 is high
+0x000B BTH3   BTH3        .asm    11      -- Branch if T3 is high
+0x000C BMW0   BMW0        .asm    12      -- Branch multi-way
+0x000D BMW1   BMW1        .asm    13      -- Branch multi-way
+0x000E BMW2   BMW2        .asm    14      -- Branch multi-way
+0x000F BMW3   BMW3        .asm    15      -- Branch multi-way
+ 
+-- Equates --
+0x0102 Vec     .equ    258     -- 1_0000_001_0; Vec:  NA  <=       M + 0; PC,MAR <= NA
+0x0102 Jmp     .equ    258     -- 1_0000_001_0; Jmp:  NA  <=       M + 0; PC,MAR <= NA
+0x010A JmpX    .equ    266     -- 1_0000_101_0; JmpX: NA  <= X   + M + 0; PC,MAR <= NA
+0x0106 JmpY    .equ    262     -- 1_0000_011_0; JmpY: NA  <= Y   + M + 0; PC,MAR <= NA
+0x0103 Rtn     .equ    259     -- 1_0000_001_1; Rtn:  NA  <=       M + 1; PC,MAR <= NA
+0x0180 PC      .equ    384     -- 1_1000_000_0; PC:   NA  <= PC      + 0; PC,MAR <= NA
+0x0181 Inc     .equ    385     -- 1_1000_000_1; Inc:  NA  <= PC      + 1; PC,MAR <= NA
+0x0183 Bra     .equ    387     -- 1_1000_001_1; Bra:  NA  <= PC  + M + 1; PC,MAR <= NA
+0x0083 Rel     .equ    131     -- 0_1000_001_1; Rel:  NA  <= PC  + M + 1; MAR <= NA
+0x0040 Psh     .equ     64     -- 0_0100_000_0; Psh:  NA  <= S       + 0; MAR <= NA
+0x0041 Pop     .equ     65     -- 0_0100_000_1; Pop:  NA  <= S       + 1; MAR <= NA
+0x0043 SPM     .equ     67     -- 0_0100_001_1; BP:   NA  <= S   + M + 1; MAR <= NA
+0x000B BPM     .equ     11     -- 0_0000_101_1; BP:   NA  <= X   + M + 1; MAR <= NA
+0x0020 IPN     .equ     32     -- 0_0010_000_0; IP:   NA  <= IP      + 0; MAR <= NA
+0x0002 ZPM     .equ      2     -- 0_0000_001_0; ZPM:  NA  <=       M + 0; MAR <= NA
+0x000A ZPX     .equ     10     -- 0_0000_101_0; ZPX:  NA  <= X   + M + 0; MAR <= NA
+0x0006 ZPY     .equ      6     -- 0_0000_011_0; ZPY:  NA  <= Y   + M + 0; MAR <= NA
+0x0002 LDA     .equ      2     -- 0_0000_001_0; LDA:  NA  <=       M + 0; MAR <= NA
+0x000A LDAX    .equ     10     -- 0_0000_101_0; LDAX: NA  <= X   + M + 0; MAR <= NA
+0x0006 LDAY    .equ      6     -- 0_0000_011_0; LDAY: NA  <= Y   + M + 0; MAR <= NA
+0x0008 SRC     .equ      8     -- 0_0000_100_0; LDA:  NA  <= X       + 0; MAR <= NA
+0x0004 DST     .equ      4     -- 0_0000_010_0; LDA:  NA  <= Y       + 0; MAR <= NA
+0x0010 MAR     .equ     16     -- 0_0001_000_0; MAR:  NA  <= MAR     + 0; MAR <= NA
+0x0011 Nxt     .equ     17     -- 0_0001_000_1; Nxt:  NA  <= MAR     + 1; MAR <= NA
+0x0001 MOD     .equ    1       -- Asserts MOD (% 256), page determined by AL[15:8]
+0x0002 SIZ     .equ    2       -- Asserts TSiz
+0x0004 PRV     .equ    4       -- Complements AR to force decrement of NA
+0x0008 SPR     .equ    8       -- Enable SP-Relative Addressing mode if OSX == 1
+0x0003 SMD     .equ    3       -- Assert:    ,    , SIZ, MOD   (% 256)
+0x0006 PVS     .equ    6       -- Assert:    , PRV, SIZ,       16-bit RMW Instructions
+0x0009 RMD     .equ    9       -- Assert: SPR,    ,    , MOD
+0x000A RSZ     .equ    10      -- Assert: SPR,    , SIZ,
+0x000B RSM     .equ    11      -- Assert: SPR,    , SIZ, MOD
+0x0001 WR      .equ    1       -- Bus Operand Write
+0x0002 RD      .equ    2       -- Bus Operand Read
+0x0002 IF      .equ    2       -- Bus Insruction Fetch
+0x0007 SGN     .equ    7       -- OP1 <= DI; OP2 <= sign(DI);
+0x0002 OP2     .equ    2       -- OP2 <= DI; OP1 <= OP1;
+0x0006 OP1     .equ    6       -- OP1 <= DI; OP2 <= 0;
+0x0004 MEM     .equ    4       -- OP1 <= DI; OP2 <= OP2;
+0x0008 IR      .equ    8       -- IR  <= DI;
+0x0001 ALU     .equ    1       -- DO  <= ALU
+0x0003 DOH     .equ    3       -- DO  <= ALU_DO[15:8]
+0x0005 DOL     .equ    5       -- DO  <= ALU_DO[ 7:0]
+0x0002 DMH     .equ    2       -- DO  <= ((PHR) ? MARH : PCH)
+0x0004 DML     .equ    4       -- DO  <= ((PHR) ? MARL : PCL)
+0x0008 PSW     .equ    8       -- DO  <= PSW (P)
+0x0001 WE_R    .equ    1       -- Write Enable Selected Register/Enable ALU operation
+0x0001 ISR     .equ    1       -- Assert ISR: Clr D, Set I, Set M
+0x0001 STW     .equ    1       -- Output W else IP     : T  <= ((STW) ? W : IP)
+0x0002 IP1     .equ    2       -- Increment IP by 1    : IP <= IP + 1
+0x0003 WP2     .equ    3       -- increment W  by 2    : W  <= W  + 2
+0x0004 M2W     .equ    4       -- Load W  with M       : W  <= {OP2, OP1}
+0x0005 M2I     .equ    5       -- Load IP with M       : IP <= {OP2, OP1}
+0x0006 A2I     .equ    6       -- Load IP with A       : IP <= A
+0x0007 W2I     .equ    7       -- Load IP with W       : IP <= W
+0x0001 DecCntr .equ    1       -- Decrement Transfer Length Counter (A)
+0x0006 UpdtPtr .equ    6       -- Update Source (X) and Destination (Y) Pointers
+ 
+-- Defines --
+0x0004 Inst        .def    4       -- Instruction
+0x0008 BA          .def    8       -- Branch Address
+0x0004 uP_Cntl     .def    4       -- Microprogram Control
+0x0009 NA_Cntl     .def    9       -- Next Address Control Field
+0x0002 IO_Cntl     .def    2       -- I/O Cycle Control Field
+0x0004 DIO_Cntl    .def    4       -- Data Input/Output Demux/Mux Control Field
+0x0001 RegWE_Cntl  .def    1       -- Register Write Enable (A, X, Y, S, P)
+0x0001 PSW_Cntl    .def    1       -- Asserted to Clear D and Set I in PSW
+0x0003 uMCntl      .def    3       -- micro-Machine Control Field
+ 
+-- Labels --
+0x0000 _Start
+0x0001 _Rst
+0x0008 _Nxt
+0x0008 _Php
+0x0008 _Plp
+0x0009 _Int
+0x000A _Brk
+0x000B _PshPCL
+0x0010 _Rel
+0x0012 _JSR
+0x0015 _JSR_absI
+0x0018 _RTI
+0x0019 _RTS
+0x001B _Jmp_absXI
+0x001C _Jmp_absXII
+0x0020 _Jmp_abs
+0x0021 _Jmp_absI
+0x0022 _Jmp_absII
+0x0024 _JmpI_Exit
+0x0026 _Jmp_Exit
+0x0027 _Imm
+0x002A _Pop
+0x002D _Psh
+0x0030 _RO_zpII
+0x0032 _RO_zpI
+0x0034 _RO_zp
+0x0036 _RO_zpXII
+0x0038 _RO_zpXI
+0x003A _RO_zpX
+0x003C _RO_zpIIY
+0x003E _RO_zpIY
+0x0040 _RO_zpY
+0x0042 _WO_zpII
+0x0044 _WO_zpI
+0x0046 _WO_zp
+0x0048 _WO_zpXII
+0x004A _WO_zpXI
+0x004C _WO_zpX
+0x004E _WO_zpIIY
+0x0050 _WO_zpIY
+0x0052 _WO_zpY
+0x0054 _RO_abs
+0x0055 _RO_absI
+0x0057 _RO_abs_Exit
+0x0059 _RO_absX
+0x005A _RO_absXI
+0x005C _RO_absX
+0x005E _RO_absY
+0x005F _RO_absIY
+0x0061 _RO_absY_Exit
+0x0063 _WO_abs
+0x0064 _WO_absI
+0x0066 _WO_abs_Exit
+0x0068 _WO_absX
+0x0069 _WO_absIX
+0x006D _WO_absY
+0x006E _WO_absIY
+0x0070 _WO_absY_Exit
+0x0072 _RMW
+0x0074 _RMW_zpX
+0x0075 _RMW_zp
+0x0076 _RMW_zp_IS
+0x0077 _RMW_zp_I
+0x0078 _RMW_zp_S
+0x007A _RMW_absX
+0x007C _RMW_abs
+0x007E _RMW_abs_IS
+0x007F _RMW_abs_I
+0x0080 _RMW_abs_S
+0x0082 _RMW_IS_Exit
+0x0084 _RMW_S_Exit
+0x0086 _RMW_I_Exit
+0x0088 _yMBx_zp
+0x0089 _yMBx_zpI
+0x008C _BByx_zp_rel
+0x008D _BByx_zpI_rel
+0x0091 _PHR_Rel16
+0x0095 _PSH_Imm
+0x0098 _PSH_zp
+0x0099 _PSH_abs
+0x009B _PSH_IS
+0x009C _PSH_I
+0x009D _PSH_S
+0x009E _PSH_Exit
+0x009F _PSH_I_Exit
+0x00A0 _PSH_IS_Exit
+0x00A2 _PSH_S_Exit
+0x00A3 _PUL_zpI
+0x00A5 _PUL_zp
+0x00A6 _PUL_abs
+0x00A7 _PUL_absI
+0x00A9 _PUL_I_Exit
+0x00AA _PUL_Exit
+0x00AC _PUL_S_Exit
+0x00B0 _ENTER
+0x00B2 _NEXT
+0x00B3 _ITC
+0x00B5 _DTC
+0x00B6 _ITC_EXIT
+0x00B7 _PHI
+0x00B8 _PLI
+0x00B9 _PLI_Exit
+0x00BB _RO_ipI
+0x00BD _RO_ip
+0x00BF _WO_ipI
+0x00C1 _WO_ip
+0x00C3 _RMW_ip
+0x00C4 _RMW_ip_IS
+0x00C5 _RMW_ip_I
+0x00C6 _RMW_ip_S
+0x00C8 _MOV
+0x00CB _XMA_zpX
+0x00CC _XMA_zpX_IS
+0x00CD _XMA_zpX_I
+0x00CE _XMA_zpX_S
+0x00D0 _XMA_IS_Exit
+0x00D2 _XMA_S_Exit
+0x00D4 _XMA_I_Exit
+0x00D6 _End_uPgm
+0x0100 _IDEC_Start
+0x0100 _BRK_imm
+0x0101 _BPL_rel
+0x0102 _JSR_abs
+0x0103 _BMI_rel
+0x0104 _RTI_imp
+0x0105 _BVC_rel
+0x0106 _RTS_imp
+0x0107 _BVS_rel
+0x0108 _BRA_rel
+0x0109 _BCC_re
+0x010A _LDY_imm
+0x010B _BCS_rel
+0x010C _CPY_imm
+0x010D _BNE_rel
+0x010E _CPX_imm
+0x010F _BEQ_rel
+0x0110 _ORA_zpXi
+0x0111 _ORA_zpiY
+0x0112 _ANL_zpXi
+0x0113 _ANL_zpiY
+0x0114 _EOR_zpXi
+0x0115 _EOR_zpiY
+0x0116 _ADC_zpXi
+0x0117 _ADC_zpiY
+0x0118 _STA_zpXi
+0x0119 _STA_zpiY
+0x011A _LDA_zpXi
+0x011B _LDA_zpiY
+0x011C _CMP_zpXi
+0x011D _CMP_zpiY
+0x011E _SBC_zpXi
+0x011F _SBC_zpiY
+0x0120 _COPimm
+0x0121 _ORA_zpi
+0x0122 _NOP_22
+0x0123 _ANL_zpi
+0x0124 _NOP_42
+0x0125 _EOR_zpi
+0x0126 _NOP_62
+0x0127 _ADC_zpi
+0x0128 _NOP_82
+0x0129 _STA_zpi
+0x012A _LDX_imm
+0x012B _LDA_zpi
+0x012C _ADJimm
+0x012D _CMP_zpi
+0x012E _PSHimm
+0x012F _SBC_zpi
+0x0130 _ORA_ipp
+0x0131 _ASL_ipp
+0x0132 _ANL_ipp
+0x0133 _ROL_ipp
+0x0134 _EOR_ipp
+0x0135 _LSR_ipp
+0x0136 _ADD_ipp
+0x0137 _ROR_ipp
+0x0138 _STA_ipp
+0x0139 _TSB_ipp
+0x013A _LDA_ipp
+0x013B _TRB_ipp
+0x013C _CMP_ipp
+0x013D _DEC_ipp
+0x013E _SUB_ipp
+0x013F _INC_ipp
+0x0140 _TSB_zp
+0x0141 _TRB_zp
+0x0142 _BIT_zp
+0x0143 _BIT_zpX
+0x0144 _XMA_zp
+0x0145 _MOV_54
+0x0146 _STZ_zp
+0x0147 _STZ_zpX
+0x0148 _STY_zp
+0x0149 _STY_zpX
+0x014A _LDY_zp
+0x014B _LDY_zpX
+0x014C _CPY_zp
+0x014D _PSHzp
+0x014E _CPX_zp
+0x014F _PULzp
+0x0150 _ORA_zp
+0x0151 _ORA_zpX
+0x0152 _ANL_zp
+0x0153 _ANL_zpX
+0x0154 _EOR_zp
+0x0155 _EOR_zpX
+0x0156 _ADC_zp
+0x0157 _ADC_zpX
+0x0158 _STA_zp
+0x0159 _STA_zpX
+0x015A _LDA_zp
+0x015B _LDA_zpX
+0x015C _CMP_zp
+0x015D _CMP_zpX
+0x015E _SBC_zp
+0x015F _SBC_zpX
+0x0160 _ASL_zp
+0x0161 _ASL_zpX
+0x0162 _ROL_zp
+0x0163 _ROL_zpX
+0x0164 _LSR_zp
+0x0165 _LSR_zpX
+0x0166 _ROR_zp
+0x0167 _ROR_zpX
+0x0168 _STX_zp
+0x0169 _STX_zpY
+0x016A _LDX_zp
+0x016B _LDX_zpY
+0x016C _DEC_zp
+0x016D _DEC_zpX
+0x016E _INC_zp
+0x016F _INC_zpX
+0x0170 _RMB0_zp
+0x0171 _RMB1_zp
+0x0172 _RMB2_zp
+0x0173 _RMB3_zp
+0x0174 _RMB4_zp
+0x0175 _RMB5_zp
+0x0176 _RMB6_zp
+0x0177 _RMB7_zp
+0x0178 _SMB0_zp
+0x0179 _SMB1_zp
+0x017A _SMB2_zp
+0x017B _SMB3_zp
+0x017C _SMB4_zp
+0x017D _SMB5_zp
+0x017E _SMB6_zp
+0x017F _SMB7_zp
+0x0180 _PHP
+0x0181 _CLC
+0x0182 _PLP
+0x0183 _SEC
+0x0184 _PHA
+0x0185 _CLI
+0x0186 _PLA
+0x0187 _SEI
+0x0188 _DEY
+0x0189 _TYA
+0x018A _TAY
+0x018B _CLV
+0x018C _INY
+0x018D _CLD
+0x018E _INX
+0x018F _SED
+0x0190 _ORA_imm
+0x0191 _ORA_absY
+0x0192 _ANL_imm
+0x0193 _ANL_absY
+0x0194 _EOR_imm
+0x0195 _EOR_absY
+0x0196 _ADC_imm
+0x0197 _ADC_absY
+0x0198 _BIT_imm
+0x0199 _STA_absY
+0x019A _LDA_imm
+0x019B _LDA_absY
+0x019C _CMP_imm
+0x019D _CMP_absY
+0x019E _SBC_imm
+0x019F _SBC_absY
+0x01A0 _ASL_A
+0x01A1 _INC_A
+0x01A2 _ROL_A
+0x01A3 _DEC_A
+0x01A4 _LSR_A
+0x01A5 _PHY
+0x01A6 _ROR_A
+0x01A7 _PLY
+0x01A8 _TXA
+0x01A9 _TXS
+0x01AA _TAX
+0x01AB _TSX
+0x01AC _DEX
+0x01AD _PHX
+0x01AE _NOP
+0x01AF _PLX
+0x01B0 _DUP
+0x01B1 _SWP
+0x01B2 _ROT
+0x01B3 _NXT
+0x01B4 _PHI
+0x01B5 _INI
+0x01B6 _PLI
+0x01B7 _ENT
+0x01B8 _OAY
+0x01B9 _IND
+0x01BA _SIZ
+0x01BB _ISZ
+0x01BC _OAX
+0x01BD _OSX
+0x01BE _OSZ
+0x01BF _OIS
+0x01C0 _TSB_abs
+0x01C1 _TRB_abs
+0x01C2 _BIT_abs
+0x01C3 _BIT_absX
+0x01C4 _JMP_abs
+0x01C5 _PHRrel16
+0x01C6 _JMP_absI
+0x01C7 _JMP_absXI
+0x01C8 _STY_abs
+0x01C9 _STZ_abs
+0x01CA _LDY_abs
+0x01CB _LDY_absX
+0x01CC _CPY_abs
+0x01CD _PSH_DC
+0x01CE _CPX_abs
+0x01CF _PUL_FC
+0x01D0 _ORA_abs
+0x01D1 _ORA_absX
+0x01D2 _ANL_abs
+0x01D3 _ANL_absX
+0x01D4 _EOR_abs
+0x01D5 _EOR_absX
+0x01D6 _ADC_abs
+0x01D7 _ADC_absX
+0x01D8 _STA_abs
+0x01D9 _STA_absX
+0x01DA _LDA_abs
+0x01DB _LDA_absX
+0x01DC _CMP_abs
+0x01DD _CMP_absX
+0x01DE _SBC_abs
+0x01DF _SBC_absX
+0x01E0 _ASL_abs
+0x01E1 _ASL_absX
+0x01E2 _ROL_abs
+0x01E3 _ROL_absX
+0x01E4 _LSR_abs
+0x01E5 _LSR_absX
+0x01E6 _ROR_abs
+0x01E7 _ROR_absX
+0x01E8 _STX_abs
+0x01E9 _STZ_absX
+0x01EA _LDX_abs
+0x01EB _LDX_absY
+0x01EC _DEC_abs
+0x01ED _DEC_absX
+0x01EE _INC_abs
+0x01EF _INC_absX
+0x01F0 _BBR0_zp_rel
+0x01F1 _BBR1_zp_rel
+0x01F2 _BBR2_zp_rel
+0x01F3 _BBR3_zp_rel
+0x01F4 _BBR4_zp_rel
+0x01F5 _BBR5_zp_rel
+0x01F6 _BBR6_zp_rel
+0x01F7 _BBR7_zp_rel
+0x01F8 _BBS0_zp_rel
+0x01F9 _BBS1_zp_rel
+0x01FA _BBS2_zp_rel
+0x01FB _BBS3_zp_rel
+0x01FC _BBS4_zp_rel
+0x01FD _BBS5_zp_rel
+0x01FE _BBS6_zp_rel
+0x01FF _BBS7_zp_rel
+0x0200 _Last
+0x0200 _end
+ 
+File  Prog     
+Line  Line   Opcode                                Line
+0576 0x0000 _Start: .org 0
+0577 0x0000  01000006 BRV2 _Rst -- {OP2, OP1}<={RST}
+0578 0x0001 _Rst:
+0579 0x0001  01120252 FTCH $,MOD, Psh, WR, DMH, WE_R -- NA<={1,SP}; DO<=PCH; SP--
+0580 0x0002  02120292 FTCH $,MOD, Psh, WR, DML, WE_R -- NA<={1,SP}; DO<=PCL; SP--
+0581 0x0003  0312031A FTCH $,MOD, Psh, WR, PSW, WE_R, ISR -- NA<={1,SP}; DO<=PSW; SP--
+0582  --
+0583 0x0004  040014C2 FTCH $,, LDA, RD, OP1 -- NA<={OP2,OP1}; OP1<=Lo(RST)
+0584 0x0005  05008C4A FTCH $,, Nxt, RD, OP2,, ISR -- NA<=MAR+1; OP2<=Hi(RST)
+0585  --
+0586 0x0006  06081505 BRV1 $,, Jmp, IF, IR -- PC<={OP2,OP1}; NA<={OP2,OP1}
+0588  --------------------------------------------------------------------------------
+0589  -- 2-Way Jump Table: _Nxt and _Int; Instruction Fetch and Execute Microstate
+0590  --------------------------------------------------------------------------------
+0000 0x0007  00000000 added by program
+0592 0x0008 _Nxt: .org 8
+0593 0x0008 _Php:
+0594 0x0008 _Plp:
+0595 0x0008  080C0D15 BRV1 _Nxt,, Inc, IF, IR, WE_R -- Instruction Fetch/Execute
+0597  --------------------------------------------------------------------------------
+0598  -- Interrupt Entry - NMI, (unmasked) IRQ (falls through to second state of BRK)
+0599  --------------------------------------------------------------------------------
+0601 0x0009 _Int:
+0602 0x0009  0B120256 BRV2 _PshPCL,MOD, Psh, WR, DMH, WE_R -- Push PCH, {OP2,OP1}<=Vector(INT)
+0604  --------------------------------------------------------------------------------
+0605  -- BRK Entry - BRK #imm (_Int falls through to _PshPCL, see comment above)
+0606  --------------------------------------------------------------------------------
+0608 0x000A _Brk:
+0609 0x000A  0B120256 BRV2 _PshPCL,MOD, Psh, WR, DMH, WE_R -- Push PCH
+0610 0x000B _PshPCL:
+0611 0x000B  0B120292 FTCH $,MOD, Psh, WR, DML, WE_R -- Push PCL
+0612 0x000C  0C12031A FTCH $,MOD, Psh, WR, PSW, WE_R, ISR -- Push PSW; Clr D, Set I;
+0613  -- {OP2,OP1}<=Vector(BRK)
+0614  --
+0615 0x000D  0D0814C2 FTCH $,, Vec, RD, OP1 -- Read Indirect Dst Ptr Lo
+0616 0x000E  0E008C4A FTCH $,, Nxt, RD, OP2,, ISR -- Read Indirect Dst Ptr Hi
+0617  --
+0618 0x000F  0F081505 BRV1 $,, Jmp, IF, IR -- Instruction Fetch
+0620  --------------------------------------------------------------------------------
+0621  -- Branch if CC - Bcc Rel (Not interruptable)
+0622  --------------------------------------------------------------------------------
+0624 0x0010 _Rel:
+0625 0x0010  100C0C42 FTCH $,, Inc, IF, OP2 -- Read Hi Byte
+0626 0x0011  110C1D05 BRV1 $,, Bra, IF, IR -- Instruction Fetch
+0628  --------------------------------------------------------------------------------
+0629  -- Jump To Subroutine - JSR abs, JSR (abs) (Not interruptable)
+0630  --------------------------------------------------------------------------------
+0632 0x0012 _JSR:
+0633 0x0012  120C0C42 FTCH $,, Inc, RD, OP2 -- Load Dst Ptr Hi
+0634 0x0013  13120242 FTCH $,MOD, Psh, WR, DMH -- Push PC Hi
+0635 0x0014  1512028E BMW2 _JSR_absI,MOD, Psh, WR, DML -- Push PC Lo
+0636 0x0015 _JSR_absI:
+0637 0x0015  150014C2 FTCH $,, LDA, RD, OP1 -- Load Dst Ptr Lo
+0638 0x0016  16008C42 FTCH $,, Nxt, RD, OP2 -- Load Dst Ptr Hi
+0639  --
+0640 0x0017  17081505 BRV1 $,, Jmp, IF, IR -- Instruction Fetch
+0642  --------------------------------------------------------------------------------
+0643  -- Return from Interrupt - RTI (Not interruptable)
+0644  --------------------------------------------------------------------------------
+0646 0x0018 _RTI:
+0647 0x0018  18120CD2 FTCH $,MOD, Pop, RD, OP1, WE_R -- Pop PCL, PSW <= OP1
+0649  --------------------------------------------------------------------------------
+0650  -- Return From Subroutine - RTS (Not interruptable)
+0651  --------------------------------------------------------------------------------
+0653 0x0019 _RTS:
+0654 0x0019  19120C42 FTCH $,MOD, Pop, RD, OP2 -- Pop PCH
+0655 0x001A  1A081D05 BRV1 $,, Rtn, IF, IR -- Execute RTS
+0657  --------------------------------------------------------------------------------
+0658  -- Jump Pre-Indexed Indirect - JMP (abs,X) (Not interruptable)
+0659  --------------------------------------------------------------------------------
+0661 0x001B _Jmp_absXI:
+0662 0x001B  1C0C0C4E BMW2 _Jmp_absXII,, Inc, IF, OP2 -- Load Dst Ptr Hi
+0664 0x001C _Jmp_absXII:
+0665 0x001C  1C0054C2 FTCH $,, LDAX, RD, OP1 -- Read Dst Ptr Lo
+0666 0x001D  24008C44 BRV0 _JmpI_Exit,, Nxt, RD, OP2 -- Read Dst Ptr Hi
+0667  --
+0668 0x001E  1E0054C2 FTCH $,, LDAX, RD, OP1 -- Read Dst Ptr Lo
+0669 0x001F  26008C42 FTCH _Jmp_Exit,, Nxt, RD, OP2 -- Read Dst Ptr Hi
+0671  --------------------------------------------------------------------------------
+0672  -- Jump Absolute - JMP abs (Not interruptable)
+0673  --------------------------------------------------------------------------------
+0675 0x0020 _Jmp_abs:
+0676 0x0020  24008C4E BMW2 _JmpI_Exit,, Nxt, RD, OP2 -- Read Dst Ptr Hi
+0678  --------------------------------------------------------------------------------
+0679  -- Jump Indirect - JMP (abs) (Not interruptable)
+0680  --------------------------------------------------------------------------------
+0682 0x0021 _Jmp_absI:
+0683 0x0021  220C0C4E BMW2 _Jmp_absII,, Inc, IF, OP2 -- Load Dst Ptr Hi
+0685  --------------------------------------------------------------------------------
+0686  -- Jump Double Indirect - JMP ((abs)) (Not interruptable)
+0687  --------------------------------------------------------------------------------
+0689 0x0022 _Jmp_absII:
+0690 0x0022  220014C2 FTCH $,, LDA, RD, OP1 -- Read Dst Ptr Lo
+0691 0x0023  23008C42 FTCH $,, Nxt, RD, OP2 -- Read Dst Ptr Hi
+0693  --------------------------------------------------------------------------------
+0694  -- Jump Absolute Indirect Exit (Not interruptable)
+0695  --------------------------------------------------------------------------------
+0697 0x0024 _JmpI_Exit:
+0698 0x0024  240014C2 FTCH $,, LDA, RD, OP1 -- Read Dst Ptr Lo
+0699 0x0025  25008C42 FTCH $,, Nxt, RD, OP2 -- Read Dst Ptr Hi
+0700  --
+0701 0x0026 _Jmp_Exit:
+0702 0x0026  26081505 BRV1 $,, Jmp, IF, IR -- Next, no Reg_WE, P okay
+0704  --------------------------------------------------------------------------------
+0705  -- Immediate Operand: ORA/ANL/EOR/ADC/LDA/CMP/SBC, LDX/CPX, LDY/CPY, BIT, ADJ
+0706  --
+0707  -- BMW0 uses MW <= {1'b0, SIZ, 1'b0}.
+0708  -- #imm8 : Listed immediate instructions complete execution mormally.
+0709  -- #imm16 : Listed immediate instructions complete execution with extra
+0710  -- read cycle to read the high byte of the immediate operand.
+0711  --------------------------------------------------------------------------------
+0713 0x0027 _Imm:
+0714 0x0027  080C0D15 BRV1 _Nxt,, Inc, IF, IR, WE_R -- Instruction Fetch/Execute
+0715 0x0028  0B120256 BRV2 _PshPCL,MOD, Psh, WR, DMH, WE_R -- {OP2,OP1}<=Vector(INT)
+0716  --
+0717 0x0029  270C0C43 BMW _Imm,, Inc, IF, OP2 -- Read Operand Hi
+0719  --------------------------------------------------------------------------------
+0720  -- Stack Pop: PLA/PLX/PLY
+0721  --
+0722  -- BMW0 uses MW <= {1'b0, SIZ, 1'b0}.
+0723  -- 8-bit : Listed stack instructions complete execution mormally.
+0724  -- 16-bit : Listed stack instructions complete execution with extra
+0725  -- read cycle to read the high byte of the register from stack.
+0726  --------------------------------------------------------------------------------
+0728 0x002A _Pop:
+0729 0x002A  080C0D15 BRV1 _Nxt,, Inc, IF, IR, WE_R -- Instruction Fetch/Execute
+0730 0x002B  0B120256 BRV2 _PshPCL,MOD, Psh, WR, DMH, WE_R -- {OP2,OP1}<=Vector(INT)
+0731  --
+0732 0x002C  2A120C43 BMW _Pop,MOD, Pop, RD, OP2 -- Read Operand Hi
+0734  --------------------------------------------------------------------------------
+0735  -- Stack Push: PHA/PHX/PHY
+0736  --
+0737  -- BMW0 uses MW <= {1'b0, SIZ, 1'b0}.
+0738  -- 8-bit : Listed stack instructions complete execution mormally.
+0739  -- 16-bit : Listed stack instructions complete execution with extra
+0740  -- write cycle to write the high byte of the register to stack.
+0741  --------------------------------------------------------------------------------
+0743 0x002D _Psh:
+0744 0x002D  080C0D15 BRV1 _Nxt,, Inc, IF, IR, WE_R -- Instruction Fetch/Execute
+0745 0x002E  0B120256 BRV2 _PshPCL,MOD, Psh, WR, DMH, WE_R -- {OP2,OP1}<=Vector(INT)
+0746  --
+0747 0x002F  2D120233 BMW _Psh,MOD, Psh, WR, ALU, WE_R -- Write Operand Lo
+0749  --------------------------------------------------------------------------------
+0750  -- Memory Read-Only Zero Page Double Indirect - xxx ((zp))
+0751  --
+0752  -- Keep _RO_zpII and _RO_zpI as a 4 word jump table accessed by BMW2
+0753  --
+0754  --------------------------------------------------------------------------------
+0756 0x0030 _RO_zpII:
+0757 0x0030  309014C2 FTCH $,RMD, ZPM, RD, OP1 -- Read zp Mem Ptr Lo
+0758 0x0031  55108C44 BRV0 _RO_absI,MOD, Nxt, RD, OP2 -- Read zp Mem Ptr Hi
+0760  --------------------------------------------------------------------------------
+0761  -- Memory Read-Only Zero Page Indirect - xxx (zp)
+0762  --
+0763  -- Keep _RO_zpI and _RO_zp as a 4 word jump table accessed by BMW2
+0764  --
+0765  --------------------------------------------------------------------------------
+0767 0x0032 _RO_zpI:
+0768 0x0032  329014C2 FTCH $,RMD, ZPM, RD, OP1 -- Read zp Mem Ptr Lo
+0769 0x0033  57108C44 BRV0 _RO_abs_Exit,MOD, Nxt, RD, OP2 -- Read zp Mem Ptr Hi
+0771  --------------------------------------------------------------------------------
+0772  -- Memory Read-Only Zero Page Direct - xxx zp
+0773  --
+0774  -- Keep _RO_zpI and _RO_zp as a 4 word jump table accessed by BMW2
+0775  --
+0776  --------------------------------------------------------------------------------
+0778 0x0034 _RO_zp:
+0779 0x0034  08B014C3 BMW _Nxt,RSM, ZPM, RD, OP1 -- Read Operand Lo
+0780 0x0035  08108C43 BMW _Nxt,MOD, Nxt, RD, OP2
+0782  --------------------------------------------------------------------------------
+0783  -- Memory Read-Only Pre-Indexed Zero Page Double Indirect - xxx ((zp,X))
+0784  --
+0785  -- Keep _RO_zpXII and _RO_zpXI as a 4 word jump table accessed by BMW2
+0786  --
+0787  --------------------------------------------------------------------------------
+0789 0x0036 _RO_zpXII:
+0790 0x0036  369054C2 FTCH $,RMD, ZPX, RD, OP1 -- Read zp Mem Ptr Lo
+0791 0x0037  55108C44 BRV0 _RO_absI,MOD, Nxt, RD, OP2 -- Read zp Mem Ptr Hi
+0793  --------------------------------------------------------------------------------
+0794  -- Memory Read-Only Pre-Indexed Zero Page Indirect - xxx (zp,X)
+0795  --
+0796  -- Keep _RO_zpXII and _RO_zpXI as a 4 word jump table accessed by BMW2
+0797  --
+0798  --------------------------------------------------------------------------------
+0800 0x0038 _RO_zpXI:
+0801 0x0038  389054C2 FTCH $,RMD, ZPX, RD, OP1 -- Read zp Mem Ptr Lo (zp,X)
+0802 0x0039  57108C44 BRV0 _RO_abs_Exit,MOD, Nxt, RD, OP2 -- Read zp Mem Ptr Hi
+0804  --------------------------------------------------------------------------------
+0805  -- Memory Read-Only Pre-Indexed Zero Page Direct - xxx zp,X
+0806  --
+0807  -- Keep _RO_zpXI and _RO_zpX as a 4 word jump table accessed by BMW2
+0808  --
+0809  --------------------------------------------------------------------------------
+0811 0x003A _RO_zpX:
+0812 0x003A  08B054C3 BMW _Nxt,RSM, ZPX, RD, OP1 -- Read Operand Lo
+0813 0x003B  08108C43 BMW _Nxt,MOD, Nxt, RD, OP2 -- Read Operand Hi
+0815  --------------------------------------------------------------------------------
+0816  -- Memory Read-Only Post-Indexed Zero Page Double Indirect - xxx ((zp)),Y
+0817  --
+0818  -- Keep _RO_zpIIY and_RO_zpIY as a 4 word jump table accessed by BMW2
+0819  --
+0820  --------------------------------------------------------------------------------
+0822 0x003C _RO_zpIIY:
+0823 0x003C  3C9014C2 FTCH $,RMD, ZPM, RD, OP1 -- Read zp Mem Ptr Lo
+0824 0x003D  5F108C44 BRV0 _RO_absIY,MOD, Nxt, RD, OP2 -- Read zp Mem Ptr Lo
+0826  --------------------------------------------------------------------------------
+0827  -- Memory Read-Only Post-Indexed Zero Page Indirect - xxx (zp),Y
+0828  --
+0829  -- Keep _RO_zpIY and RO_zpY as a 4 word jump table accessed by BMW2
+0830  --
+0831  --------------------------------------------------------------------------------
+0833 0x003E _RO_zpIY:
+0834 0x003E  3E9014C2 FTCH $,RMD, ZPM, RD, OP1 -- Read zp Mem Ptr Lo
+0835 0x003F  61108C44 BRV0 _RO_absY_Exit,MOD, Nxt, RD, OP2 -- Read zp Mem Ptr Hi
+0837  --------------------------------------------------------------------------------
+0838  -- Memory Read-Only Post-Indexed Zero Page Direct - xxx zp,Y
+0839  --
+0840  -- Keep _RO_zpIY and _RO_zpY as a 4 word jump table accessed by BMW2
+0841  --
+0842  --------------------------------------------------------------------------------
+0844 0x0040 _RO_zpY:
+0845 0x0040  083034C3 BMW _Nxt,SMD, ZPY, RD, OP1 -- Read Operand Lo
+0846 0x0041  08108C43 BMW _Nxt,MOD, Nxt, RD, OP2 -- Read Operand Hi
+0848  --------------------------------------------------------------------------------
+0849  -- Memory Write-Only Zero Page Double Indirect - xxx ((zp))
+0850  --
+0851  -- Keep _WO_zpII and _WO_zpI as a 4 word jump table to be accessed by BMW2
+0852  --
+0853  --------------------------------------------------------------------------------
+0855 0x0042 _WO_zpII:
+0856 0x0042  429014C2 FTCH $,RMD, ZPM, RD, OP1 -- Read zp Mem Ptr Lo
+0857 0x0043  64108C44 BRV0 _WO_absI,MOD, Nxt, RD, OP2 -- Read zp Mem Ptr Hi
+0859  --------------------------------------------------------------------------------
+0860  -- Memory Write-Only Zero Page Indirect - xxx (zp)
+0861  --
+0862  -- Keep _WO_zpI and _WO_zp as a 4 word jump table to be accessed by BMW2
+0863  --
+0864  --------------------------------------------------------------------------------
+0866 0x0044 _WO_zpI:
+0867 0x0044  449014C2 FTCH $,RMD, ZPM, RD, OP1 -- Read zp Mem Ptr Lo
+0868 0x0045  66108C44 BRV0 _WO_abs_Exit,MOD, Nxt, RD, OP2 -- Read zp Mem Ptr Hi
+0870  --------------------------------------------------------------------------------
+0871  -- Memory Write-Only Zero Page Direct - xxx zp
+0872  --------------------------------------------------------------------------------
+0874 0x0046 _WO_zp:
+0875 0x0046  08B01233 BMW _Nxt,RSM, ZPM, WR, ALU, WE_R -- Write Memory Lo
+0876 0x0047  08108A33 BMW _Nxt,MOD, Nxt, WR, ALU, WE_R -- Write Memory Hi
+0878  --------------------------------------------------------------------------------
+0879  -- Memory Write-Only Pre-Indexed Zero Page Double Indirect - xxx ((zp,X))
+0880  --
+0881  -- Keep _WO_zpIIX and _WO_zpXI as a 4 word jump table to be accessed by BMW2
+0882  --
+0883  --------------------------------------------------------------------------------
+0885 0x0048 _WO_zpXII:
+0886 0x0048  489054C2 FTCH $,RMD, ZPX, RD, OP1 -- Read zp Mem Ptr Lo
+0887 0x0049  64108C44 BRV0 _WO_absI,MOD, Nxt, RD, OP2 -- Read zp Mem Ptr Hi
+0889  --------------------------------------------------------------------------------
+0890  -- Memory Write-Only Pre-Indexed Zero Page Indirect - xxx (zp,X)
+0891  --
+0892  -- Keep _WO_zpXI and _WO_zpX as a 4 word jump table to be accessed by BMW2
+0893  --
+0894  --------------------------------------------------------------------------------
+0896 0x004A _WO_zpXI:
+0897 0x004A  4A9054C2 FTCH $,RMD, ZPX, RD, OP1 -- Read zp Mem Ptr Lo
+0898 0x004B  66108C44 BRV0 _WO_abs_Exit,MOD, Nxt, RD, OP2 -- Read zp Mem Ptr Hi
+0900  --------------------------------------------------------------------------------
+0901  -- Memory Write-Only Pre-Indexed Zero Page Direct - xxx zp,X
+0902  --------------------------------------------------------------------------------
+0904 0x004C _WO_zpX:
+0905 0x004C  08B05233 BMW _Nxt,RSM, ZPX, WR, ALU, WE_R -- Write Memory Lo
+0906 0x004D  08108A33 BMW _Nxt,MOD, Nxt, WR, ALU, WE_R -- Write Memory Hi
+0908  --------------------------------------------------------------------------------
+0909  -- Memory Write-Only Post-Indexed Zero Page Double Indirect - xxx ((zp)),Y
+0910  --
+0911  -- Keep _WO_zpIIY and _WO_zpIY as a 4 word jump table accessed by BMW2
+0912  --
+0913  --------------------------------------------------------------------------------
+0915 0x004E _WO_zpIIY:
+0916 0x004E  4E9014C2 FTCH $,RMD, ZPM, RD, OP1 -- Read zp Mem Ptr Lo
+0917 0x004F  6E108C44 BRV0 _WO_absIY,MOD, Nxt, RD, OP2 -- Read zp Mem Ptr Hi
+0919  --------------------------------------------------------------------------------
+0920  -- Memory Write-Only Post-Indexed Zero Page Indirect - xxx (zp),Y
+0921  --
+0922  -- Keep _WO_zpIY and _WO_zpY as a 4 word jump table accessed by BMW2
+0923  --
+0924  --------------------------------------------------------------------------------
+0926 0x0050 _WO_zpIY:
+0927 0x0050  509014C2 FTCH $,RMD, ZPM, RD, OP1 -- Read zp Mem Ptr Lo
+0928 0x0051  70108C44 BRV0 _WO_absY_Exit,MOD, Nxt, RD, OP2 -- Read zp Mem Ptr Hi
+0930  --------------------------------------------------------------------------------
+0931  -- Memory Write-Only Post-Indexed Zero Page Direct - xxx zp,Y
+0932  --
+0933  -- Keep _WO_zpIY and _WO_zpY as a 4 word jump table accessed by BMW2
+0934  --
+0935  --------------------------------------------------------------------------------
+0937 0x0052 _WO_zpY:
+0938 0x0052  08303233 BMW _Nxt,SMD, ZPY, WR, ALU, WE_R -- Write Memory Lo
+0939 0x0053  08108A33 BMW _Nxt,MOD, Nxt, WR, ALU, WE_R -- Write Memory Hi
+0941  --------------------------------------------------------------------------------
+0942  -- Memory Read-Only Absolute - xxx abs
+0943  --------------------------------------------------------------------------------
+0945 0x0054 _RO_abs:
+0946 0x0054  550C0C4E BMW2 _RO_absI,, Inc, IF, OP2 -- Read Mem Ptr Hi
+0948  --------------------------------------------------------------------------------
+0949  -- Memory Read-Only Absolute Indirect - xxx (abs)
+0950  --------------------------------------------------------------------------------
+0952 0x0055 _RO_absI:
+0953 0x0055  558014C2 FTCH $,SPR, LDA, RD, OP1 -- Read Mem Ptr Lo
+0954 0x0056  56008C42 FTCH $,, Nxt, RD, OP2 -- Read Mem Ptr Hi
+0955 0x0057 _RO_abs_Exit:
+0956 0x0057  08A014C3 BMW _Nxt,RSZ, LDA, RD, OP1 -- Read Operand Lo
+0957 0x0058  08008C43 BMW _Nxt,, Nxt, RD, OP2 -- Read Operand Hi
+0959  --------------------------------------------------------------------------------
+0960  -- Memory Read-Only Pre-Indexed Absolute - xxx abs,X
+0961  --------------------------------------------------------------------------------
+0963 0x0059 _RO_absX:
+0964 0x0059  5A0C0C4E BMW2 _RO_absXI,, Inc, IF, OP2 -- Read Mem Ptr Hi
+0966  --------------------------------------------------------------------------------
+0967  -- Memory Read-Only Pre-Indexed Absolute Indirect - xxx (abs,X)
+0968  --------------------------------------------------------------------------------
+0970 0x005A _RO_absXI:
+0971 0x005A  5A8054C2 FTCH $,SPR, LDAX, RD, OP1 -- Read Mem Ptr Lo
+0972 0x005B  57008C44 BRV0 _RO_abs_Exit,, Nxt, RD, OP2 -- Read Mem Ptr Hi
+0973  --
+0974 0x005C _RO_absX:
+0975 0x005C  08A054C3 BMW _Nxt,RSZ, LDAX, RD, OP1 -- Read Operand Lo
+0976 0x005D  08008C43 BMW _Nxt,, Nxt, RD, OP2 -- Read Operand Hi
+0978  --------------------------------------------------------------------------------
+0979  -- Memory Read-Only Post-Indexed Absolute - xxx abs,Y
+0980  --------------------------------------------------------------------------------
+0982 0x005E _RO_absY:
+0983 0x005E  5F0C0C4E BMW2 _RO_absIY,, Inc, IF, OP2 -- Read Mem Ptr Hi
+0985  --------------------------------------------------------------------------------
+0986  -- Memory Read-Only Post-Indexed Absolute Indirect - xxx (abs),Y
+0987  --------------------------------------------------------------------------------
+0989 0x005F _RO_absIY:
+0990 0x005F  5F8014C2 FTCH $,SPR, LDA, RD, OP1 -- Read Mem Ptr Lo
+0991 0x0060  60008C42 FTCH $,, Nxt, RD, OP2 -- Read Mem Ptr Hi
+0992 0x0061 _RO_absY_Exit:
+0993 0x0061  08A034C3 BMW _Nxt,RSZ, LDAY, RD, OP1 -- Read Operand Lo
+0994 0x0062  08008C43 BMW _Nxt,, Nxt, RD, OP2 -- Read Operand Hi
+0996  --------------------------------------------------------------------------------
+0997  -- Memory Write-Only Absolute - xxx abs
+0998  --------------------------------------------------------------------------------
+1000 0x0063 _WO_abs:
+1001 0x0063  640C0C4E BMW2 _WO_absI,, Inc, IF, OP2 -- Read Mem Ptr Hi
+1003  --------------------------------------------------------------------------------
+1004  -- Memory Write-Only Absolute Indirect - xxx (abs)
+1005  --------------------------------------------------------------------------------
+1007 0x0064 _WO_absI:
+1008 0x0064  648014C2 FTCH $,SPR, LDA, RD, OP1 -- Read Mem Ptr Lo
+1009 0x0065  65008C42 FTCH $,, Nxt, RD, OP2 -- Read Mem Ptr Hi
+1010 0x0066 _WO_abs_Exit:
+1011 0x0066  08A01233 BMW _Nxt,RSZ, LDA, WR, ALU, WE_R -- Write Memory Lo
+1012 0x0067  08008A33 BMW _Nxt,, Nxt, WR, ALU, WE_R -- Write Memory Hi
+1014  --------------------------------------------------------------------------------
+1015  -- Memory Write-Only Pre-Indexed Absolute - xxx abs,X
+1016  --------------------------------------------------------------------------------
+1018 0x0068 _WO_absX:
+1019 0x0068  690C0C4E BMW2 _WO_absIX,, Inc, IF, OP2 -- Read Mem Ptr Hi
+1021  --------------------------------------------------------------------------------
+1022  -- Memory Write-Only Pre-Indexed Absolute Indirect - xxx (abs,X)
+1023  --------------------------------------------------------------------------------
+1025 0x0069 _WO_absIX:
+1026 0x0069  698054C2 FTCH $,SPR, LDAX, RD, OP1 -- Read Mem Ptr Lo
+1027 0x006A  66008C44 BRV0 _WO_abs_Exit,, Nxt, RD, OP2 -- Read Mem Ptr Hi
+1028  --
+1029 0x006B  08A05233 BMW _Nxt,RSZ, LDAX, WR, ALU, WE_R -- Write Memory Lo
+1030 0x006C  08008A33 BMW _Nxt,, Nxt, WR, ALU, WE_R -- Write Memory Hi
+1032  --------------------------------------------------------------------------------
+1033  -- Memory Write-Only Post-Indexed Absolute - xxx abs,Y
+1034  --------------------------------------------------------------------------------
+1036 0x006D _WO_absY:
+1037 0x006D  6E0C0C4E BMW2 _WO_absIY,, Inc, IF, OP2 -- Read Mem Ptr Hi
+1039  --------------------------------------------------------------------------------
+1040  -- Memory Write-Only Post-Indexed Absolute Indirect - xxx (abs),Y
+1041  --------------------------------------------------------------------------------
+1043 0x006E _WO_absIY:
+1044 0x006E  6E8014C2 FTCH $,SPR, LDA, RD, OP1 -- Read Mem Ptr Lo
+1045 0x006F  6F008C42 FTCH $,, Nxt, RD, OP2 -- Read Mem Ptr Hi
+1046  --
+1047 0x0070 _WO_absY_Exit:
+1048 0x0070  08A03233 BMW _Nxt,RSZ, LDAY, WR, ALU, WE_R -- Write Memory Lo
+1049 0x0071  08008A33 BMW _Nxt,, Nxt, WR, ALU, WE_R -- Write Memory Hi
+1051  --------------------------------------------------------------------------------
+1052  -- 2-way Read-Modify-Write Instruction/Interrupt Jump Table
+1053  --------------------------------------------------------------------------------
+1055 0x0072 _RMW:
+1056 0x0072  720C0D05 BRV1 _RMW,, Inc, IF, IR -- Instruction Fetch/Execute
+1057 0x0073  0A120246 BRV2 _Brk,MOD, Psh, WR, DMH -- Push PCH, capture Vector
+1059  --------------------------------------------------------------------------------
+1060  -- Read-Modify-Write Pre-Indexed Zero Page Direct - RMW zp,X
+1061  --------------------------------------------------------------------------------
+1063 0x0074 _RMW_zpX:
+1064 0x0074  769054CD BMW1 _RMW_zp_IS,RMD, ZPX, RD, OP1 -- Read Op/Op Ptr Lo
+1066  --------------------------------------------------------------------------------
+1067  -- Read-Modify-Write Zero Page Direct - RMW zp
+1068  --------------------------------------------------------------------------------
+1070 0x0075 _RMW_zp:
+1071 0x0075  769014CD BMW1 _RMW_zp_IS,RMD, ZPM, RD, OP1 -- Read Op/Op Ptr Lo
+1073  --------------------------------------------------------------------------------
+1074  -- Common Jump Table for RMW zp; RMW zp,X;
+1075  --------------------------------------------------------------------------------
+1077 0x0076 _RMW_zp_IS: -- MW<=000<={0, IND, SIZ}
+1078 0x0076  82108C44 BRV0 _RMW_IS_Exit,MOD, Nxt, RD, OP2 -- Read Op Ptr Hi
+1079 0x0077 _RMW_zp_I: -- MW<=001<={0, IND, ~SIZ}
+1080 0x0077  86108C44 BRV0 _RMW_I_Exit,MOD, Nxt, RD, OP2 -- Read Op Ptr Hi
+1081 0x0078 _RMW_zp_S: -- MW<=010<={0,~IND, SIZ}
+1082 0x0078  84108C44 BRV0 _RMW_S_Exit,MOD, Nxt, RD, OP2 -- Read Op Hi
+1083  -- -- MW<=011<={0,~IND, ~SIZ}
+1084 0x0079  72008233 BMW _RMW,, MAR, WR, ALU, WE_R -- Write 8-bit Result
+1086  --------------------------------------------------------------------------------
+1087  -- Read-Modify-Write Pre-Indexed Absolute - RMW abs,X
+1088  --------------------------------------------------------------------------------
+1090 0x007A _RMW_absX:
+1091 0x007A  7A0C0C42 FTCH $,, Inc, IF, OP2 -- Rd Mem Ptr Hi
+1092 0x007B  7E8054CD BMW1 _RMW_abs_IS,SPR, LDAX, RD, OP1 -- Rd Op/Op Ptr Lo
+1094  --------------------------------------------------------------------------------
+1095  -- Read-Modify-Write Absolute - RMW abs
+1096  --------------------------------------------------------------------------------
+1098 0x007C _RMW_abs:
+1099 0x007C  7C0C0C42 FTCH $,, Inc, IF, OP2 -- Rd Mem Ptr Hi
+1100 0x007D  7E8014CD BMW1 _RMW_abs_IS,SPR, LDA, RD, OP1 -- Rd Op/Op Ptr Lo
+1102  --------------------------------------------------------------------------------
+1103  -- Common Jump Table for RMW abs and RMW abs,X
+1104  --------------------------------------------------------------------------------
+1106 0x007E _RMW_abs_IS: -- MW<=000<={0, IND, SIZ}
+1107 0x007E  82008C44 BRV0 _RMW_IS_Exit,, Nxt, RD, OP2 -- Read Op Ptr Hi
+1108 0x007F _RMW_abs_I: -- MW<=001<={0, IND, ~SIZ}
+1109 0x007F  86008C44 BRV0 _RMW_I_Exit,, Nxt, RD, OP2 -- Read Op Ptr Hi
+1110 0x0080 _RMW_abs_S: -- MW<=010<={0,~IND, SIZ}
+1111 0x0080  84008C44 BRV0 _RMW_S_Exit,, Nxt, RD, OP2 -- Read Op Hi
+1112  -- -- MW<=011<={0,~IND, ~SIZ}
+1113 0x0081  72008233 BMW _RMW,, MAR, WR, ALU, WE_R -- Write 8-bit Result
+1115  --------------------------------------------------------------------------------
+1116  -- Common RMW Instruction Microsequences: RMW zp; RMW zp,X; RMW abs; RMW abs,X
+1117  -- RMW ip,I++
+1118  --------------------------------------------------------------------------------
+1120 0x0082 _RMW_IS_Exit:
+1121 0x0082  820014C2 FTCH $,, LDA, RD, OP1 -- Read 16-bit Operand Lo
+1122 0x0083  83008C42 FTCH $,, Nxt, RD, OP2 -- Read 16-bit Operand Hi
+1123  --
+1124 0x0084 _RMW_S_Exit:
+1125 0x0084  84608232 FTCH $,PVS, MAR, WR, ALU, WE_R -- Write 16-bit Result Lo
+1126 0x0085  72008A33 BMW _RMW,, Nxt, WR, ALU, WE_R -- Write 16-bit Result Hi
+1127  --
+1128 0x0086 _RMW_I_Exit:
+1129 0x0086  860014C2 FTCH _$,, LDA, RD, OP1 -- Read 8-bit Operand
+1130 0x0087  72008233 BMW _RMW,, MAR, WR, ALU, WE_R -- Write 8-bit Result
+1132  --------------------------------------------------------------------------------
+1133  --------------------------------------------------------------------------------
+1134  -- W65C02S Specific instructions
+1135  --------------------------------------------------------------------------------
+1136  --------------------------------------------------------------------------------
+1137  -- Rockwell RMBx/SMBx zp instructions (Support OSX, IND, but not SIZ)
+1138  --------------------------------------------------------------------------------
+1140 0x0088 _yMBx_zp:
+1141 0x0088  899014CE BMW2 _yMBx_zpI,RMD, ZPM, RD, OP1 -- Rd Op/Op Ptr Lo
+1143 0x0089 _yMBx_zpI:
+1144 0x0089  89108C42 FTCH $,MOD, Nxt, RD, OP2 -- Rd Op Ptr Hi
+1145 0x008A  8A0014C2 FTCH $,, LDA, RD, OP1 -- Rd Operand
+1146  --
+1147 0x008B  72008233 BMW _RMW,, MAR, WR, ALU, WE_R -- Wr Result to Memory
+1149  --------------------------------------------------------------------------------
+1150  -- Rockwell BBRx/BBSx zp,rel instructions (Support OSX, IND, but not SIZ)
+1151  --------------------------------------------------------------------------------
+1153 0x008C _BByx_zp_rel:
+1154 0x008C  8D9014CE BMW2 _BByx_zpI_rel,RMD, ZPM, RD, OP1 -- Read Op/Op Ptr Lo
+1156 0x008D _BByx_zpI_rel:
+1157 0x008D  8D108C42 FTCH $,MOD, Nxt, RD, OP2 -- Read Op Ptr Hi
+1158 0x008E  8E0014C2 FTCH $,, LDA, RD, OP1 -- Read Operand
+1159  --
+1160 0x008F  8F0C0CF2 FTCH $,, Inc, IF, SGN, WE_R -- Read rel val, test op
+1161 0x0090  900C1D05 BRV1 $,, Bra, IF, IR -- Execute BByx
+1163  --------------------------------------------------------------------------------
+1164  -- STP - Wait for Interrupt
+1165  --------------------------------------------------------------------------------
+1166  --
+1167  --_STP:
+1168  -- BRV0 $,, PC -- Halt Exection
+1169  --
+1170  --------------------------------------------------------------------------------
+1171  -- WAI - Wait for Interrupt
+1172  --------------------------------------------------------------------------------
+1173  --
+1174  --_WAI: -- Set up 4-way table for WAI instruction
+1175  -- BMW _WAI,, PC -- No external interrupts asserted
+1176  -- BRV0 _Int,, PC -- Int asserted by NMI, do NMI interrupt
+1177  -- BRV0 _Nxt,, PC -- xIRQ asserted with IRQ_Msk asserted, cont.
+1178  -- BRV0 _Int,, PC -- Int asserted by xIRQ, do IRQ interrupt
+1179  --
+1180  --------------------------------------------------------------------------------
+1181  --------------------------------------------------------------------------------
+1182  -- M65C02A Specific: New Stack Instructions
+1183  --------------------------------------------------------------------------------
+1184  --------------------------------------------------------------------------------
+1186  --------------------------------------------------------------------------------
+1187  -- Push 16-bit PC-Relative Value - PHR Rel16
+1188  --------------------------------------------------------------------------------
+1190 0x0091 _PHR_Rel16:
+1191 0x0091  910C0C42 FTCH $,, Inc, IF, OP2 -- Read Hi(Rel16)
+1192 0x0092  92041802 FTCH $,, Rel -- MAR = PC + {OP2, OP1} + 1
+1193 0x0093  93120252 FTCH $,MOD, Psh, WR, DMH, WE_R -- Push Hi(MAR) (MAR[15:8])
+1194 0x0094  08120293 BMW _Nxt,MOD, Psh, WR, DML, WE_R -- Push Lo(MAR) (MAR[ 7:0])
+1196  --------------------------------------------------------------------------------
+1197  -- Push Immediate Value - PSH #Imm; PSH.w #Imm16
+1198  --------------------------------------------------------------------------------
+1200 0x0095 _PSH_Imm:
+1201 0x0095  950C0C42 FTCH $,, Inc, IF, OP2 -- Read Hi (OP2)
+1202 0x0096  96120272 FTCH $,MOD, Psh, WR, DOH, WE_R -- Push Hi (OP2)
+1203  --
+1204 0x0097  081202B3 BMW _Nxt,MOD, Psh, WR, DOL, WE_R -- Push Lo (OP1)
+1206  --------------------------------------------------------------------------------
+1207  -- Push Zero-Page Value - PSH zp; PSH (zp); PSH.w zp; PSH.w (zp)
+1208  --------------------------------------------------------------------------------
+1210 0x0098 _PSH_zp:
+1211 0x0098  9B9014CD BMW1 _PSH_IS,RMD, ZPM, RD, OP1 -- Read Op/Op Ptr Lo
+1213  --------------------------------------------------------------------------------
+1214  -- Push Absolute Value - PSH abs; PSH (abs); PSH.w abs; PSH.w (abs)
+1215  --------------------------------------------------------------------------------
+1217 0x0099 _PSH_abs:
+1218 0x0099  990C0C42 FTCH $,, Inc, IF, OP2 -- Read Data Ptr Hi
+1219 0x009A  9B8014CD BMW1 _PSH_IS,SPR, LDA, RD, OP1 -- Read Op/Op Ptr Lo
+1221  --------------------------------------------------------------------------------
+1222  -- Common Jump Table - PSH zp; PSH (zp); PSH.w zp; PSH.w (zp)
+1223  -- PSH abs; PSH (abs); PSH.w abs; PSH.w (abs)
+1224  --------------------------------------------------------------------------------
+1226 0x009B _PSH_IS: -- MW<=000<={0, IND, SIZ}
+1227 0x009B  A0108C44 BRV0 _PSH_IS_Exit,MOD, Nxt, RD, OP2 -- Read Op Ptr Hi
+1228 0x009C _PSH_I: -- MW<=001<={0, IND, ~SIZ}
+1229 0x009C  9F108C44 BRV0 _PSH_I_Exit,MOD, Nxt, RD, OP2 -- Read Op Ptr Hi
+1230 0x009D _PSH_S: -- MW<=010<={0,~IND, SIZ}
+1231 0x009D  A2108C44 BRV0 _PSH_S_Exit,MOD, Nxt, RD, OP2 -- Read Op Hi
+1232 0x009E _PSH_Exit: -- MW<=011<={0,~IND, ~SIZ}
+1233 0x009E  081202B3 BMW _Nxt,MOD, Psh, WR, DOL, WE_R -- Push Op Lo
+1235  --------------------------------------------------------------------------------
+1236  -- Common Exit Table - PSH zp; PSH (zp); PSH.w zp; PSH.w (zp)
+1237  -- PSH abs; PSH (abs); PSH.w abs; PSH.w (abs)
+1238  --------------------------------------------------------------------------------
+1240 0x009F _PSH_I_Exit:
+1241 0x009F  9E0014C4 BRV0 _PSH_Exit,, LDA, RD, OP1 -- Read Op Lo
+1242 0x00A0 _PSH_IS_Exit:
+1243 0x00A0  A00014C2 FTCH $,, LDA, RD, OP1 -- Read Op Lo
+1244 0x00A1  A1008C42 FTCH $,, Nxt, RD, OP2 -- Read Op Hi
+1245 0x00A2 _PSH_S_Exit:
+1246 0x00A2  9E120274 BRV0 _PSH_Exit,MOD, Psh, WR, DOH, WE_R -- Push Op Hi
+1248  --------------------------------------------------------------------------------
+1249  -- Pull Zero-Page Value - PUL zp; PUL (zp); PUL.w zp; PUL.w (zp)
+1250  --------------------------------------------------------------------------------
+1252 0x00A3 _PUL_zpI:
+1253 0x00A3  A39014C2 FTCH $,RMD, ZPM, RD, OP1 -- Read Data Ptr Lo
+1254 0x00A4  A9108C44 BRV0 _PUL_I_Exit,MOD, Nxt, RD, OP2 -- Read Data Ptr Hi
+1255 0x00A5 _PUL_zp:
+1256 0x00A5  AA90100C BMW0 _PUL_Exit,RMD, ZPM -- MAR = {0, OP1}
+1258  --------------------------------------------------------------------------------
+1259  -- Pull Absolute Value - PUL abs; PUL (abs); PUL.w abs; PUL.w (abs)
+1260  --------------------------------------------------------------------------------
+1262 0x00A6 _PUL_abs:
+1263 0x00A6  A70C0C4E BMW2 _PUL_absI,, Inc, IF, OP2 -- Read Data Ptr Hi
+1264 0x00A7 _PUL_absI:
+1265 0x00A7  A78014C2 FTCH $,SPR, LDA, RD, OP1 -- Read Data Ptr Lo
+1266 0x00A8  AA008C4C BMW0 _PUL_Exit,, Nxt, RD, OP2 -- Read Data Ptr Hi
+1267 0x00A9 _PUL_I_Exit:
+1268 0x00A9  AA80100C BMW0 _PUL_Exit,SPR, LDA -- MAR = {OP2, OP1}
+1270  --------------------------------------------------------------------------------
+1271  -- Common Exit Table - PUL zp; PUL (zp); PUL.w zp; PUL.w (zp)
+1272  -- PUL abs; PUL (abs); PUL.w abs; PUL.w (abs)
+1273  --------------------------------------------------------------------------------
+1275 0x00AA _PUL_Exit: -- 8-bit PUL operation
+1276 0x00AA  AA120CC2 FTCH $,MOD, Pop, RD, OP1 -- Pop Operand Lo
+1277 0x00AB  080082B3 BMW _Nxt,, MAR, WR, DOL, WE_R -- Write Operand Lo
+1278 0x00AC _PUL_S_Exit: -- 16-bit PUL operation
+1279 0x00AC  AC120CC2 FTCH $,MOD, Pop, RD, OP1 -- Pop Operand Lo
+1280 0x00AD  AD120C42 FTCH $,MOD, Pop, RD, OP2 -- Pop Operand Hi
+1281 0x00AE  AE0082B2 FTCH $,, MAR, WR, DOL, WE_R -- Write Operand Lo
+1282 0x00AF  08008A73 BMW _Nxt,, Nxt, WR, DOH, WE_R -- Write Operand Hi
+1284  --------------------------------------------------------------------------------
+1285  --------------------------------------------------------------------------------
+1286  -- M65C02A-Specific: FORTH VM Instructions
+1287  --------------------------------------------------------------------------------
+1288  --------------------------------------------------------------------------------
+1290  --------------------------------------------------------------------------------
+1291  -- ENTER - FORTH VM Inner Interpreter Call/Enter (Not Interruptable)
+1292  --------------------------------------------------------------------------------
+1294 0x00B0 _ENTER:
+1295 0x00B0  B03202B9 FTCH $,SMD, Psh, WR, DOL, WE_R,, W2I -- Push FORTH Addrs Ptr Hi
+1296  --
+1297 0x00B1  B10104C4 FTCH $,, IPN, RD, OP1,,, IP1 -- Read FORTH Addrs Ptr Lo
+1299  --------------------------------------------------------------------------------
+1300  -- NEXT - FORTH VM Inner Interpreter (Not Interruptable)
+1301  --------------------------------------------------------------------------------
+1303 0x00B2 _NEXT:
+1304 0x00B2  B3010450 BMW2 _ITC,, IPN, RD, OP2,,, IP1 -- Read FORTH Addrs Ptr Hi
+1305 0x00B3 _ITC:
+1306 0x00B3  B30014C6 FTCH $,, LDA, RD, OP1,,, M2W -- Read FORTH Word CFA Lo
+1307 0x00B4  B6008C44 BRV0 _ITC_EXIT,, Nxt, RD, OP2 -- Read FORTH Word CFA Hi
+1308 0x00B5 _DTC:
+1309 0x00B5  B5081509 BRV1 $,, Jmp, IF, IR,,, M2W -- Fetch next instruction
+1310 0x00B6 _ITC_EXIT:
+1311 0x00B6  B6081505 BRV1 $,, Jmp, IF, IR -- Fetch next instruction
+1313  --------------------------------------------------------------------------------
+1314  -- Push 16-bit IP/W - PSH I (PHI); PSH W (IND PHI)
+1315  --------------------------------------------------------------------------------
+1317 0x00B7 _PHI:
+1318 0x00B7  081202B3 BMW _Nxt,MOD, Psh, WR, DOL, WE_R -- Push IP/W Lo
+1320  --------------------------------------------------------------------------------
+1321  -- Pull 16-bit IP/W - PUL I (PLI); PUL W (PLW) (IND PLI)
+1322  --------------------------------------------------------------------------------
+1324 0x00B8 _PLI:
+1325 0x00B8  B9120C43 BMW _PLI_Exit,MOD, Pop, RD, OP2 -- Read Operand Hi
+1327 0x00B9 _PLI_Exit:
+1328 0x00B9  B9008D0A BRV1 $,, Nxt, IF, IR,,, M2I -- Fetch next instruction
+1329 0x00BA  0B12025B BRV2 _PshPCL,MOD, Psh, WR, DMH, WE_R,, M2I -- {OP2, OP1} <= Vector(INT)
+1330  -- Push PCH
+1331  --------------------------------------------------------------------------------
+1332  --------------------------------------------------------------------------------
+1333  -- M65C02A Specific: IP-Relative w/ Auto-Increment Instructions
+1334  --------------------------------------------------------------------------------
+1335  --------------------------------------------------------------------------------
+1337  --------------------------------------------------------------------------------
+1338  -- RO IP-relative (with autoincrement) Indirect: xxx (ip,I++)
+1339  --
+1340  -- Keep in 4 word table with RO xxx ip,I++
+1341  --------------------------------------------------------------------------------
+1343 0x00BB _RO_ipI:
+1344 0x00BB  BB0104C4 FTCH $,, IPN, RD, OP1,,, IP1 -- Read Pointer Lo
+1345 0x00BC  57010446 BRV0 _RO_abs_Exit,, IPN, RD, OP2,,, IP1 -- Read Pointer Hi
+1347  --------------------------------------------------------------------------------
+1348  -- RO IP-relative (with autoincrement): xxx ip,I++
+1349  --
+1350  -- Keep in 4 word table with RO xxx (ip,I++)
+1351  --------------------------------------------------------------------------------
+1353 0x00BD _RO_ip:
+1354 0x00BD  082104C5 BMW _Nxt,SIZ, IPN, RD, OP1,,, IP1 -- Read Operand Lo
+1355 0x00BE  08010445 BMW _Nxt,, IPN, RD, OP2,,, IP1 -- Read Operand Hi
+1357  --------------------------------------------------------------------------------
+1358  -- WO IP-relative (with autoincrement) Indirect: xxx (ip,I++)
+1359  --
+1360  -- Keep in 4 word table with WO xxx ip,I++
+1361  --------------------------------------------------------------------------------
+1363 0x00BF _WO_ipI:
+1364 0x00BF  BF0104C4 FTCH $,, IPN, RD, OP1,,, IP1 -- Read Pointer Lo
+1365 0x00C0  66010446 BRV0 _WO_abs_Exit,, IPN, RD, OP2,,, IP1 -- Read Pointer Hi
+1367  --------------------------------------------------------------------------------
+1368  -- WO IP-relative (with autoincrement): xxx ip,I++
+1369  --
+1370  -- Keep in 4 word table with WO xxx (ip,I++)
+1371  --------------------------------------------------------------------------------
+1373 0x00C1 _WO_ip:
+1374 0x00C1  08210235 BMW _Nxt,SIZ, IPN, WR, ALU, WE_R,, IP1 -- Write Accumulator Lo
+1375 0x00C2  08010235 BMW _Nxt,, IPN, WR, ALU, WE_R,, IP1 -- Write Accumulator Hi
+1377  --------------------------------------------------------------------------------
+1378  -- Read-Modify-Write IP-relative - RMW ip,I++
+1379  --------------------------------------------------------------------------------
+1381 0x00C3 _RMW_ip:
+1382 0x00C3  C41104CF BMW1 _RMW_ip_IS,MOD, IPN, RD, OP1,,, IP1 -- Read Op/Op Ptr Lo
+1384  --------------------------------------------------------------------------------
+1385  -- Jump Table for RMW ip,I++
+1386  --------------------------------------------------------------------------------
+1388 0x00C4 _RMW_ip_IS: -- MW<=000<={0, IND, SIZ}
+1389 0x00C4  82108C46 BRV0 _RMW_IS_Exit,MOD, Nxt, RD, OP2,,, IP1 -- Read Op Ptr Hi
+1390 0x00C5 _RMW_ip_I: -- MW<=001<={0, IND, ~SIZ}
+1391 0x00C5  86108C46 BRV0 _RMW_I_Exit,MOD, Nxt, RD, OP2,,, IP1 -- Read Op Ptr Hi
+1392 0x00C6 _RMW_ip_S: -- MW<=010<={0,~IND, SIZ}
+1393 0x00C6  84108C46 BRV0 _RMW_S_Exit,MOD, Nxt, RD, OP2,,, IP1 -- Read Op Hi
+1394  -- -- MW<=011<={0,~IND, ~SIZ}
+1395 0x00C7  72008233 BMW _RMW,, MAR, WR, ALU, WE_R -- Write 8-bit Result
+1397  --------------------------------------------------------------------------------
+1398  --------------------------------------------------------------------------------
+1399  -- M65C02A-Specific: Miscellaneous Instructions
+1400  --------------------------------------------------------------------------------
+1401  --------------------------------------------------------------------------------
+1403  --------------------------------------------------------------------------------
+1404  -- MOV - Move Byte: A - Cnt; X - Src; Y - Dst; Mode: 0 - hold, 2 - dec, 3 - inc
+1405  --------------------------------------------------------------------------------
+1407 0x00C8 _MOV:
+1408 0x00C8  C8004493 FTCH $,, SRC, RD, MEM, WE_R,, DecCntr -- Read Memory, Decrement A
+1409 0x00C9  C800223E BTH0 _MOV,, DST, WR, ALU, WE_R,, UpdtPtr -- Write Memory, Update Ptrs
+1410  --
+1411 0x00CA  CA0C0D05 BRV1 $,, Inc, IF, IR -- Fetch next instruction
+1413  --------------------------------------------------------------------------------
+1414  -- eXchange Memory and Accumulator SP-relative - XMA zp,X
+1415  --------------------------------------------------------------------------------
+1417 0x00CB _XMA_zpX:
+1418 0x00CB  CC9054CD BMW1 _XMA_zpX_IS,RMD, ZPX, RD, OP1 -- Read Op/Op Ptr Lo
+1420  --------------------------------------------------------------------------------
+1421  -- Jump Table: XMA zp,X; XMA.w zp,X; XMA (zp,X); XMA.w (zp,X);
+1422  --------------------------------------------------------------------------------
+1424 0x00CC _XMA_zpX_IS: -- MW<=000<={0, IND, SIZ}
+1425 0x00CC  D0108C44 BRV0 _XMA_IS_Exit,MOD, Nxt, RD, OP2 -- Read Op Ptr Hi
+1426 0x00CD _XMA_zpX_I: -- MW<=001<={0, IND, ~SIZ}
+1427 0x00CD  D4108C44 BRV0 _XMA_I_Exit,MOD, Nxt, RD, OP2 -- Read Op Ptr Hi
+1428 0x00CE _XMA_zpX_S: -- MW<=010<={0,~IND, SIZ}
+1429 0x00CE  D2108C44 BRV0 _XMA_S_Exit,MOD, Nxt, RD, OP2 -- Read Op Hi
+1430  -- -- MW<=011<={0,~IND, ~SIZ}
+1431 0x00CF  08008233 BMW _Nxt,, MAR, WR, ALU, WE_R -- Write 8-bit Result
+1433  --------------------------------------------------------------------------------
+1434  -- XMA Instruction Exit Microsequences: XMA zp,X; XMA.w zp,X;
+1435  -- XMA (zp,X); XMA.w (zp,X);
+1436  --------------------------------------------------------------------------------
+1438 0x00D0 _XMA_IS_Exit:
+1439 0x00D0  D00014C2 FTCH $,, LDA, RD, OP1 -- Read 16-bit Operand Lo
+1440 0x00D1  D1008C42 FTCH $,, Nxt, RD, OP2 -- Read 16-bit Operand Hi
+1441  --
+1442 0x00D2 _XMA_S_Exit:
+1443 0x00D2  D2608234 BRV0 $,PVS, MAR, WR, ALU, WE_R -- Write 16-bit Result Lo
+1444 0x00D3  08008A33 BMW _Nxt,, Nxt, WR, ALU, WE_R -- Write 16-bit Result Hi
+1445  --
+1446 0x00D4 _XMA_I_Exit:
+1447 0x00D4  D40014C2 FTCH $,, LDA, RD, OP1 -- Read 8-bit Operand
+1448 0x00D5  08008233 BMW _Nxt,, MAR, WR, ALU, WE_R -- Write 8-bit Result
+1450  --------------------------------------------------------------------------------
+1451  -- End of Microprogram Routines for Normal Instructions
+1452  --------------------------------------------------------------------------------
+1454 0x00D6 _End_uPgm:
+0000 0x00D6  00000000 added by program
+0000 0x00D7  00000000 added by program
+0000 0x00D8  00000000 added by program
+0000 0x00D9  00000000 added by program
+0000 0x00DA  00000000 added by program
+0000 0x00DB  00000000 added by program
+0000 0x00DC  00000000 added by program
+0000 0x00DD  00000000 added by program
+0000 0x00DE  00000000 added by program
+0000 0x00DF  00000000 added by program
+0000 0x00E0  00000000 added by program
+0000 0x00E1  00000000 added by program
+0000 0x00E2  00000000 added by program
+0000 0x00E3  00000000 added by program
+0000 0x00E4  00000000 added by program
+0000 0x00E5  00000000 added by program
+0000 0x00E6  00000000 added by program
+0000 0x00E7  00000000 added by program
+0000 0x00E8  00000000 added by program
+0000 0x00E9  00000000 added by program
+0000 0x00EA  00000000 added by program
+0000 0x00EB  00000000 added by program
+0000 0x00EC  00000000 added by program
+0000 0x00ED  00000000 added by program
+0000 0x00EE  00000000 added by program
+0000 0x00EF  00000000 added by program
+0000 0x00F0  00000000 added by program
+0000 0x00F1  00000000 added by program
+0000 0x00F2  00000000 added by program
+0000 0x00F3  00000000 added by program
+0000 0x00F4  00000000 added by program
+0000 0x00F5  00000000 added by program
+0000 0x00F6  00000000 added by program
+0000 0x00F7  00000000 added by program
+0000 0x00F8  00000000 added by program
+0000 0x00F9  00000000 added by program
+0000 0x00FA  00000000 added by program
+0000 0x00FB  00000000 added by program
+0000 0x00FC  00000000 added by program
+0000 0x00FD  00000000 added by program
+0000 0x00FE  00000000 added by program
+0000 0x00FF  00000000 added by program
+1456 0x0100 _IDEC_Start: .org 256
+1458  --------------------------------------------------------------------------------
+1459  -- Start of Instruction Decode Table (Entry for each Opcode)
+1460  --
+1461  -- Instead of being organized in numerical order, the table is organized by
+1462  -- columns: the least significant nibble and the most significant nibble of the
+1463  -- opcode are swapped. This organization more clearly shows the arrangement of
+1464  -- the addressing modes of the WDC W65C02 microprocessor being emulated. It al-
+1465  -- so more clearly shows the regularity of the ALU instructions that are imple-
+1466  -- mented. The implementation of the microprogram is first based on the addres-
+1467  -- sing mode, and then on the ALU function. Single cycle instructions will be
+1468  -- easily recognized in the following table because their table entries use the
+1469  -- BRV3 instruction. Multi-cycle instructions use the BRV0 instruction to vec-
+1470  -- tor a microroutine in the lower 256 words of the microprogram ROM/RAM.
+1471  --
+1472  -- Single byte instructions such as BRK, RTS, RTI, and register push/pull in-
+1473  -- structions (PHA, PLA, PHP, PLP, PHX, PLX, PHY, PLY), and multi-byte instruc-
+1474  -- tions like JSR abs are implemented with special microroutines that perform
+1475  -- the necessary stack accesses. The remainder of the microroutines are orga-
+1476  -- nized by addressing mode, and whether the addressing mode is used in a RO,
+1477  -- WO, or RMW manner.
+1478  --
+1479  -- Microprogram Word Format:
+1480  --
+1481  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1482  --
+1483  --------------------------------------------------------------------------------
+1485  --------------------------------------------------------------------------------
+1486  -- Row 0 : 0x00-0xF0 (All Bcc/JMP/JSR/RTS/RTI implemented as uninterruptable)
+1487  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1488  --------------------------------------------------------------------------------
+1489 0x0100 _BRK_imm:
+1490 0x0100  0A0C0CC4 BRV0 _Brk,, Inc, IF, OP1 -- Start Break Handler
+1491 0x0101 _BPL_rel:
+1492 0x0101  100C0CEF BMW3 _Rel,, Inc, IF, SGN -- Read rel Value
+1493 0x0102 _JSR_abs:
+1494 0x0102  120C0CC4 BRV0 _JSR,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1495 0x0103 _BMI_rel:
+1496 0x0103  100C0CEF BMW3 _Rel,, Inc, IF, SGN -- Read rel Value
+1497 0x0104 _RTI_imp:
+1498 0x0104  18120CC4 BRV0 _RTI,MOD, Pop, RD, OP1 -- Read PSW from Stack
+1499 0x0105 _BVC_rel:
+1500 0x0105  100C0CEF BMW3 _Rel,, Inc, IF, SGN -- Read rel Value
+1501 0x0106 _RTS_imp:
+1502 0x0106  19120CC4 BRV0 _RTS,MOD, Pop, RD, OP1 -- Read PCL from Stack
+1503 0x0107 _BVS_rel:
+1504 0x0107  100C0CEF BMW3 _Rel,, Inc, IF, SGN -- Read rel Value
+1505 0x0108 _BRA_rel:
+1506 0x0108  100C0CEF BMW3 _Rel,, Inc, IF, SGN -- Read rel Value
+1507 0x0109 _BCC_rel
+1508 0x0109  100C0CEF BMW3 _Rel,, Inc, IF, SGN -- Read rel Value
+1509 0x010A _LDY_imm:
+1510 0x010A  270C0CCC BMW0 _Imm,, Inc, IF, OP1 -- Read #imm Value
+1511 0x010B _BCS_rel:
+1512 0x010B  100C0CEF BMW3 _Rel,, Inc, IF, SGN -- Read rel Value
+1513 0x010C _CPY_imm:
+1514 0x010C  270C0CCC BMW0 _Imm,, Inc, IF, OP1 -- Read #imm Value
+1515 0x010D _BNE_rel:
+1516 0x010D  100C0CEF BMW3 _Rel,, Inc, IF, SGN -- Read rel Value
+1517 0x010E _CPX_imm:
+1518 0x010E  270C0CCC BMW0 _Imm,, Inc, IF, OP1 -- Read #imm Value
+1519 0x010F _BEQ_rel:
+1520 0x010F  100C0CEF BMW3 _Rel,, Inc, IF, SGN -- Read rel Value
+1521  --------------------------------------------------------------------------------
+1522  -- Row 1 : 0x01-0xF1
+1523  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1524  --------------------------------------------------------------------------------
+1525 0x0110 _ORA_zpXi:
+1526 0x0110  360C0CCE BMW2 _RO_zpXII,, Inc, IF, OP1 -- Read zp Ptr
+1527 0x0111 _ORA_zpiY:
+1528 0x0111  3C0C0CCE BMW2 _RO_zpIIY,, Inc, IF, OP1 -- Read zp Ptr
+1529 0x0112 _ANL_zpXi:
+1530 0x0112  360C0CCE BMW2 _RO_zpXII,, Inc, IF, OP1 -- Read zp Ptr
+1531 0x0113 _ANL_zpiY:
+1532 0x0113  3C0C0CCE BMW2 _RO_zpIIY,, Inc, IF, OP1 -- Read zp Ptr
+1533 0x0114 _EOR_zpXi:
+1534 0x0114  360C0CCE BMW2 _RO_zpXII,, Inc, IF, OP1 -- Read zp Ptr
+1535 0x0115 _EOR_zpiY:
+1536 0x0115  3C0C0CCE BMW2 _RO_zpIIY,, Inc, IF, OP1 -- Read zp Ptr
+1537 0x0116 _ADC_zpXi:
+1538 0x0116  360C0CCE BMW2 _RO_zpXII,, Inc, IF, OP1 -- Read zp Ptr
+1539 0x0117 _ADC_zpiY:
+1540 0x0117  3C0C0CCE BMW2 _RO_zpIIY,, Inc, IF, OP1 -- Read zp Ptr
+1541 0x0118 _STA_zpXi:
+1542 0x0118  480C0CCE BMW2 _WO_zpXII,, Inc, IF, OP1 -- Read zp Ptr
+1543 0x0119 _STA_zpiY:
+1544 0x0119  4E0C0CCE BMW2 _WO_zpIIY,, Inc, IF, OP1 -- Read zp Ptr
+1545 0x011A _LDA_zpXi:
+1546 0x011A  360C0CCE BMW2 _RO_zpXII,, Inc, IF, OP1 -- Read zp Ptr
+1547 0x011B _LDA_zpiY:
+1548 0x011B  3C0C0CCE BMW2 _RO_zpIIY,, Inc, IF, OP1 -- Read zp Ptr
+1549 0x011C _CMP_zpXi:
+1550 0x011C  360C0CCE BMW2 _RO_zpXII,, Inc, IF, OP1 -- Read zp Ptr
+1551 0x011D _CMP_zpiY:
+1552 0x011D  3C0C0CCE BMW2 _RO_zpIIY,, Inc, IF, OP1 -- Read zp Ptr
+1553 0x011E _SBC_zpXi:
+1554 0x011E  360C0CCE BMW2 _RO_zpXII,, Inc, IF, OP1 -- Read zp Ptr
+1555 0x011F _SBC_zpiY:
+1556 0x011F  3C0C0CCE BMW2 _RO_zpIIY,, Inc, IF, OP1 -- Read zp Ptr
+1557  --------------------------------------------------------------------------------
+1558  -- Row 2 : 0x02-0xF2
+1559  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1560  --------------------------------------------------------------------------------
+1561 0x0120 _COPimm:
+1562 0x0120  080C0C43 BMW _Nxt,, Inc, IF, OP2 -- Read #imm (OP2 <= imm8)
+1563 0x0121 _ORA_zpi:
+1564 0x0121  300C0CCE BMW2 _RO_zpII,, Inc, IF, OP1 -- Read zp address
+1565 0x0122 _NOP_22:
+1566 0x0122  220C0D07 BRV3 $,, Inc, IF, IR -- Skip Reserved Instruction
+1567 0x0123 _ANL_zpi:
+1568 0x0123  300C0CCE BMW2 _RO_zpII,, Inc, IF, OP1 -- Read zp address
+1569 0x0124 _NOP_42:
+1570 0x0124  240C0D07 BRV3 $,, Inc, IF, IR -- Skip Reserved Instruction
+1571 0x0125 _EOR_zpi:
+1572 0x0125  300C0CCE BMW2 _RO_zpII,, Inc, IF, OP1 -- Read zp address
+1573 0x0126 _NOP_62:
+1574 0x0126  260C0D07 BRV3 $,, Inc, IF, IR -- Skip Reserved Instruction
+1575 0x0127 _ADC_zpi:
+1576 0x0127  300C0CCE BMW2 _RO_zpII,, Inc, IF, OP1 -- Read zp address
+1577 0x0128 _NOP_82:
+1578 0x0128  280C0D07 BRV3 $,, Inc, IF, IR -- Skip Reserved Instruction
+1579 0x0129 _STA_zpi:
+1580 0x0129  440C0CC4 BRV0 _WO_zpI,, Inc, IF, OP1 -- Read zp address
+1581 0x012A _LDX_imm:
+1582 0x012A  270C0CCC BMW0 _Imm,, Inc, IF, OP1 -- Read #imm Value
+1583 0x012B _LDA_zpi:
+1584 0x012B  300C0CCE BMW2 _RO_zpII,, Inc, IF, OP1 -- Read zp address
+1585 0x012C _ADJimm:
+1586 0x012C  270C0CEC BMW0 _Imm,, Inc, IF, SGN -- Read Imm Op, sign extend -- Read #imm
+1587 0x012D _CMP_zpi:
+1588 0x012D  300C0CCE BMW2 _RO_zpII,, Inc, IF, OP1 -- Read zp address
+1589 0x012E _PSHimm:
+1590 0x012E  950C0CCC BMW0 _PSH_Imm,, Inc, IF, OP1 -- Read lo operand
+1591 0x012F _SBC_zpi:
+1592 0x012F  300C0CCE BMW2 _RO_zpII,, Inc, IF, OP1 -- Read zp address
+1593  --------------------------------------------------------------------------------
+1594  -- Row 3 : 0x03-0xF3 IP-relative (with IP autoincrement)
+1595  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1596  --------------------------------------------------------------------------------
+1597 0x0130 _ORA_ipp:
+1598 0x0130  BB0C0CEE BMW2 _RO_ipI,, Inc, IF, SGN -- Read ip Offset
+1599 0x0131 _ASL_ipp:
+1600 0x0131  C30C0CE4 BRV0 _RMW_ip,, Inc, IF, SGN -- Read ip Offset
+1601 0x0132 _ANL_ipp:
+1602 0x0132  BB0C0CEE BMW2 _RO_ipI,, Inc, IF, SGN -- Read ip Offset
+1603 0x0133 _ROL_ipp:
+1604 0x0133  C30C0CE4 BRV0 _RMW_ip,, Inc, IF, SGN -- Read ip Offset
+1605 0x0134 _EOR_ipp:
+1606 0x0134  BB0C0CEE BMW2 _RO_ipI,, Inc, IF, SGN -- Read ip Offset
+1607 0x0135 _LSR_ipp:
+1608 0x0135  C30C0CE4 BRV0 _RMW_ip,, Inc, IF, SGN -- Read ip Offset
+1609 0x0136 _ADD_ipp:
+1610 0x0136  BB0C0CCE BMW2 _RO_ipI,, Inc, IF, OP1 -- Read ip Offset
+1611 0x0137 _ROR_ipp:
+1612 0x0137  C30C0CE4 BRV0 _RMW_ip,, Inc, IF, SGN -- Read ip Offset
+1613 0x0138 _STA_ipp:
+1614 0x0138  BF0C0CCE BMW2 _WO_ipI,, Inc, IF, OP1 -- Read ip Offset
+1615 0x0139 _TSB_ipp:
+1616 0x0139  C30C0CE4 BRV0 _RMW_ip,, Inc, IF, SGN -- Read ip Offset
+1617 0x013A _LDA_ipp:
+1618 0x013A  BB0C0CCE BMW2 _RO_ipI,, Inc, IF, OP1 -- Read ip Offset
+1619 0x013B _TRB_ipp:
+1620 0x013B  C30C0CE4 BRV0 _RMW_ip,, Inc, IF, SGN -- Read ip Offset
+1621 0x013C _CMP_ipp:
+1622 0x013C  BB0C0CEE BMW2 _RO_ipI,, Inc, IF, SGN -- Read ip Offset
+1623 0x013D _DEC_ipp:
+1624 0x013D  C30C0CE4 BRV0 _RMW_ip,, Inc, IF, SGN -- Read ip Offset
+1625 0x013E _SUB_ipp:
+1626 0x013E  BB0C0CEE BMW2 _RO_ipI,, Inc, IF, SGN -- Read ip Offset
+1627 0x013F _INC_ipp:
+1628 0x013F  C30C0CE4 BRV0 _RMW_ip,, Inc, IF, SGN -- Read ip Offset
+1629  --------------------------------------------------------------------------------
+1630  -- Row 4 : 0x04-0xF4
+1631  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1632  --------------------------------------------------------------------------------
+1633 0x0140 _TSB_zp:
+1634 0x0140  750C0CC4 BRV0 _RMW_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1635 0x0141 _TRB_zp:
+1636 0x0141  750C0CC4 BRV0 _RMW_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1637 0x0142 _BIT_zp:
+1638 0x0142  320C0CCE BMW2 _RO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1639 0x0143 _BIT_zpX:
+1640 0x0143  380C0CCE BMW2 _RO_zpXI,, Inc, IF, OP1 -- Read ZP Pointer
+1641 0x0144 _XMA_zp:
+1642 0x0144  440C0CE4 BRV0 _XMA_zp,, Inc, IF, SGN -- Read ZP Offset
+1643 0x0145 _MOV_54:
+1644 0x0145  C80C0C44 BRV0 _MOV,, Inc, IF, OP2 -- Read MOV operand
+1645 0x0146 _STZ_zp:
+1646 0x0146  440C0CCE BMW2 _WO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1647 0x0147 _STZ_zpX:
+1648 0x0147  4A0C0CCE BMW2 _WO_zpXI,, Inc, IF, OP1 -- Read ZP Pointer
+1649 0x0148 _STY_zp:
+1650 0x0148  440C0CCE BMW2 _WO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1651 0x0149 _STY_zpX:
+1652 0x0149  4A0C0CCE BMW2 _WO_zpXI,, Inc, IF, OP1 -- Read ZP Pointer
+1653 0x014A _LDY_zp:
+1654 0x014A  320C0CCE BMW2 _RO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1655 0x014B _LDY_zpX:
+1656 0x014B  380C0CCE BMW2 _RO_zpXI,, Inc, IF, OP1 -- Read ZP Pointer
+1657 0x014C _CPY_zp:
+1658 0x014C  320C0CCE BMW2 _RO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1659 0x014D _PSHzp:
+1660 0x014D  980C0CC4 BRV0 _PSH_zp,, Inc, IF, OP1 -- Read zp address
+1661 0x014E _CPX_zp:
+1662 0x014E  320C0CCE BMW2 _RO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1663 0x014F _PULzp:
+1664 0x014F  A50C0CC4 BRV0 _PUL_zp,, Inc, IF, OP1 -- Read zp address
+1665  --------------------------------------------------------------------------------
+1666  -- Row 5 : 0x05-0xF5
+1667  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1668  --------------------------------------------------------------------------------
+1669 0x0150 _ORA_zp:
+1670 0x0150  320C0CCE BMW2 _RO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1671 0x0151 _ORA_zpX:
+1672 0x0151  380C0CCE BMW2 _RO_zpXI,, Inc, IF, OP1 -- Read ZP Pointer
+1673 0x0152 _ANL_zp:
+1674 0x0152  320C0CCE BMW2 _RO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1675 0x0153 _ANL_zpX:
+1676 0x0153  380C0CCE BMW2 _RO_zpXI,, Inc, IF, OP1 -- Read ZP Pointer
+1677 0x0154 _EOR_zp:
+1678 0x0154  320C0CCE BMW2 _RO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1679 0x0155 _EOR_zpX:
+1680 0x0155  380C0CCE BMW2 _RO_zpXI,, Inc, IF, OP1 -- Read ZP Pointer
+1681 0x0156 _ADC_zp:
+1682 0x0156  320C0CCE BMW2 _RO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1683 0x0157 _ADC_zpX:
+1684 0x0157  380C0CCE BMW2 _RO_zpXI,, Inc, IF, OP1 -- Read ZP Pointer
+1685 0x0158 _STA_zp:
+1686 0x0158  440C0CCE BMW2 _WO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1687 0x0159 _STA_zpX:
+1688 0x0159  4A0C0CCE BMW2 _WO_zpXI,, Inc, IF, OP1 -- Read ZP Pointer
+1689 0x015A _LDA_zp:
+1690 0x015A  320C0CCE BMW2 _RO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1691 0x015B _LDA_zpX:
+1692 0x015B  380C0CCE BMW2 _RO_zpXI,, Inc, IF, OP1 -- Read ZP Pointer
+1693 0x015C _CMP_zp:
+1694 0x015C  320C0CCE BMW2 _RO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1695 0x015D _CMP_zpX:
+1696 0x015D  380C0CCE BMW2 _RO_zpXI,, Inc, IF, OP1 -- Read ZP Pointer
+1697 0x015E _SBC_zp:
+1698 0x015E  320C0CCE BMW2 _RO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1699 0x015F _SBC_zpX:
+1700 0x015F  380C0CCE BMW2 _RO_zpXI,, Inc, IF, OP1 -- Read ZP Pointer
+1701  --------------------------------------------------------------------------------
+1702  -- Row 6 : 0x06-0xF6
+1703  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1704  --------------------------------------------------------------------------------
+1705 0x0160 _ASL_zp:
+1706 0x0160  750C0CC4 BRV0 _RMW_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1707 0x0161 _ASL_zpX:
+1708 0x0161  740C0CC4 BRV0 _RMW_zpX,, Inc, IF, OP1 -- Read ZP Pointer
+1709 0x0162 _ROL_zp:
+1710 0x0162  750C0CC4 BRV0 _RMW_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1711 0x0163 _ROL_zpX:
+1712 0x0163  740C0CC4 BRV0 _RMW_zpX,, Inc, IF, OP1 -- Read ZP Pointer
+1713 0x0164 _LSR_zp:
+1714 0x0164  750C0CC4 BRV0 _RMW_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1715 0x0165 _LSR_zpX:
+1716 0x0165  740C0CC4 BRV0 _RMW_zpX,, Inc, IF, OP1 -- Read ZP Pointer
+1717 0x0166 _ROR_zp:
+1718 0x0166  750C0CC4 BRV0 _RMW_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1719 0x0167 _ROR_zpX:
+1720 0x0167  740C0CC4 BRV0 _RMW_zpX,, Inc, IF, OP1 -- Read ZP Pointer
+1721 0x0168 _STX_zp:
+1722 0x0168  440C0CCE BMW2 _WO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1723 0x0169 _STX_zpY:
+1724 0x0169  500C0CCE BMW2 _WO_zpIY,, Inc, IF, OP1 -- Read ZP Pointer
+1725 0x016A _LDX_zp:
+1726 0x016A  320C0CCE BMW2 _RO_zpI,, Inc, IF, OP1 -- Read ZP Pointer
+1727 0x016B _LDX_zpY:
+1728 0x016B  3E0C0CCE BMW2 _RO_zpIY,, Inc, IF, OP1 -- Read ZP Pointer
+1729 0x016C _DEC_zp:
+1730 0x016C  750C0CC4 BRV0 _RMW_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1731 0x016D _DEC_zpX:
+1732 0x016D  740C0CC4 BRV0 _RMW_zpX,, Inc, IF, OP1 -- Read ZP Pointer
+1733 0x016E _INC_zp:
+1734 0x016E  750C0CC4 BRV0 _RMW_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1735 0x016F _INC_zpX:
+1736 0x016F  740C0CC4 BRV0 _RMW_zpX,, Inc, IF, OP1 -- Read ZP Pointer
+1737  --------------------------------------------------------------------------------
+1738  -- Row 7 : 0x07-0xF7 (Rockwell Instructions: RMBx/SMBx zp)
+1739  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, VM
+1740  --------------------------------------------------------------------------------
+1741 0x0170 _RMB0_zp:
+1742 0x0170  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1743 0x0171 _RMB1_zp:
+1744 0x0171  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1745 0x0172 _RMB2_zp:
+1746 0x0172  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1747 0x0173 _RMB3_zp:
+1748 0x0173  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1749 0x0174 _RMB4_zp:
+1750 0x0174  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1751 0x0175 _RMB5_zp:
+1752 0x0175  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1753 0x0176 _RMB6_zp:
+1754 0x0176  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1755 0x0177 _RMB7_zp:
+1756 0x0177  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1757 0x0178 _SMB0_zp:
+1758 0x0178  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1759 0x0179 _SMB1_zp:
+1760 0x0179  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1761 0x017A _SMB2_zp:
+1762 0x017A  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1763 0x017B _SMB3_zp:
+1764 0x017B  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1765 0x017C _SMB4_zp:
+1766 0x017C  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1767 0x017D _SMB5_zp:
+1768 0x017D  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1769 0x017E _SMB6_zp:
+1770 0x017E  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1771 0x017F _SMB7_zp:
+1772 0x017F  880C0CC4 BRV0 _yMBx_zp,, Inc, IF, OP1 -- Read ZP Pointer
+1773  --------------------------------------------------------------------------------
+1774  -- Row 8 : 0x08-0xF8
+1775  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1776  --------------------------------------------------------------------------------
+1777 0x0180 _PHP:
+1778 0x0180  08120233 BMW _Php,MOD, Psh, WR, ALU, WE_R -- Push P (8-bit only)
+1779 0x0181 _CLC:
+1780 0x0181  810C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Clear Carry Flag
+1781 0x0182 _PLP:
+1782 0x0182  08120CC3 BMW _Plp,MOD, Pop, RD, OP1 -- Pop P (8-bit only)
+1783 0x0183 _SEC:
+1784 0x0183  830C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Set Carry Flag
+1785 0x0184 _PHA:
+1786 0x0184  2D32023C BMW0 _Psh,SMD, Psh, WR, ALU, WE_R -- Push A (SIZ ? Hi : Lo)
+1787 0x0185 _CLI:
+1788 0x0185  850C0D15 BRV1 $,, Inc, IF, IR, WE_R -- Clear Interrupt Mask Flg
+1789 0x0186 _PLA:
+1790 0x0186  2A120CCC BMW0 _Pop,MOD, Pop, RD, OP1 -- Pop A
+1791 0x0187 _SEI:
+1792 0x0187  870C0D15 BRV1 $,, Inc, IF, IR, WE_R -- Set Interrupt Mask Flag
+1793 0x0188 _DEY:
+1794 0x0188  880C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Decrement Y
+1795 0x0189 _TYA:
+1796 0x0189  890C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Transfer Y to A
+1797 0x018A _TAY:
+1798 0x018A  8A0C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Transfer A to Y
+1799 0x018B _CLV:
+1800 0x018B  8B0C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Clear oVerflow Flag
+1801 0x018C _INY:
+1802 0x018C  8C0C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Increment Y
+1803 0x018D _CLD:
+1804 0x018D  8D0C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Clear Decimal Mode Flag
+1805 0x018E _INX:
+1806 0x018E  8E0C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Increment X
+1807 0x018F _SED:
+1808 0x018F  8F0C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Set Decimal Mode Flag
+1809  --------------------------------------------------------------------------------
+1810  -- Row 9 : 0x09-0xF9
+1811  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1812  --------------------------------------------------------------------------------
+1813 0x0190 _ORA_imm:
+1814 0x0190  270C0CCC BMW0 _Imm,, Inc, IF, OP1 -- Read Immediate Operand
+1815 0x0191 _ORA_absY:
+1816 0x0191  5E0C0CC4 BRV0 _RO_absY,, Inc, IF, OP1 -- Read Mem Ptr Lo
+1817 0x0192 _ANL_imm:
+1818 0x0192  270C0CCC BMW0 _Imm,, Inc, IF, OP1 -- Read Immediate Operand
+1819 0x0193 _ANL_absY:
+1820 0x0193  5E0C0CC4 BRV0 _RO_absY,, Inc, IF, OP1 -- Read Mem Ptr Lo
+1821 0x0194 _EOR_imm:
+1822 0x0194  270C0CCC BMW0 _Imm,, Inc, IF, OP1 -- Read Immediate Operand
+1823 0x0195 _EOR_absY:
+1824 0x0195  5E0C0CC4 BRV0 _RO_absY,, Inc, IF, OP1 -- Read Mem Ptr Lo
+1825 0x0196 _ADC_imm:
+1826 0x0196  270C0CCC BMW0 _Imm,, Inc, IF, OP1 -- Read Immediate Operand
+1827 0x0197 _ADC_absY:
+1828 0x0197  5E0C0CC4 BRV0 _RO_absY,, Inc, IF, OP1 -- Read Mem Ptr Lo
+1829 0x0198 _BIT_imm:
+1830 0x0198  270C0CCC BMW0 _Imm,, Inc, IF, OP1 -- Read Immediate Operand
+1831 0x0199 _STA_absY:
+1832 0x0199  6D0C0CC4 BRV0 _WO_absY,, Inc, IF, OP1 -- Read Mem Ptr Lo
+1833 0x019A _LDA_imm:
+1834 0x019A  270C0CCC BMW0 _Imm,, Inc, IF, OP1 -- Read Immediate Operand
+1835 0x019B _LDA_absY:
+1836 0x019B  5E0C0CC4 BRV0 _RO_absY,, Inc, IF, OP1 -- Read Mem Ptr Lo
+1837 0x019C _CMP_imm:
+1838 0x019C  270C0CCC BMW0 _Imm,, Inc, IF, OP1 -- Read Immediate Operand
+1839 0x019D _CMP_absY:
+1840 0x019D  5E0C0CC4 BRV0 _RO_absY,, Inc, IF, OP1 -- Read Mem Ptr Lo
+1841 0x019E _SBC_imm:
+1842 0x019E  270C0CCC BMW0 _Imm,, Inc, IF, OP1 -- Read Immediate Operand
+1843 0x019F _SBC_absY:
+1844 0x019F  5E0C0CC4 BRV0 _RO_absY,, Inc, IF, OP1 -- Read Mem Ptr Lo
+1845  --------------------------------------------------------------------------------
+1846  -- Row A : 0x0A-0xFA
+1847  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1848  --------------------------------------------------------------------------------
+1849 0x01A0 _ASL_A:
+1850 0x01A0  A00C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Arithmetic Shift A Left
+1851 0x01A1 _INC_A:
+1852 0x01A1  A10C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Increment A
+1853 0x01A2 _ROL_A:
+1854 0x01A2  A20C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Rotate A Left
+1855 0x01A3 _DEC_A:
+1856 0x01A3  A30C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Decrement A
+1857 0x01A4 _LSR_A:
+1858 0x01A4  A40C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Logical Shift A Right
+1859 0x01A5 _PHY:
+1860 0x01A5  2D32023C BMW0 _Psh,SMD, Psh, WR, ALU, WE_R -- Push Y (SIZ ? Hi : Lo)
+1861 0x01A6 _ROR_A:
+1862 0x01A6  A60C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Rotate A Right
+1863 0x01A7 _PLY:
+1864 0x01A7  2A120CCC BMW0 _Pop,MOD, Pop, RD, OP1 -- Pop Y
+1865 0x01A8 _TXA:
+1866 0x01A8  A80C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Transfer X to A
+1867 0x01A9 _TXS:
+1868 0x01A9  A90C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Transfer X to S
+1869 0x01AA _TAX:
+1870 0x01AA  AA0C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Transfer A to X
+1871 0x01AB _TSX:
+1872 0x01AB  AB0C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Transfer S to X
+1873 0x01AC _DEX:
+1874 0x01AC  AC0C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Decrement X
+1875 0x01AD _PHX:
+1876 0x01AD  2D32023C BMW0 _Psh,SMD, Psh, WR, ALU, WE_R -- Push X (SIZ ? Hi : Lo)
+1877 0x01AE _NOP: -- the real NOP
+1878 0x01AE  AE0C0D07 BRV3 $,, Inc, IF, IR -- Skip True NOP Instruction
+1879 0x01AF _PLX:
+1880 0x01AF  2A120CCC BMW0 _Pop,MOD, Pop, RD, OP1 -- Pop X
+1881  --------------------------------------------------------------------------------
+1882  -- Row B : 0x0B-0xFB
+1883  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1884  --------------------------------------------------------------------------------
+1885 0x01B0 _DUP:
+1886 0x01B0  B00C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Duplicate TOS, Push NOS
+1887 0x01B1 _SWP:
+1888 0x01B1  B10C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Swap TOS & NOS
+1889 0x01B2 _ROT:
+1890 0x01B2  B20C0D17 BRV3 $,, Inc, IF, IR, WE_R -- Rotate Register Stack
+1891 0x01B3 _NXT:
+1892 0x01B3  B20104C6 BRV0 _NEXT,, IPN, RD, OP1,,, IP1 -- Read FORTH Addrs Ptr Lo
+1893 0x01B4 _PHI:
+1894 0x01B4  B7120274 BRV0 _PHI,MOD, Psh, WR, DOH, WE_R -- Psh IP/W
+1895 0x01B5 _INI:
+1896 0x01B5  B50C0D09 BRV3 $,, Inc, IF, IR,,, IP1 -- Increment IP by 1
+1897 0x01B6 _PLI:
+1898 0x01B6  B8120CC4 BRV0 _PLI,MOD, Pop, RD, OP1 -- Pop IP/W
+1899 0x01B7 _ENT:
+1900 0x01B7  B0320277 BRV0 _ENTER,SMD, Psh, WR, DOH, WE_R,, WP2 -- FORTH VM ENTER (DOCOL)
+1901 0x01B8 _OAY:
+1902 0x01B8  B80C0D05 BRV1 $,, Inc, IF, IR -- Prefix 0 - OAY
+1903 0x01B9 _IND:
+1904 0x01B9  B90C0D05 BRV1 $,, Inc, IF, IR -- Prefix 1 - IND
+1905 0x01BA _SIZ:
+1906 0x01BA  BA0C0D05 BRV1 $,, Inc, IF, IR -- Prefix 2 - SIZ
+1907 0x01BB _ISZ:
+1908 0x01BB  BB0C0D05 BRV1 $,, Inc, IF, IR -- Prefix 3 - ISZ
+1909 0x01BC _OAX:
+1910 0x01BC  BC0C0D05 BRV1 $,, Inc, IF, IR -- Prefix 4 - OAX
+1911 0x01BD _OSX:
+1912 0x01BD  BD0C0D05 BRV1 $,, Inc, IF, IR -- Prefix 5 - OSX
+1913 0x01BE _OSZ:
+1914 0x01BE  BE0C0D05 BRV1 $,, Inc, IF, IR -- Prefix 6 - OSZ
+1915 0x01BF _OIS:
+1916 0x01BF  BF0C0D05 BRV1 $,, Inc, IF, IR -- Prefix 7 - OIS
+1917  --------------------------------------------------------------------------------
+1918  -- Row C : 0x0C-0xFC
+1919  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1920  --------------------------------------------------------------------------------
+1921 0x01C0 _TSB_abs:
+1922 0x01C0  7C0C0CC4 BRV0 _RMW_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1923 0x01C1 _TRB_abs:
+1924 0x01C1  7C0C0CC4 BRV0 _RMW_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1925 0x01C2 _BIT_abs:
+1926 0x01C2  540C0CC4 BRV0 _RO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1927 0x01C3 _BIT_absX:
+1928 0x01C3  590C0CC4 BRV0 _RO_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1929 0x01C4 _JMP_abs:
+1930 0x01C4  200C0CC4 BRV0 _Jmp_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1931 0x01C5 _PHRrel16:
+1932 0x01C5  910C0CC4 BRV0 _PHR_Rel16,, Inc, IF, OP1 -- Read low (rel16)
+1933 0x01C6 _JMP_absI:
+1934 0x01C6  210C0CC4 BRV0 _Jmp_absI,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1935 0x01C7 _JMP_absXI:
+1936 0x01C7  1B0C0CC4 BRV0 _Jmp_absXI,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1937 0x01C8 _STY_abs:
+1938 0x01C8  630C0CC4 BRV0 _WO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1939 0x01C9 _STZ_abs:
+1940 0x01C9  630C0CC4 BRV0 _WO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1941 0x01CA _LDY_abs:
+1942 0x01CA  540C0CC4 BRV0 _RO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1943 0x01CB _LDY_absX:
+1944 0x01CB  590C0CC4 BRV0 _RO_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1945 0x01CC _CPY_abs:
+1946 0x01CC  540C0CC4 BRV0 _RO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1947 0x01CD _PSH_DC:
+1948 0x01CD  990C0CC4 BRV0 _PSH_abs,, Inc, IF, OP1 -- Read Src Ptr Lo
+1949 0x01CE _CPX_abs:
+1950 0x01CE  540C0CC4 BRV0 _RO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1951 0x01CF _PUL_FC:
+1952 0x01CF  A60C0CC4 BRV0 _PUL_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1953  --------------------------------------------------------------------------------
+1954  -- Row D : 0x0D-0xFD
+1955  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1956  --------------------------------------------------------------------------------
+1957 0x01D0 _ORA_abs:
+1958 0x01D0  540C0CC4 BRV0 _RO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1959 0x01D1 _ORA_absX:
+1960 0x01D1  590C0CC4 BRV0 _RO_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1961 0x01D2 _ANL_abs:
+1962 0x01D2  540C0CC4 BRV0 _RO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1963 0x01D3 _ANL_absX:
+1964 0x01D3  590C0CC4 BRV0 _RO_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1965 0x01D4 _EOR_abs:
+1966 0x01D4  540C0CC4 BRV0 _RO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1967 0x01D5 _EOR_absX:
+1968 0x01D5  590C0CC4 BRV0 _RO_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1969 0x01D6 _ADC_abs:
+1970 0x01D6  540C0CC4 BRV0 _RO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1971 0x01D7 _ADC_absX:
+1972 0x01D7  590C0CC4 BRV0 _RO_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1973 0x01D8 _STA_abs:
+1974 0x01D8  630C0CC4 BRV0 _WO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1975 0x01D9 _STA_absX:
+1976 0x01D9  680C0CC4 BRV0 _WO_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1977 0x01DA _LDA_abs:
+1978 0x01DA  540C0CC4 BRV0 _RO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1979 0x01DB _LDA_absX:
+1980 0x01DB  590C0CC4 BRV0 _RO_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1981 0x01DC _CMP_abs:
+1982 0x01DC  540C0CC4 BRV0 _RO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1983 0x01DD _CMP_absX:
+1984 0x01DD  590C0CC4 BRV0 _RO_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1985 0x01DE _SBC_abs:
+1986 0x01DE  540C0CC4 BRV0 _RO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1987 0x01DF _SBC_absX:
+1988 0x01DF  590C0CC4 BRV0 _RO_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1989  --------------------------------------------------------------------------------
+1990  -- Row E : 0x0E-0xFE
+1991  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+1992  --------------------------------------------------------------------------------
+1993 0x01E0 _ASL_abs:
+1994 0x01E0  7C0C0CC4 BRV0 _RMW_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1995 0x01E1 _ASL_absX:
+1996 0x01E1  7A0C0CC4 BRV0 _RMW_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1997 0x01E2 _ROL_abs:
+1998 0x01E2  7C0C0CC4 BRV0 _RMW_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+1999 0x01E3 _ROL_absX:
+2000 0x01E3  7A0C0CC4 BRV0 _RMW_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+2001 0x01E4 _LSR_abs:
+2002 0x01E4  7C0C0CC4 BRV0 _RMW_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+2003 0x01E5 _LSR_absX:
+2004 0x01E5  7A0C0CC4 BRV0 _RMW_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+2005 0x01E6 _ROR_abs:
+2006 0x01E6  7C0C0CC4 BRV0 _RMW_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+2007 0x01E7 _ROR_absX:
+2008 0x01E7  7A0C0CC4 BRV0 _RMW_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+2009 0x01E8 _STX_abs:
+2010 0x01E8  630C0CC4 BRV0 _WO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+2011 0x01E9 _STZ_absX:
+2012 0x01E9  680C0CC4 BRV0 _WO_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+2013 0x01EA _LDX_abs:
+2014 0x01EA  540C0CC4 BRV0 _RO_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+2015 0x01EB _LDX_absY:
+2016 0x01EB  5E0C0CC4 BRV0 _RO_absY,, Inc, IF, OP1 -- Read Dst Ptr Lo
+2017 0x01EC _DEC_abs:
+2018 0x01EC  7C0C0CC4 BRV0 _RMW_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+2019 0x01ED _DEC_absX:
+2020 0x01ED  7A0C0CC4 BRV0 _RMW_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+2021 0x01EE _INC_abs:
+2022 0x01EE  7C0C0CC4 BRV0 _RMW_abs,, Inc, IF, OP1 -- Read Dst Ptr Lo
+2023 0x01EF _INC_absX:
+2024 0x01EF  7A0C0CC4 BRV0 _RMW_absX,, Inc, IF, OP1 -- Read Dst Ptr Lo
+2025  --------------------------------------------------------------------------------
+2026  -- Row F : 0x0F-0xFF (Rockwell Instructions: BBRx/BBSx zp,rel)
+2027  -- I BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
+2028  --------------------------------------------------------------------------------
+2029 0x01F0 _BBR0_zp_rel:
+2030 0x01F0  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2031 0x01F1 _BBR1_zp_rel:
+2032 0x01F1  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2033 0x01F2 _BBR2_zp_rel:
+2034 0x01F2  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2035 0x01F3 _BBR3_zp_rel:
+2036 0x01F3  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2037 0x01F4 _BBR4_zp_rel:
+2038 0x01F4  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2039 0x01F5 _BBR5_zp_rel:
+2040 0x01F5  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2041 0x01F6 _BBR6_zp_rel:
+2042 0x01F6  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2043 0x01F7 _BBR7_zp_rel:
+2044 0x01F7  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2045 0x01F8 _BBS0_zp_rel:
+2046 0x01F8  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2047 0x01F9 _BBS1_zp_rel:
+2048 0x01F9  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2049 0x01FA _BBS2_zp_rel:
+2050 0x01FA  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2051 0x01FB _BBS3_zp_rel:
+2052 0x01FB  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2053 0x01FC _BBS4_zp_rel:
+2054 0x01FC  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2055 0x01FD _BBS5_zp_rel:
+2056 0x01FD  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2057 0x01FE _BBS6_zp_rel:
+2058 0x01FE  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2059 0x01FF _BBS7_zp_rel:
+2060 0x01FF  8C0C0CC4 BRV0 _BByx_zp_rel,, Inc, IF, OP1 -- Read ZP Pointer
+2061  --------------------------------------------------------------------------------
+2062  -- End of Instruction Decode Table
+2063  --------------------------------------------------------------------------------
+2065 0x0200 _Last: .org 512
+2067 0x0200 _end:

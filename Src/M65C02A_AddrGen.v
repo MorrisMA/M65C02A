@@ -113,6 +113,8 @@ module M65C02A_AddrGen #(
     input   OAY,                    // Override: Swap A and Y
     input   OSX,                    // Override: Swap S and X, and X is stk ptr
     
+    input   SPR,                    // Enable SP-Relative Addressing Mode
+    
     input   Mod,                    // % 256 Control - wrap address to page
     input   Prv,                    // Previous Address Control
     
@@ -205,15 +207,15 @@ wire    CE_PC;                      // Program Counter Clock Enable
 assign Ld_PC   = NA_Op[8];
 //
 assign Sel_PC  = NA_Op[7];          // JMP/JSR/Bcc/BRL/RTS/RTI
-assign Sel_SP  = ((OSX) ? NA_Op[3] : NA_Op[6]);    // if OSX then swap X & S
+assign Sel_SP  = ((OSX) ? NA_Op[3] | SPR : NA_Op[6]); // if OSX, X <=> S
 assign Sel_IP  = NA_Op[5];          // IP-relative w/ autoincrement: ip,I++
 assign Sel_MAR = NA_Op[4];          // Sequential memory access/PHR
 //
-assign Sel_X   = ((OSX) ? NA_Op[6] : NA_Op[3]);    // if OSX then swap X & S
+assign Sel_X   = ((OSX) ? NA_Op[6] : NA_Op[3]); // if OSX, X <=> S
 assign Sel_Y   = NA_Op[2];
 assign Sel_Abs = NA_Op[1];
 //
-assign Ci      = ((OSX) ? (NA_Op[3] | NA_Op[0]) : NA_Op[0]);
+assign Ci      = NA_Op[0];
 //
 assign Ld_MAR  = ~(NA_Op[6] & ~Sel_Abs);
 

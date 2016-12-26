@@ -99,7 +99,7 @@
 //  TOS of register of the A register stack. These three registers are expected
 //  to be initialized to 16-bit values. The operating mode of the instruction is
 //  provided by an 8-bit operand which follows the MOV op-code. The MOV sm,dm
-//  instruction is represented by an opcode, 0x82, followed by a single imme-
+//  instruction is represented by an opcode, 0x54, followed by a single imme-
 //  diate operand byte that encodes the source and destination modes. The source
 //  and destination pointers, X and Y, respectively, may be held, incremented,
 //  or decremented. The MSB of the mode byte determines if the MOV instruction
@@ -120,7 +120,7 @@
 //  control field used to adjust the auxiliary stack of the X register stack.
 //  That is, source pointer hold maps to Stk_Op == NOP; source pointer increment
 //  maps to Stk_Op == POP; and source pointer decrement maps to Stk_Op == PSH.
-//  The destination mode bits, OP2[5:4], map directly to the definitions of the
+//  The destination mode bits, OP2[3:2], map directly to the definitions of the
 //  Stk_Op control field used to adjust the Y Top-Of-Stack register. That is,
 //  destination pointer hold maps to Stk_Op == NOP; destination pointer incre-
 //  ment maps to Stk_Op == POP; and destination pointer decrement maps to
@@ -202,7 +202,6 @@ module M65C02A_ALUv2 (
     input   [1:0] Stk_Op,   // Stack Pointer Operation: NOP, POP, PUSH
     
     input   ADJ,            // Stack Pointer Adjust Instruction Input
-    input   ASR,            // Enable Arithmetic Right Shift Operation
     input   VEN,            // Enable true Arithmetic Left Shift Operation
     input   CEN,            // Enable C for INC/DEC A Instructions
     

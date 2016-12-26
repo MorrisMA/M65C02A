@@ -73,7 +73,6 @@ wire    COM1_DE;
 reg    [15:0] X;
 reg    [15:0] Y;
 reg    [15:0] A;
-//reg    [15:0] T;
 reg    [ 7:0] P;
 reg    [15:0] S;
 reg    [15:0] M;
@@ -161,8 +160,10 @@ initial begin
     
     // Add stimulus here
     
-    @(posedge uut.WAI) nIRQ = 0;
-    @(negedge uut.WAI) nIRQ = 1;
+//    @(posedge uut.WAI) nIRQ = 0;
+//    @(negedge uut.WAI) nIRQ = 1;
+
+    
 
 end
 
@@ -178,18 +179,6 @@ begin
             nIRQ = #1 1;
 end
 
-//  Probe Internal Processor Registers
-
-always @(uut.X or uut.Y or uut.A or uut.P or uut.S or uut.M)
-begin
-    X = uut.X;
-    Y = uut.Y;
-    A = uut.A;
-    P = uut.P;
-    S = uut.S;
-    M = uut.M;
-end
-
 //  Probe 6502_Functional_Test Test Number
 
 reg TFF;
@@ -202,8 +191,12 @@ begin
         Tst = #1 0;
     end else if(uut.IO_Op[0])
         if(uut.VA == 16'h0200) begin
-            TFF = #1 ((uut.CPU_DO != Tst) ? ~TFF : TFF);
-            Tst = #1 uut.CPU_DO;
+            if(TFF && (uut.CPU_DO == 8'h29)) begin
+                $stop;
+            end else begin
+                TFF = #1 ((uut.CPU_DO != Tst) ? ~TFF : TFF);
+                Tst = #1 uut.CPU_DO;
+            end
         end
 end
 

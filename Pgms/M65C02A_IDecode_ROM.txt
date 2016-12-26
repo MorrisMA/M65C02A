@@ -1,6 +1,6 @@
 header
 Project: M65C02A_IDecode_ROMa
-File Revision: 0019
+File Revision: 0020
 Author(s): Michael A. Morris
 Description: M65C02A Instruction Decoder - HLL-optimized Instruction Set
 endh
@@ -205,6 +205,19 @@ endh
 --                          instruction to NUL so that the flags in PSW are not
 --                          affected.
 --
+--  0020    16L05   MAM     Restructured the instruction decoder to match the
+--                          Excel spreadsheet. Column 7 & 15 restored to decode
+--                          Rockwell bit-oriented instructions. Column 3 imple-
+--                          ments the FORTH-oriented IP++ instructions. MOV #imm
+--                          moved from $82 to $54, and $22, $42, $62 and $82 are
+--                          reserved for future use. The WDC 65C02S instructions
+--                          WAI and STP have been replaced with two new prefix
+--                          instructions: OSZ and OIS. OSZ combines OSX and SIZ.
+--                          OIS combines OSX, IND, and SIZ. The prefix instruc-
+--                          tions have been reorganized into a group of eight
+--                          instructions: $8B - OAY, $9B - IND, $AB - SIZ, $BB -
+--                          ISZ, $CB - OAX, $DB - OSX, $EB - OSZ, $FB - OIS.
+--
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 -- Mode Field
@@ -217,7 +230,7 @@ BRK     .asm    3   -- BRK Instruction
 FTH     .asm    4   -- FORTH VM Instructions      
 SPC1    .asm    5   -- Special 1 Instructions  (See table below             ) 
 PFX     .asm    6   -- Prefix Instructions   (See table below               ) 
-WAI     .asm    7   -- WAI Instruction  (WAit for Interrupt                 )
+--WAI     .asm    7   -- WAI Instruction  (WAit for Interrupt                 )
 --
 --  One-hot encoding of the Opcode field for SPC1 mode instructions
 --
@@ -535,13 +548,13 @@ _start:     .org    0
  
     COP     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x02  -- 02:#COP #imm
     VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x12  -- 12:*ORA (zp)
-    VAL     0,ADD,ADC,Q_A,R_M,Ci_0,WS_A,    ,NVZC,0x42  -- 22:#ADD ip,I++
+    VAL     0,   ,   ,   ,   ,    ,    ,    ,    ,0x22  -- 22:#NOP
     VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x32  -- 32:*ANL (zp)
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0xD4  -- 42:#STA ip,I++
+    VAL     0,   ,   ,   ,   ,    ,    ,    ,    ,0x42  -- 42:#NOP
     VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x52  -- 52:*EOR (zp)
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xE4  -- 62:#LDA ip,I++
+    VAL     0,   ,   ,   ,   ,    ,    ,    ,    ,0x62  -- 62:#NOP
     VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x72  -- 72:*ADC (zp)
-    SPC1    0,   ,   ,   ,   ,    ,    ,    ,    ,0x20  -- 82:#MOV #imm
+    VAL     0,   ,   ,   ,   ,    ,    ,    ,    ,0x82  -- 82:#NOP
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x92  -- 92:*STA (zp)
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xA2  -- A2: LDX #imm
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xB2  -- B2:*LDA (zp)
@@ -552,22 +565,22 @@ _start:     .org    0
     
 --------------------------------------------------------------------------------
 
-    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x03  -- 03:#ORA sp,S
-    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x13  -- 13:#ORA (sp,S),Y
-    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x23  -- 23:#ANL sp,S
-    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x33  -- 33:#ANL (sp,S),Y
-    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x43  -- 43:#EOR sp,S
-    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x53  -- 53:#EOR (sp,S),Y
-    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x63  -- 63:#ADC sp,S
-    VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x73  -- 73:#ADC (sp,S),Y
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x83  -- 83:#STA sp,S
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x93  -- 93:#STA (sp,S),Y
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xA3  -- A3:#LDA sp,S
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xB3  -- B3:#LDA (sp,S),Y
-    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xC3  -- C3:#CMP sp,S
-    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xD3  -- D3:#CMP (sp,S),Y
-    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xE3  -- E3:#SBC sp,S
-    VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xF3  -- F3:#SBC (sp,S),Y
+    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x03  -- 03:#ORA ip,I++
+    VAL     1,SU ,ASL,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x13  -- 13:#ASL ip,I++
+    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x23  -- 23:#ANL ip,I++
+    VAL     1,SU ,ROL,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x33  -- 33:#ROL ip,I++
+    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x43  -- 43:#EOR ip,I++
+    VAL     1,SU ,LSR,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x53  -- 53:#LSR ip,I++
+    VAL     0,ADD,ADC,Q_A,R_M,Ci_0,WS_A,    ,NVZC,0x63  -- 63:#ADD ip,I++
+    VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x73  -- 73:#ROR ip,I++
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x83  -- 83:#STA ip,I++
+    VAL     1,LU ,TSB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x93  -- 93:#TSB ip,I++
+    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xA3  -- A3:#LDA ip,I++
+    VAL     1,LU ,TRB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0xB3  -- B3:#TRB ip,I++
+    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xC3  -- C3:#CMP ip,I++
+    VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- D3:#DEC ip,I++
+    VAL     0,ADD,SBC,Q_A,R_M,Ci_1,WS_A,    ,NVZC,0xE3  -- E3:#SUB ip,I++
+    VAL     1,IDC,INC,Q_M,R_K,Ci_1,WS_P,    ,NZ  ,0x00  -- F3:#INC ip,I++
 
 --------------------------------------------------------------------------------
 
@@ -575,8 +588,8 @@ _start:     .org    0
     VAL     1,LU ,TRB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x14  -- 14:*TRB zp
     VAL     0,LU ,BIT,L_A,R_M,Ci_C,WS_P,    ,NVZ ,0x24  -- 24: BIT zp
     VAL     0,LU ,BIT,L_A,R_M,Ci_C,WS_P,    ,NVZ ,0x34  -- 34:*BIT zp,X
-    VAL     0,LST,XFR,Q_A,R_M,Ci_C,    ,OS_A,    ,0x42  -- 44:#XMA sp,S
-    VAL     0,   ,   ,   ,   ,    ,    ,    ,    ,0x82  -- 54:#NOP
+    VAL     0,LST,XFR,Q_A,R_M,Ci_C,    ,OS_A,    ,0x44  -- 44:#XMA sp,S
+    SPC1    0,   ,   ,   ,   ,    ,    ,    ,    ,0x20  -- 54:#MOV #imm
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x64  -- 64:*STZ zp
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x74  -- 74:*STZ zp,X
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_Y,    ,0x84  -- 84: STY zp
@@ -628,22 +641,22 @@ _start:     .org    0
     
 --------------------------------------------------------------------------------
 
-    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x07  -- 07:#ORA bp,B
-    VAL     1,SU ,ASL,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x17  -- 17:#ASL bp,B
-    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x27  -- 27:#ANL bp,B
-    VAL     1,SU ,ROL,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x37  -- 37:#ROL bp,B
-    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x47  -- 47:#EOR bp,B
-    VAL     1,SU ,LSR,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x57  -- 57:#LSR bp,B
-    VAL     1,ADD,ADC,Q_M,R_A,Ci_C,WS_P,    ,NVZC,0x67  -- 67:#ADC bp,B
-    VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x77  -- 77:#ROR bp,B
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x87  -- 87:#STA bp,B
-    VAL     1,LU ,TSB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x97  -- 97:#TSB bp,B
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xA7  -- A7:#LDA bp,B
-    VAL     1,LU ,TRB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0xB7  -- B7:#TRB bp,B
-    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xC7  -- C7:#CMP bp,B
-    VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- D7:#DEC bp,B
-    VAL     1,ADD,SBC,Q_M,R_A,Ci_C,WS_P,    ,NVZC,0xE7  -- E7:#SBC bp,B
-    VAL     1,IDC,INC,Q_M,R_K,Ci_1,WS_P,    ,NZ  ,0x00  -- F7:#INC bp,B
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_0   -- 07:+RMB0 dp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_1   -- 17:+RMB1 dp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_2   -- 27:+RMB2 dp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_3   -- 37:+RMB3 dp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_4   -- 47:+RMB4 dp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_5   -- 57:+RMB5 dp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_6   -- 67:+RMB6 dp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_7   -- 77:+RMB7 dp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_0   -- 87:+SMB0 dp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_1   -- 97:+SMB1 dp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_2   -- A7:+SMB2 dp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_3   -- B7:+SMB3 dp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_4   -- C7:+SMB4 dp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_5   -- D7:+SMB5 dp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_6   -- E7:+SMB6 dp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_7   -- F7:+SMB7 dp
 
 --------------------------------------------------------------------------------
 
@@ -712,14 +725,14 @@ _start:     .org    0
     FTH     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x01  -- 5B:#INI  -- Inc IP/W
     FTH     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x18  -- 6B:#PLI  -- Pop IP/W
     FTH     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_T,    ,0x48  -- 7B:#ENT  -- ENTer
-    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x10  -- 8B:#OSX  -- S <=> X
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x08  -- FB:#OAY  -- A <=> Y
     PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x01  -- 9B:#IND  -- IND
     PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x02  -- AB:#SIZ  -- SIZ
     PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x03  -- BB:#ISZ  -- IND + SIZ
-    WAI     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xCB  -- CB:&WAI
-    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xDB  -- DB:&STP
     PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x04  -- EB:#OAX  -- A <=> X
-    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x08  -- FB:#OAY  -- A <=> Y
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x10  -- 8B:#OSX  -- S <=> X
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x12  -- EB:#OSZ  -- OSX + SIZ
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x13  -- FB:#OIS  -- OSX + ISZ
 
 --------------------------------------------------------------------------------
 
@@ -780,22 +793,22 @@ _start:     .org    0
 
 --------------------------------------------------------------------------------
 
-    VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x0F  -- 0F:#ORA ip,I++
-    VAL     1,SU ,ASL,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x1F  -- 1F:#ASL ip,I++
-    VAL     0,LU ,AND,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x2F  -- 2F:#ANL ip,I++
-    VAL     1,SU ,ROL,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x3F  -- 3F:#ROL ip,I++
-    VAL     0,LU ,EOR,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x4F  -- 4F:#EOR ip,I++
-    VAL     1,SU ,LSR,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x5F  -- 5F:#LSR ip,I++
-    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x6F  -- 6F:#NOP
-    VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x7F  -- 7F:#ROR ip,I++
-    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x8F  -- 8F:#NOP
-    VAL     1,LU ,TSB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0x9F  -- 9F:#TSB ip,I++
-    VAL     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0xAF  -- AF:#NOP
-    VAL     1,LU ,TRB,L_A,R_M,Ci_C,WS_P,    ,Z   ,0xBF  -- BF:#TRB ip,I++
-    VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xCF  -- CF:#CMP ip,I++
-    VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- DF:#DEC ip,I++
-    VAL     0,ADD,SBC,Q_A,R_M,Ci_1,WS_A,    ,NVZC,0xEF  -- EF:#SUB ip,I++
-    VAL     1,IDC,INC,Q_M,R_K,Ci_1,WS_P,    ,NZ  ,0x00  -- FF:#INC ip,I++
+    VAL     0,LU ,BBR,L_K,R_M,Ci_C,    ,    ,BEQ ,K_0   -- 0F:+BBR0 zp,rel
+    VAL     0,LU ,BBR,L_K,R_M,Ci_C,    ,    ,BEQ ,K_1   -- 1F:+BBR1 zp,rel
+    VAL     0,LU ,BBR,L_K,R_M,Ci_C,    ,    ,BEQ ,K_2   -- 2F:+BBR2 zp,rel
+    VAL     0,LU ,BBR,L_K,R_M,Ci_C,    ,    ,BEQ ,K_3   -- 3F:+BBR3 zp,rel
+    VAL     0,LU ,BBR,L_K,R_M,Ci_C,    ,    ,BEQ ,K_4   -- 4F:+BBR4 zp,rel
+    VAL     0,LU ,BBR,L_K,R_M,Ci_C,    ,    ,BEQ ,K_5   -- 5F:+BBR5 zp,rel
+    VAL     0,LU ,BBR,L_K,R_M,Ci_C,    ,    ,BEQ ,K_6   -- 6F:+BBR6 zp,rel
+    VAL     0,LU ,BBR,L_K,R_M,Ci_C,    ,    ,BEQ ,K_7   -- 7F:+BBR7 zp,rel
+    VAL     0,LU ,BBS,L_K,R_M,Ci_C,    ,    ,BNE ,K_0   -- 8F:+BBS0 zp,rel
+    VAL     0,LU ,BBS,L_K,R_M,Ci_C,    ,    ,BNE ,K_1   -- 9F:+BBS1 zp,rel
+    VAL     0,LU ,BBS,L_K,R_M,Ci_C,    ,    ,BNE ,K_2   -- AF:+BBS2 zp,rel
+    VAL     0,LU ,BBS,L_K,R_M,Ci_C,    ,    ,BNE ,K_3   -- BF:+BBS3 zp,rel
+    VAL     0,LU ,BBS,L_K,R_M,Ci_C,    ,    ,BNE ,K_4   -- CF:+BBS4 zp,rel
+    VAL     0,LU ,BBS,L_K,R_M,Ci_C,    ,    ,BNE ,K_5   -- DF:+BBS5 zp,rel
+    VAL     0,LU ,BBS,L_K,R_M,Ci_C,    ,    ,BNE ,K_6   -- EF:+BBS6 zp,rel
+    VAL     0,LU ,BBS,L_K,R_M,Ci_C,    ,    ,BNE ,K_7   -- FF:+BBS7 zp,rel
 
 --------------------------------------------------------------------------------
 

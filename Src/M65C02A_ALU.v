@@ -462,7 +462,7 @@ wire    [15:0] J;               // X bus multiplexer for src reg overrides
 
 wire    [15:0] G, H, L;         // LU Input Busses
 wire    [15:0] W, U, Q;         // Adder Left Operand Input Busses (SU <= W)
-wire    [15:0] E, F, R, O;      // Adder Right Operand Input Busses
+wire    [15:0] E, F, R;         // Adder Right Operand Input Busses
 
 reg     Ci;                     // Adder Carry In signal
 
