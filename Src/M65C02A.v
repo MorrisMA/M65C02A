@@ -437,9 +437,12 @@ M65C02A_Core    #(
                     .Clk(Clk),              // System Clock
                     
                     .IRQ_Msk(IRQ_Msk),      // M65C02A Core Interrupt Mask
+                    .LE_Int(LE_Int),        // M65C02A Core Latch Enable Int/Vec
+
+                    .xIRQ(IRQ),             // M65C02A Core Extrn Interrupt Flag
                     .Int(Int),              // M65C02A Core Interrupt Request
                     .Vector(Vector),        // M65C02A Core Interrupt Vector
-                    .LE_Int(LE_Int),        // M65C02A Core Latch Enable Int/Vec
+
                     .VP(VP),                // M65C02A Core Interrupt Vec. Pull
 
                     .SO(SO),                // M65C02A Core Set oVerflow Input

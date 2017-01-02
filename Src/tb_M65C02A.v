@@ -191,12 +191,8 @@ begin
         Tst = #1 0;
     end else if(uut.IO_Op[0])
         if(uut.VA == 16'h0200) begin
-            if(TFF && (uut.CPU_DO == 8'h29)) begin
-                $stop;
-            end else begin
-                TFF = #1 ((uut.CPU_DO != Tst) ? ~TFF : TFF);
-                Tst = #1 uut.CPU_DO;
-            end
+            TFF = #1 ((uut.CPU_DO != Tst) ? ~TFF : TFF);
+            Tst = #1 uut.CPU_DO;
         end
 end
 

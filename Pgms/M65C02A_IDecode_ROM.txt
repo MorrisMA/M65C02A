@@ -1,6 +1,6 @@
 header
 Project: M65C02A_IDecode_ROMa
-File Revision: 0020
+File Revision: 0021
 Author(s): Michael A. Morris
 Description: M65C02A Instruction Decoder - HLL-optimized Instruction Set
 endh
@@ -48,7 +48,7 @@ endh
 --  0002    15G04   MAM     Updated to support LDA @IP+off and MOV instructions
 --
 --  0003    15G06   MAM     Modified code for CMP/CPX/CPY instructions in order
---                          to indicate that CMP/CPX/CPY is being executed. In 
+--                          to indicate that CMP/CPX/CPY is being executed. In
 --                          the 16-bit mode, this indicator will be used by the
 --                          ALU logic to change the condition code field from
 --                          one that sets NZC to one that sets all four: NVZC.
@@ -86,7 +86,7 @@ endh
 --  0009    15K13   MAM     Changed the assigned opcode for MOV from $44 to $42.
 --                          Assigned the unused opcode at $44 to STA ip,I++ to
 --                          match the LDA ip,I++ opcode at $54. The new instruc-
---                          tion uses the same addressing mode as LDA ip,I++, 
+--                          tion uses the same addressing mode as LDA ip,I++,
 --                          but stores the accumulator at the address specified
 --                          by IP and autoincrements IP. IND, SIZ, and ISZ pre-
 --                          fix instructions may be applied with the expected
@@ -99,7 +99,7 @@ endh
 --                          expected to be used for computing IP-relative jumps
 --                          and branches.
 --
---  0011    15L10   MAM     Replaced the JMP ip,I++ instruction because NXT 
+--  0011    15L10   MAM     Replaced the JMP ip,I++ instruction because NXT
 --                          faster and shorter. JMP ip,I++ replaced with an
 --                          instruction to adjust the system stack pointer. The
 --                          ADJ #imm16 add (w/o carry) the signed 16-bit imme-
@@ -115,20 +115,20 @@ endh
 --
 --  0013    15L30   MAM     Removed WRD flag for DUP, SWP, and ROT instructions.
 --
---  0014    15L31   MAM     Replaced the Rockwell bit-oriented instructions in 
+--  0014    15L31   MAM     Replaced the Rockwell bit-oriented instructions in
 --                          columns 7 and F with another set of instructions
 --                          intended to provide better stack-oriented processing
 --                          and to more fully support threaded code compilers
 --                          and interpreters. In column 7, the even entries are
 --                          duplicates of the corresponding entries in column 3.
 --                          Instead of BP-relative, the addressing mode is SP-
---                          relative by default. (Prefixing with OSX results in 
+--                          relative by default. (Prefixing with OSX results in
 --                          same instruction from column 3 and vice-versa. This
 --                          modification is being made as a consequence of the
 --                          high use of SP-relative operations in the Pascal
 --                          compiler being targetted to the core.) The odd ele-
 --                          ments of column 7 implement BP-relative versions of
---                          a number of RMW instructions: ASL/ROL/LSR/ROR, 
+--                          a number of RMW instructions: ASL/ROL/LSR/ROR,
 --                          TSB/TRB, and DEC/INC. (While porting the Pascal com-
 --                          piler it was determined that incrementing/decrement-
 --                          ing array indices is a frequent requirement. Since
@@ -138,9 +138,9 @@ endh
 --                          tions. Given the support for nested procedures and
 --                          functions in Pascal, the majority of array opera-
 --                          tions are in procedures and functions which means
---                          that the majority of array index variables are on 
+--                          that the majority of array index variables are on
 --                          the stack. Only array indices defined at the root
---                          level can use the DEC/INC abs instructions of the 
+--                          level can use the DEC/INC abs instructions of the
 --                          core. All other array indices must be manipulated
 --                          using loads, register DEC/INC, and stores. Although
 --                          this is a straightforward instruction sequence, the
@@ -161,11 +161,11 @@ endh
 --  0015    16A05   MAM     Converted ADC/SBC sp,S to RMW where the left operand
 --                          is M and the right operand is A, and the result is
 --                          written back to M. This is expected to improve the
---                          HLL performance of the core by operating directly on 
+--                          HLL performance of the core by operating directly on
 --                          local variables found on the system stack either in
---                          function/procedure stack frame (relative to BP) or 
+--                          function/procedure stack frame (relative to BP) or
 --                          in dynamically created variables used for expression
---                          evaluation. Replaced BRL rel16 with XMA sp,S. XMA 
+--                          evaluation. Replaced BRL rel16 with XMA sp,S. XMA
 --                          exchanges the accumulator with the addressed stack
 --                          element.
 --
@@ -175,21 +175,21 @@ endh
 --                          lumn in which the new instruction is placed. IOW,
 --                          the new single byte instructions are placed in a co-
 --                          lumn which is composed of single byte instructions
---                          of the original 6502/65C02. New two/three byte 
+--                          of the original 6502/65C02. New two/three byte
 --                          instructions are placed in columns in which the ori-
 --                          ginal 6502/65C02 two/three byte instructions were
 --                          defined.
 --
 --  0017    16D10   MAM     Modified the Mode fields to add support for several
---                          special instructions enabled by the IND prefix. The 
+--                          special instructions enabled by the IND prefix. The
 --                          dedicated ADJ mode was converted to SPC2, and the
 --                          ADJ instruction included in the decode space created
 --                          by the change. In addition, with IND prefixed to the
---                          ASL/ROL A instructions, an arithmetic left shift 
+--                          ASL/ROL A instructions, an arithmetic left shift
 --                          that sets the V flag was enabled. With IND prefixed
 --                          to the LSR instruction, an arithmetic right shift
 --                          instruction was enabled by shifting Q[7] instead of
---                          a logic zero. Finally, when prefixed by IND, the 
+--                          a logic zero. Finally, when prefixed by IND, the
 --                          INC/DEC A instructions will now set the C flag.
 --
 --  0018    16I27   MAM     Modified the decode table to match that in the uPgm.
@@ -218,6 +218,13 @@ endh
 --                          instructions: $8B - OAY, $9B - IND, $AB - SIZ, $BB -
 --                          ISZ, $CB - OAX, $DB - OSX, $EB - OSZ, $FB - OIS.
 --
+--  0021    17A01   MAM     The prefix instructions have been restored into a
+--                          group of eight instructions: $8B - OSX, $9B - IND,
+--                          $AB - SIZ, $BB - ISZ, $CB - OSX, $DB - OSZ, $EB -
+--                          OAX, and $FB - OAY. This allows WAI ($CB) and STP
+--                          ($DB) to be restored if W65C02S compatibility is 
+--                          needed.
+--
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 -- Mode Field
@@ -227,9 +234,9 @@ VAL     .asm    0   -- Valid Instruction (not otherwise decoded)
 SPC2    .asm    1   -- Special 2 Instructions  (See table below             )
 COP     .asm    2   -- COP Instruction  (CO-Processor instruction           )
 BRK     .asm    3   -- BRK Instruction
-FTH     .asm    4   -- FORTH VM Instructions      
-SPC1    .asm    5   -- Special 1 Instructions  (See table below             ) 
-PFX     .asm    6   -- Prefix Instructions   (See table below               ) 
+FTH     .asm    4   -- FORTH VM Instructions
+SPC1    .asm    5   -- Special 1 Instructions  (See table below             )
+PFX     .asm    6   -- Prefix Instructions   (See table below               )
 --WAI     .asm    7   -- WAI Instruction  (WAit for Interrupt                 )
 --
 --  One-hot encoding of the Opcode field for SPC1 mode instructions
@@ -305,7 +312,7 @@ LU      .equ    40  -- Select Logic Unit (AND/ORA/EOR, BIT/TRB/TSB,
                     --                    SEC/CLC/SEI/CLI/SED/CLD/CLV
 SU      .equ    36  -- Select Shift/Rotate Unit (ASL/ROL/LSR/ROR)
 ADD     .equ    34  -- Select Decimal/Binary Adder (ADC/SBC, ADD/SUB, ADJ)
-IDC     .equ    33  -- Select Bin. Add (INC/DEC/CMP/INX/DEX/CPX/INY/DEY/CPY) 
+IDC     .equ    33  -- Select Bin. Add (INC/DEC/CMP/INX/DEX/CPX/INY/DEY/CPY)
 
 --------------------------------------------------------------------------------
 --  General Definitions
@@ -325,7 +332,7 @@ ORA     .equ    2   -- ALU <=  A | M;   N <= ALU[7]; Z <= ~|ALU;
 EOR     .equ    3   -- ALU <=  A ^ M;   N <= ALU[7]; Z <= ~|ALU;
 
 BIT     .equ    1   -- ALU <=  A & M;   N <= M[7]; V <= M[6]; Z <= ~|(A & M)
--- BIT #imm         -- ALU <=  A & M;                         Z <= ~|(A & M)   
+-- BIT #imm         -- ALU <=  A & M;                         Z <= ~|(A & M)
 TRB     .equ    0   -- ALU <= ~A & M;                         Z <= ~|(A & M)
 TSB     .equ    2   -- ALU <=  A | M;                         Z <= ~|(A & M)
 
@@ -476,7 +483,7 @@ K_N     .equ    128 -- Mask for P.N (Negative Flag)
 --  65C02. In other words, the non-NOP instructions are for the W65C02/G65SC02.
 --  In the right margin, opcodes that were added by these two processors to the
 --  base MOS6502A instruction set are marked with an asterisk (*).
---  
+--
 --  The instructions added by the Rockwell R65C02 are marked by an addition (+)
 --  symbol. The instructions added by WDC from the W65C816/W65C802 processor(s)
 --  are marked with an ampersand (&) symbol. The instructions marked by the
@@ -486,17 +493,17 @@ K_N     .equ    128 -- Mask for P.N (Negative Flag)
 --  M65C02A instructions, which provide a significant improvement to the base
 --  instruction set.
 --
---  The new instructions include the PSH zp/abs/imm16, PHR rel16, PUL zp/abs, 
+--  The new instructions include the PSH zp/abs/imm16, PHR rel16, PUL zp/abs,
 --  and stack/base relative instructions from the 8/16-bit W65C816 micropro-
 --  cessor. In addition, unique to the M65C02A are a number of prefix instruc-
 --  tions that provide indirection to most of the base W65C02S instructions, and
---  increase the size of the operation from 8 bits to 16 bits, and change the 
---  default destination register for various instructions. In addition, there 
+--  increase the size of the operation from 8 bits to 16 bits, and change the
+--  default destination register for various instructions. In addition, there
 --  are M65C02A-specific instructions to manipulate the M65C02A-specific regis-
---  ter stacks, instructions to implement a DTC/ITC FORTH VM, add support for a 
+--  ter stacks, instructions to implement a DTC/ITC FORTH VM, add support for a
 --  CO-Processor interface, and provide block moves.
 --
---  The M65C02A instruction set starts with the instruction set of the 6502 ( ), 
+--  The M65C02A instruction set starts with the instruction set of the 6502 ( ),
 --  adds the 65C02 (*), adds the Rockwell (+), and the W65C816/W65C802 (&) in-
 --  structions. The resulting instruction set is equivalent to the instruction
 --  set of the WDC W65C02S microprocessor.
@@ -545,7 +552,7 @@ _start:     .org    0
     VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xF1  -- F1: SBC (zp),Y
 
 --------------------------------------------------------------------------------
- 
+
     COP     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x02  -- 02:#COP #imm
     VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x12  -- 12:*ORA (zp)
     VAL     0,   ,   ,   ,   ,    ,    ,    ,    ,0x22  -- 22:#NOP
@@ -562,7 +569,7 @@ _start:     .org    0
     VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xD2  -- D2:*CMP (zp)
     SPC1    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x80  -- E2:#PSH #imm
     VAL     0,ADD,SBC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0xF2  -- F2:*SBC (zp)
-    
+
 --------------------------------------------------------------------------------
 
     VAL     0,LU ,ORA,L_A,R_M,Ci_C,WS_A,    ,NZ  ,0x03  -- 03:#ORA ip,I++
@@ -638,7 +645,7 @@ _start:     .org    0
     VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- D6: DEC zp,X
     VAL     1,IDC,INC,Q_M,R_K,Ci_1,WS_P,    ,NZ  ,0x00  -- E6: INC zp
     VAL     1,IDC,INC,Q_M,R_K,Ci_1,WS_P,    ,NZ  ,0x00  -- F6: INC zp,X
-    
+
 --------------------------------------------------------------------------------
 
     VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_0   -- 07:+RMB0 dp
@@ -725,14 +732,14 @@ _start:     .org    0
     FTH     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x01  -- 5B:#INI  -- Inc IP/W
     FTH     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x18  -- 6B:#PLI  -- Pop IP/W
     FTH     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_T,    ,0x48  -- 7B:#ENT  -- ENTer
-    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x08  -- FB:#OAY  -- A <=> Y
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x10  -- 8B:#OSX  -- S <=> X
     PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x01  -- 9B:#IND  -- IND
     PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x02  -- AB:#SIZ  -- SIZ
     PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x03  -- BB:#ISZ  -- IND + SIZ
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x12  -- CB:#OSZ  -- OSX + SIZ
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x13  -- DB:#OIS  -- OSX + ISZ
     PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x04  -- EB:#OAX  -- A <=> X
-    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x10  -- 8B:#OSX  -- S <=> X
-    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x12  -- EB:#OSZ  -- OSX + SIZ
-    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x13  -- FB:#OIS  -- OSX + ISZ
+    PFX     0,NOP,NOP,Q_M,R_M,Ci_C,    ,    ,    ,0x08  -- FB:#OAY  -- A <=> Y
 
 --------------------------------------------------------------------------------
 

@@ -181,6 +181,7 @@ module M65C02A_Core #(
     output  IRQ_Msk,        // Interrupt mask from P to Interrupt Handler
     output  LE_Int,         // Interrupt Latch Enable - Hold Int until serviced
 
+    input   xIRQ,           // External Maskable Interrupt Request Input
     input   Int,            // Interrupt input from Interrupt Handler
     input   [15:0] Vector,  // ISR Vector from Interrupt Handler
 
@@ -415,7 +416,7 @@ wire    [15:0] ALU_DO;                  // M65C02A ALU Data Output Bus
 wire    Valid;                          // M65C02A ALU Output Valid Signal
 wire    CC;                             // ALU Condition Code Output
 
-wire    ALU_N, ALU_V, ALU_Z;            // M65C02A ALU Flags
+wire    ALU_Z;                          // M65C02A ALU Flags
 
 reg     dTSZ;                           // ALU DO Multiplexer Control 16-bit Ops
 
@@ -495,7 +496,7 @@ always @(*) BA <= ((Done) ? ((Int & SC) ? pInt_Hndlr
 
 //  Assign Test Input Signals
 
-assign T = {ALU_N, ALU_V, ALU_Z, CC};
+assign T = {xIRQ, Int, ALU_Z, CC};
 
 //  Generate TSZ Microprogram Control Signal
 //      Conditionally modifies the MPC instruction
@@ -921,8 +922,8 @@ M65C02A_ALUv2   ALUv2 (
                     
                     .ALU_C(),           // M65C02A ALU Carry Out
                     .ALU_Z(ALU_Z),      // M65C02A ALU Zero Out
-                    .ALU_V(ALU_V),      // M65C02A ALU OVerflow
-                    .ALU_N(ALU_N),      // M65C02A ALU Negative
+                    .ALU_V(),           // M65C02A ALU OVerflow
+                    .ALU_N(),           // M65C02A ALU Negative
 
                     .X(X),              // M65C02A ALU Index Register
                     .Y(Y),              // M65C02A ALU Index Register

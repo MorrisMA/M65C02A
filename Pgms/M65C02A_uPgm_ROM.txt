@@ -1,6 +1,6 @@
 header
 Project: M65C02A_uPgm_ROM
-File Revision: 0017
+File Revision: 0020
 Author(s): Michael A. Morris
 Description: M65C02A HLL-Optimized Microprogram
 endh
@@ -61,7 +61,7 @@ endh
 --                          tion; it no longers causes an interrupt/trap, but
 --                          instead it loads OP2 with the immediate operand and
 --                          initiates a co-processor operation. In this Revision
---                          only OP2 is loaded with the coprocessor operand. It 
+--                          only OP2 is loaded with the coprocessor operand. It
 --                          functions as a 2 cycle NOP for the time being. A mux
 --                          for multi-way branching is required in the core in
 --                          order to properly implement the M65C02A co-processor
@@ -84,26 +84,26 @@ endh
 --  0008    15K13   MAM     Changed the assigned opcode for MOV from $44 to $42.
 --                          Assigned the unused opcode at $44 to STA ip,I++ to
 --                          match the LDA ip,I++ opcode at $54. The new instruc-
---                          tion uses the same addressing mode as LDA ip,I++, 
+--                          tion uses the same addressing mode as LDA ip,I++,
 --                          but stores the accumulator at the address specified
 --                          by IP and autoincrements IP. IND, SIZ, and ISZ pre-
---                          fix instructions may be applied to both of these 
+--                          fix instructions may be applied to both of these
 --                          instructions with the expected indirection and size
 --                          effects.
 --
---  0009    15K25   MAM     Replaced the BSR rel16 instruction with the 
+--  0009    15K25   MAM     Replaced the BSR rel16 instruction with the
 --                          JMP (bp,B),Y instruction . BSR rel16 can be synthe-
 --                          sized using PSH #imm16; BRL rel16; with only a four
 --                          cycle penalty. Replaced JMP (bp,B),Y with the
 --                          ADC ip,I++ as $82. This instruction will be used for
---                          computing IP-relative jumps and branches. The 
+--                          computing IP-relative jumps and branches. The
 --                          ADC ip,I++ instruction will use sequence used for
 --                          the LDA ip,I++ instruction, so the sequence is re-
 --                          named to _RO_ipIPP, since more than one instruction
 --                          uses the sequence. Recovered the microcode space for
 --                          the BSR rel16 instruction.
 --
---  0010    15L10   MAM     Replaced the JMP (bp,B),Y instruction with the 
+--  0010    15L10   MAM     Replaced the JMP (bp,B),Y instruction with the
 --                          ADJ #imm16 instruction. The ADJ instruction directly
 --                          adjusts the system or auxiliary stack pointers with
 --                          the 16-bit two's complement immediate value.
@@ -115,7 +115,7 @@ endh
 --
 --  0012    15A01   MAM     Modified the instruction decode to conform with ver-
 --                          sion 0014 of the Instruction Decode ROM. MOV moved
---                          to 82 and 42 defined as a NOP. ADD/LDA ip,I++ and 
+--                          to 82 and 42 defined as a NOP. ADD/LDA ip,I++ and
 --                          STA ip,I++ moved to column F. Column 7 replaced.
 --                          Added addressing mode sequences for addressing modes
 --                          RO/WO sp,S, RMW bp,B, and RMW ip,I++, and deleted
@@ -125,19 +125,19 @@ endh
 --  0013    16A05   MAM     Converted ADC/SBC sp,S to RMW where the left operand
 --                          is M and the right operand is A, and the result is
 --                          written back to M. This is expected to improve the
---                          HLL performance of the core by operating directly on 
+--                          HLL performance of the core by operating directly on
 --                          local variables found on the system stack either in
---                          function/procedure stack frame (relative to BP) or 
+--                          function/procedure stack frame (relative to BP) or
 --                          in dynamically created variables used for expression
 --                          evaluation.
 --
 --  0014    16A08   MAM     Added XMA sp,S: M <= [EA]; [EA] <= A; A <= M; Will
 --                          require a RMW-like microsequence with a change in
---                          the ALU control word. The instruction decode will 
+--                          the ALU control word. The instruction decode will
 --                          enable [EA] <= A, i.e. store accumulator. The in-
 --                          struction sequence will first read the effective
 --                          address into {OP2, OP1}, i.e. M, then write A to the
---                          effective address, and finally write M into A. To 
+--                          effective address, and finally write M into A. To
 --                          write A to the effective address, the initial ALU
 --                          control word will be for the STA instruction. To
 --                          write M into A after writing A to memory, the ALU
@@ -158,29 +158,50 @@ endh
 --                          tructions, reduced the number of supported base-
 --                          relative instructions, and reorganized the micropro-
 --                          to placed all implemented instructions in sections:
---                          6502/65C02, W65C02S, and M65C02A. ADJ instruction 
+--                          6502/65C02, W65C02S, and M65C02A. ADJ instruction
 --                          implemented as ADJ #imm with immediate operand sign
 --                          extended, and supporting the SIZ prefix instruction.
 --
 --  0017    16K13   MAM     Adjusted the decode table portion to match that of
 --                          Excel spreadsheet. Locations in the tables changed
 --                          were those for the ADJ #imm, MOV #imm, PSH/PUL zp,
---                          PHR rel16, XMA sp,S, ADD/STA/LDA ip,I++. XMA sp,S 
+--                          PHR rel16, XMA sp,S, ADD/STA/LDA ip,I++. XMA sp,S
 --                          reverted to 8-bit offset for consistency in the
 --                          opcode map. PSH/PUL zp/abs/imm changed so that the
 --                          operation size default is not forced to 16 bits; SIZ
 --                          required for 16-bit operations. PHR rel16 is still a
 --                          16-bit default instruction.
 --
---  0018    16L05   MAM     Modified to conform with the Excel spreadsheet: 
+--  0018    16L05   MAM     Modified to conform with the Excel spreadsheet:
 --                          MOV #imm instruction moved to $54; XMA instruction
 --                          changed to ZP direct with support for IND, SIZ, ISZ,
 --                          OSX, OSZ, and OIS prefix instructions; Moved ip,I++
---                          from column 15 to column 3 and moved ADD/STA/LDA 
+--                          from column 15 to column 3 and moved ADD/STA/LDA
 --                          ip,I++ instructions from column 2 into column 3;
 --                          restored Rockwell instructions to column 7 and 15;
 --                          Replaced WAI and STP instructions and reordered
---                          prefix instructions in column B. 
+--                          prefix instructions in column B.
+--
+--  0019    17A01   MAM     Restored original order to prefix instructions so
+--                          that OSZ ($CB) and OIS ($DB) prefix instructions can
+--                          be replaced by WAI and STP to fully support the WDC
+--                          W65C02S instruction set table while also incorpora-
+--                          all of the M65C02A instructions except OSZ and OIS.
+--                          For the W65C02S to be supported by M65C02A tools,
+--                          it is only necessary to adjust the code generation
+--                          for stack-relative addressing modes to use a prefix
+--                          instruction sequence OSX followed by SIZ, IND, or 
+--                          ISZ. The benefit of using OSZ and OIS is slight, but
+--                          the use of stack-relative addressing mode is great
+--                          when using a HLL. Therefore, the advantage of OSZ
+--                          and OIS can be considerable in a HLL-generated pro-
+--                          gram. The utilization rate of WAI and STP are not
+--                          expected to match that of the OSZ and OIS prefix
+--                          instructions which replace them in the M65C02A.
+--
+--  0020    17A01   MAM     Modified PHR rel16 to support to IND prefix to con-
+--                          vert into a PC-relative subroutine call instruction:
+--                          CSR rel16.
 --
 --------------------------------------------------------------------------------
 --  Comments
@@ -294,7 +315,7 @@ endh
 --  tions, or for handling specific addressing modes. The most significant 256
 --  locations in the microprogram ROM/RAM constitute the initial microstate for
 --  each of the 256 possible instruction opcodes. In the M65C02A implementation,
---  256 of these instructions represent valid instructions. 
+--  256 of these instructions represent valid instructions.
 --
 --  A second 2-way jump table is included specifically for the RMW instructions.
 --  The purpose of the microword with the BRV1 instruction is to complete the
@@ -414,7 +435,7 @@ PC      .equ    384     -- 1_1000_000_0; PC:   NA  <= PC      + 0; PC,MAR <= NA
 Inc     .equ    385     -- 1_1000_000_1; Inc:  NA  <= PC      + 1; PC,MAR <= NA
 --------------------------------------------------------------------------------
 Bra     .equ    387     -- 1_1000_001_1; Bra:  NA  <= PC  + M + 1; PC,MAR <= NA
-Rel     .equ    131     -- 0_1000_001_1; Rel:  NA  <= PC  + M + 1; MAR <= NA
+Rel     .equ    131     -- 0_1000_001_1; Rel:  NA  <= PC  + M + 1;    MAR <= NA
 --------------------------------------------------------------------------------
 Psh     .equ     64     -- 0_0100_000_0; Psh:  NA  <= S       + 0; MAR <= NA
 Pop     .equ     65     -- 0_0100_000_1; Pop:  NA  <= S       + 1; MAR <= NA
@@ -505,8 +526,8 @@ UpdtPtr .equ    6       -- Update Source (X) and Destination (Y) Pointers
 --
 --  T[0]    -   CC
 --  T[1]    -   ALU_Z
---  T[2]    -   ALU_V
---  T[3]    -   ALU_N
+--  T[2]    -   INT
+--  T[3]    -   xIRQ
 --
 --  Via[0]  -   BA, but also waits for the completion of a memory or ALU cycle
 --  Via[1]  -   Instruction Decoder, effectively functions as a 256 way branch
@@ -525,7 +546,7 @@ UpdtPtr .equ    6       -- Update Source (X) and Destination (Y) Pointers
 --              3 : MW <= {1'b0, 1'b0, ~IND};   // Other Instructions
 --          endcase
 --      else        // Used by the BMW MPC instruction
---          MW <= ((WAI) ? {1'b0, xIRQ, Int} : {2'b00, Int});
+--          MW <= {2'b00, Int};
 --  end
 --
 --  Memory Output Data Multiplexer Definitions
@@ -537,7 +558,7 @@ UpdtPtr .equ    6       -- Update Source (X) and Destination (Y) Pointers
 --
 --  TSZ = SIZ & TSiz;
 --
---  always @(posedge Clk) dTSZ <= ((Rst) ? 1'b0 : TSZ & ~dTSZ) 
+--  always @(posedge Clk) dTSZ <= ((Rst) ? 1'b0 : TSZ & ~dTSZ)
 --
 --  HB = ((SIZ) ?  (^{dTSZ, PSH}) : 1'b0);
 --  LB = ((SIZ) ? ~(^{dTSZ, PSH}) : 1'b1);
@@ -1136,7 +1157,7 @@ _RMW_I_Exit:
 --------------------------------------------------------------------------------
 --  Rockwell RMBx/SMBx zp instructions (Support OSX, IND, but not SIZ)
 --------------------------------------------------------------------------------
-  
+
 _yMBx_zp:
     BMW2    _yMBx_zpI,RMD, ZPM, RD, OP1             -- Rd Op/Op Ptr Lo
 
@@ -1145,11 +1166,11 @@ _yMBx_zpI:
     FTCH    $,, LDA, RD, OP1                        -- Rd Operand
 --
     BMW     _RMW,, MAR, WR, ALU, WE_R               -- Wr Result to Memory
-  
+
 --------------------------------------------------------------------------------
 --  Rockwell BBRx/BBSx zp,rel instructions (Support OSX, IND, but not SIZ)
 --------------------------------------------------------------------------------
-  
+
 _BByx_zp_rel:
     BMW2    _BByx_zpI_rel,RMD, ZPM, RD, OP1         -- Read Op/Op Ptr Lo
 
@@ -1163,20 +1184,19 @@ _BByx_zpI_rel:
 --------------------------------------------------------------------------------
 --  STP - Wait for Interrupt
 --------------------------------------------------------------------------------
---
---_STP:
---    BRV0    $,, PC              -- Halt Exection
---
+
+_STP:
+    BRV0    $,, PC              -- Halt Execution
+
 --------------------------------------------------------------------------------
 --  WAI - Wait for Interrupt
 --------------------------------------------------------------------------------
---
---_WAI:                           -- Set up 4-way table for WAI instruction
---    BMW     _WAI,, PC           -- No external interrupts asserted
---    BRV0    _Int,, PC           -- Int asserted by NMI, do NMI interrupt
---    BRV0    _Nxt,, PC           -- xIRQ asserted with IRQ_Msk asserted, cont.
---    BRV0    _Int,, PC           -- Int asserted by xIRQ, do IRQ interrupt
---
+
+_WAI:
+    BTH3  _Nxt,, PC             -- xIRQ asserted with IRQ_Msk asserted, cont.
+    BTH2  _Int,, PC             -- Int asserted by NMI or IRQ, do IRQ interrupt
+    BMW   _WAI,, PC             -- No external interrupts asserted, check xIRQ
+
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --  M65C02A Specific: New Stack Instructions
@@ -1184,12 +1204,18 @@ _BByx_zpI_rel:
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
---  Push 16-bit PC-Relative Value - PHR Rel16
+--  Push 16-bit PC-Relative Value - PHR Rel16, CSR Rel16
 --------------------------------------------------------------------------------
 
 _PHR_Rel16:
     FTCH    $,, Inc, IF, OP2                        -- Read Hi(Rel16)
-    FTCH    $,, Rel                                 -- MAR = PC + {OP2, OP1} + 1
+    BRV0    _PHR_Rel16_Exit,, Rel                   -- MAR = PC + {OP2, OP1} + 1
+--
+    FTCH    $,MOD, Psh, WR, DMH, WE_R               -- Push Hi(MAR) (MAR[15:8])
+    FTCH    $,MOD, Psh, WR, DML, WE_R               -- Push Lo(MAR) (MAR[ 7:0])
+    BRV1    $,, Bra, IF, IR                         -- Instruction Fetch
+
+_PHR_Rel16_Exit:
     FTCH    $,MOD, Psh, WR, DMH, WE_R               -- Push Hi(MAR) (MAR[15:8])
     BMW     _Nxt,MOD, Psh, WR, DML, WE_R            -- Push Lo(MAR) (MAR[ 7:0])
 
@@ -1217,7 +1243,7 @@ _PSH_zp:
 _PSH_abs:
     FTCH    $,, Inc, IF, OP2                        -- Read Data Ptr Hi
     BMW1    _PSH_IS,SPR, LDA, RD, OP1               -- Read Op/Op Ptr Lo
-    
+
 --------------------------------------------------------------------------------
 --  Common Jump Table - PSH zp;  PSH (zp);  PSH.w zp;  PSH.w (zp)
 --                      PSH abs; PSH (abs); PSH.w abs; PSH.w (abs)
@@ -1231,7 +1257,7 @@ _PSH_S:                                             -- MW<=010<={0,~IND,  SIZ}
     BRV0    _PSH_S_Exit,MOD, Nxt, RD, OP2           -- Read Op Hi
 _PSH_Exit:                                          -- MW<=011<={0,~IND, ~SIZ}
     BMW     _Nxt,MOD, Psh, WR, DOL, WE_R            -- Push Op Lo
-    
+
 --------------------------------------------------------------------------------
 --  Common Exit Table - PSH zp;  PSH (zp);  PSH.w zp;  PSH.w (zp)
 --                      PSH abs; PSH (abs); PSH.w abs; PSH.w (abs)
@@ -1292,24 +1318,24 @@ _PUL_S_Exit:                                        -- 16-bit PUL operation
 --------------------------------------------------------------------------------
 
 _ENTER:
-    FTCH    $,SMD, Psh, WR, DOL, WE_R,, W2I         -- Push FORTH Addrs Ptr Hi 
+    FTCH    $,SMD, Psh, WR, DOL, WE_R,, W2I         -- Push FORTH Addrs Ptr Hi
 --
     FTCH    $,, IPN, RD, OP1,,, IP1                 -- Read FORTH Addrs Ptr Lo
-    
+
 --------------------------------------------------------------------------------
 --  NEXT - FORTH VM Inner Interpreter               (Not Interruptable)
 --------------------------------------------------------------------------------
 
 _NEXT:
-    BMW2    _ITC,, IPN, RD, OP2,,, IP1              -- Read FORTH Addrs Ptr Hi 
+    BMW2    _ITC,, IPN, RD, OP2,,, IP1              -- Read FORTH Addrs Ptr Hi
 _ITC:
     FTCH    $,, LDA, RD, OP1,,, M2W                 -- Read FORTH Word CFA Lo
-    BRV0    _ITC_EXIT,, Nxt, RD, OP2                -- Read FORTH Word CFA Hi   
-_DTC:    
+    BRV0    _ITC_EXIT,, Nxt, RD, OP2                -- Read FORTH Word CFA Hi
+_DTC:
     BRV1    $,, Jmp, IF, IR,,, M2W                  -- Fetch next instruction
 _ITC_EXIT:
     BRV1    $,, Jmp, IF, IR                         -- Fetch next instruction
-    
+
 --------------------------------------------------------------------------------
 --  Push 16-bit IP/W - PSH I (PHI); PSH W (IND PHI)
 --------------------------------------------------------------------------------
@@ -1409,7 +1435,7 @@ _MOV:
     BTH0    _MOV,, DST, WR, ALU, WE_R,, UpdtPtr     -- Write Memory, Update Ptrs
 --
     BRV1    $,, Inc, IF, IR                         -- Fetch next instruction
-      
+
 --------------------------------------------------------------------------------
 --  eXchange Memory and Accumulator SP-relative - XMA zp,X
 --------------------------------------------------------------------------------
@@ -1898,22 +1924,22 @@ _PLI:
     BRV0    _PLI,MOD, Pop, RD, OP1                  -- Pop IP/W
 _ENT:
     BRV0    _ENTER,SMD, Psh, WR, DOH, WE_R,, WP2    -- FORTH VM ENTER (DOCOL)
-_OAY:
-    BRV1    $,, Inc, IF, IR                         -- Prefix 0 - OAY
-_IND:
-    BRV1    $,, Inc, IF, IR                         -- Prefix 1 - IND
-_SIZ:
-    BRV1    $,, Inc, IF, IR                         -- Prefix 2 - SIZ
-_ISZ:
-    BRV1    $,, Inc, IF, IR                         -- Prefix 3 - ISZ
-_OAX:
-    BRV1    $,, Inc, IF, IR                         -- Prefix 4 - OAX
 _OSX:
-    BRV1    $,, Inc, IF, IR                         -- Prefix 5 - OSX
+    BRV1    $,, Inc, IF, IR                         -- Prefix 1 - OSX
+_IND:
+    BRV1    $,, Inc, IF, IR                         -- Prefix 2 - IND
+_SIZ:
+    BRV1    $,, Inc, IF, IR                         -- Prefix 3 - SIZ
+_ISZ:
+    BRV1    $,, Inc, IF, IR                         -- Prefix 4 - ISZ
 _OSZ:
-    BRV1    $,, Inc, IF, IR                         -- Prefix 6 - OSZ
+    BRV1    $,, Inc, IF, IR                         -- Prefix 5 - OSZ
 _OIS:
-    BRV1    $,, Inc, IF, IR                         -- Prefix 7 - OIS
+    BRV1    $,, Inc, IF, IR                         -- Prefix 6 - OIS
+_OAX:
+    BRV1    $,, Inc, IF, IR                         -- Prefix 7 - OAX
+_OAY:
+    BRV1    $,, Inc, IF, IR                         -- Prefix 8 - OAY
 --------------------------------------------------------------------------------
 -- Row C : 0x0C-0xFC
 --  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
@@ -1929,7 +1955,7 @@ _BIT_absX:
 _JMP_abs:
     BRV0    _Jmp_abs,, Inc, IF, OP1                 -- Read Dst Ptr Lo
 _PHRrel16:
-    BRV0    _PHR_Rel16,, Inc, IF, OP1               -- Read low (rel16)
+    BMW2    _PHR_Rel16,, Inc, IF, OP1               -- Read low (rel16)
 _JMP_absI:
     BRV0    _Jmp_absI,, Inc, IF, OP1                -- Read Dst Ptr Lo
 _JMP_absXI:
