@@ -12,9 +12,9 @@ General Description
 This project provides a synthesizable enhanced version of the 6502/65C02 
 processor core. The M65C02A soft-core processor implements the instruction set 
 architecture (ISA) of the 6502/65C02 microprocessors as exemplified by the 
-instruction set of the Rockwell R65C02, CMD/GTE G65SC02, and WDC W65C02S. The 
-instruction set is defined by microprogram consisting of a variable and a 
-fixed compoent. The exact instruction set implemented is dependent on the 
+instruction sets of the Rockwell R65C02, CMD/GTE G65SC02, and WDC W65C02S. The 
+instruction set is defined by a microprogram consisting of a variable and a 
+fixed component. The exact instruction set implemented is dependent on the 
 version of the microprogram selected for an implementation. The timing 
 behavior of the microprograms developed for this project follow the behavior 
 of the G65SC02 which eliminates the many dummy cycles inherent in the original 
@@ -51,64 +51,65 @@ processor provides the following enhancements to 6502/65C02 processors:
     
     (3)     M65C02A core’s ALU registers (A, X, and Y) are implemented using a 
     modified, three level push-down register stack. This provides the programmer 
-    the ability to preserve intermediate results on-chip. The modification to the 
-    register stack is that load and store instructions only affect the TOS 
-    locations of the A, X, and Y register stacks. In other words, the TOS location 
-    of the register stacks is not automatically pushed on loads from memory, nor 
-    is it automatically popped on stores to memory. Explicit actions are required 
-    by the programmer to manage the contents of the register stacks associated 
-    with A, X, and Y;
+    the ability to preserve intermediate results on-chip. The operation of the 
+    register stack is modification to the so that load and store instructions only 
+    affect the TOS locations of the A, X, and Y register stacks. In other words, 
+    the TOS location of the register stacks is not automatically pushed on loads 
+    from memory, nor is it automatically popped on stores to memory. Explicit 
+    actions are required by the programmer to manage the contents of the register 
+    stacks associated with A, X, and Y;
     
     (4)     M65C02A core’s X Top-Of-Stack register, XTOS, can serve as a base 
     pointer for base-relative addressing when it is used as a 16-bit index 
     register. Base-relative addressing supports the stack frames needed by 
     programming languages like C and Pascal, and which must be emulated by 
-    6502/65C02 microprocessors. (Note: base-relative addressing using XTOS is 
+    6502/65C02 microprocessors. (Note: _Base-relative addressing using XTOS is 
     generally associated with the system stack, but can be used in a more general 
-    way with any data structures in memory.)
+    way with any data structures in memory._)
     
-    (5)     The M65C02A core supports stack-relative addressing using almost any 
-    6502/65C02 instruction that uses zero page, pre-indexed zero page, absolute, 
-    pre-indexed absolute (and indirect versions of these addressing modes) through 
-    the application of the OSX plus the SIZ or ISZ prefix instructions. (Note: WAI 
-    and STP can be replaced with the OSZ (OSX+SIZ), and the OIS (OSX+ISZ) prefix 
-    instructions to reduce the instruction size and number of cycles.) 
+    (5)     The M65C02A core supports stack-relative addressing for almost any 
+    6502/65C02 instruction that uses (a) zero page, (b) pre-indexed zero page, (c) 
+    absolute, (d) pre-indexed absolute (and the indirect versions of these 
+    addressing modes) through the application of the OSX prefix instruction plus 
+    the SIZ or ISZ prefix instructions. (Note: _WAI and STP can be replaced with 
+    the OSZ (OSX+SIZ), and the OIS (OSX+ISZ) prefix instructions to reduce the 
+    instruction size and number of cycles._) 
     
     (6)     M65C02A core’s XTOS can function as a third (auxiliary) stack pointer, 
-    SX, when stack instructions are prefixed with the OSX instruction. (Note: when 
+    SX, when stack instructions are prefixed with the OSX instruction. (Note: _When 
     used as the auxiliary stack pointer, S becomes the source/target for all of 
     the 6502/65C02 instructions specific to the X register: ldx, stx, cpx, txa, 
     tax, plx, phx. This feature provides seven more ways to affect the system 
     stack pointer: lds, sts, cps, tsa, tas, pls, phs. With the OSZ and OIS prefix 
     instructions included, the width and addressing modes of these instructions 
-    can be controlled with fewer instruction bytes and cycles.)
+    can be controlled with fewer instruction bytes and instruction cycles._)
     
     (7)     The M65C02A core provides support for kernel and user modes. The 
     previously unused and unimplemented bit of the processor status word (P), bit 
     5, is used to indicate the processor mode, M. The M65C02A core provides kernel 
     mode and user mode stack pointers, SK and SU, respectively, for this purpose. 
     SU may be manipulated from kernel mode routines, but SK is inaccessible to 
-    user mode routines. (Note: a 6502/65C02 program will stay in the kernel mode 
+    user mode routines. (Note: _A 6502/65C02 program will stay in the kernel mode 
     unless bit 5 (kernel mode) of the PSW on the system stack is cleared when an 
     rti instruction is performed. On reset, the M65C02A defaults to kernel mode 
-    for compatibility with 6502/65C02 microprocessors.)
+    for compatibility with 6502/65C02 microprocessors._)
     
     (8)     M65C02A core provides automatic support for stacks greater than 256 
     bytes. This feature is automatically activated whenever stacks are allocated 
     in memory outside of memory page 0 (0x0000-0x00FF) or memory page 1 (0x0100-
-    0x01FF). (Note: a limitation of this feature is that if the stack grows into 
+    0x01FF). (Note: _A limitation of this feature is that if the stack grows into 
     page 1, then the mod 256 behavior of normal 6502/65C02 stacks will be 
-    automatically restored.)
+    automatically restored._)
     
     (9)     M65C02A core provides prefix instructions, IND, ISZ (OIS), to add 
-    indirection to an addressing mode. When an indirection prefix instruction is 
-    applied. Previously, programmer-selected indirection resulted in indirection 
-    being applied before indexing. This meant that pre-indexed addressing modes 
-    using X would be converted into post-indexed indurect addressing like that 
-    available using the Y post-indexing register. With the elimination of specific 
-    base-relative addressing mode instructions and their associated microprogram 
-    routines, pre-indexed indirect addressing will now result when an indirection 
-    prefix instruction is applied.)
+    indirection to an addressing mode. Previously, when prefix-selected 
+    indirection was added to an instruction, indirection was applied before 
+    indexing. This meant that pre-indexed addressing modes using X would be 
+    converted into post-indexed indirect addressing like that available with the Y 
+    register. Now, in the latest release, prefix-selected indirection will result 
+    in pre-indexed indirect addressing if X is the index register, and post-
+    indexed indirect addressing if Y is the index register: lable,x => (lable,x); 
+    (lable,x) => ((label,x)); lablely => (lable),y; (lable),y => ((lable),y)
     
     (10)    M65C02A core provides a prefix instruction, SIZ, ISZ (OSZ), which 
     promotes the width of the ALU operation from 8 to 16 bits. The only 
@@ -121,27 +122,27 @@ processor provides the following enhancements to 6502/65C02 processors:
     branches support four signed (multi-flag) conditional branches: Than (LT), 
     Less Than or Equal (LE), Greater Than (GT), and Greater Than or Equal (GE). In 
     addition, four unsigned (multi-flag) conditional branches are supported: lower 
-    (LO), lower or same (LS), higher (HI), and Higher or Same (HS). (Note: These 
+    (LO), lower or same (LS), higher (HI), and Higher or Same (HS). (Note: _These 
     multi-flag branch instructions are enabled using the SIZ prefix instruction. 
     In addition, application of the IND prefix instruction changes the PC-relative 
     displacement from 8 bits to 16-bits. The ISZ (OIS) prefix instruction can also 
     be applied to select the multi-flag tests and the increased displacement 
-    branch instructions.)
+    branch instructions._)
     
     (12)    M65C02A core provides support for the implementation of virtual 
     machines (VMs) for threaded interpreter’s such FORTH. The M65C02A core’s IP 
-    and W are 16 bit registers which support the implementation of DTC/ITC FORTH 
+    and W are 16-bit registers which support the implementation of DTC/ITC FORTH 
     VMs using several dedicated M65C02A instructions. The core's microprogram 
     implements the DTC FORTH inner interpreter with single byte instruction, and 
     it also implements the ENTER/DOCOLON operation with another single byte 
     instruction. The ITC FORTH version of these operations are supported using the 
-    ind prefix instruction. Instructions for pushing, popping, and incrementing IP 
+    IND prefix instruction. Instructions for pushing, popping, and incrementing IP 
     and W are also included. 
             
     (13)    M65C02A core provides transfers between IP and the ATOS: TAI, TIA,
     and XAI. XAI allows the exchange of IP and ATOS. These instructions are useful
     for supporting VMs, but they can also be used to enable register indirect
-    accesses using the IP-relative instructions in column F. Register indirect
+    accesses using the IP-relative instructions in column 3. Register indirect
     addressing is useful in HLLs for implementing pointers.
     
     (14)    M65C02A core also provides two operations in the A register stack that
@@ -167,20 +168,21 @@ processor provides the following enhancements to 6502/65C02 processors:
     columns 7 and F. The M65C02A prefix instructions can be used to extend the 
     addressing mode of the Rockwell bit-oriented instructions. Zero page indirect, 
     stack-relative, and stack-relative indirect addressing modes are supported 
-    using the IND, ISZ, OSX, and OIS prefix instructions. 
+    using the IND, ISZ (OIS), and OSX prefix instructions. 
     
     (18)    M65C02A core provides a multi-purpose move byte instruction. The 
     instruction has two operating modes: single cycle, and multi-cycle. In the 
     single cycle mode, the instruction terminates after each move is completed. 
     The count (A), source pointer (X), and destination pointer (Y) registers are 
     updated before the instruction terminates. Decrementing the count register (A) 
-    sets the ALU ZC flags like a DEC A (DEA) instruction. This allows the 
+    sets the ALU Z and C flags like a DEC A (DEA) instruction. This allows the 
     programmer the option to loop back and continue the execution of the single 
-    cycle move instruction. The multi-cycle transfers the entire block before 
-    terminating. Because of this behavior, the multi-cycle move instruction is not 
-    interruptable. The source and destination pointers may be independently 
-    configured to increment, decrement, or hold. This allows the M65C02A move 
-    instruction to support a wide range of data transfer tasks.
+    cycle move instruction. The multi-cycle version of the instruction transfers 
+    the entire block before terminating. Because of this behavior, the multi-cycle 
+    move instruction is not interruptable. The source and destination pointers may 
+    be independently configured to increment, decrement, or hold. These features 
+    allow the M65C02A move instruction to support a wide range of data transfer 
+    tasks.
     
     (19)    M65C02A core implements a zero page (and stack-relative) accumulator-
     memory exchange instruction. The M65C02A prefix instructions may be used as 
@@ -189,18 +191,18 @@ processor provides the following enhancements to 6502/65C02 processors:
     
     (20)    M65C02A core supports position-independent code. It provides an 
     unconditional PC-relative jump instruction (JRL rel16) using the IND BRA rel16 
-    instruction sequence. It provides a PC-relative subroutine call instruction 
-    using the IND PHR rel16 instruction sequence. Further, all conditional branch 
-    instructions can be converted into standard and multi-flag conditional jump 
-    instructions by the application of the IND or ISZ prefix instructions, 
-    respectively.
+    instruction sequence. It provides a PC-relative subroutine call (BSR rel16) 
+    instruction using the IND PHR rel16 instruction sequence. Further, all 
+    conditional branch instructions can be converted into standard and multi-flag 
+    conditional jump instructions by the application of the IND or ISZ prefix 
+    instructions, respectively.
         
     (20)    M65C02A core provides support for implementing application-specific 
     coprocessors. Direct support for application-specific coprocessors allows an 
     implementation based on the M65C02A core to be easily extended in a domain-
     specific manner.
         
-To demonstrate the use of the M65C02A core, an example of its use to implement 
+To demonstrate the use of the M65C02A core, an example of its application as 
 a microcomputer is provided as part of the release. The example microcomputer 
 constructed using the M65C02A core provides the following features:
 
@@ -277,26 +279,27 @@ provided to convey the character and behavior of the M65C02A-specific
 instructions. Additional detail can be gleaned from the Verilog source code, 
 the microprogram listings, and the User Guide (under development).
 
-##Prefix Instructions
+## Prefix Instructions
 
-The M65C02A gains much of its power from six (8) prefix instructions: OSX, 
-IND, SIZ, ISZ, OSZ, OIS, OAX, OAY. The IND and SIZ instructions add 
-indirection and promote ALU operations to 16 bits, respectively. The ISZ 
-prefix instruction applies IND and SIZ simultaneously. These three prefix 
-instructions can also be applied to implicit addressing mode instructions in 
-order to increase the opcode space. In general, however, IND, SIZ, and ISZ are 
-intended to be applied to logic, shift/rotate, and arithmetic instructions. 
-IND converts a direct addressing mode to an indirect addressing mode. When 
-applied to an indirect addressing mode, IND adds an additional level of 
-indirection. When IND is applied to the branch instructions, it extends the 
-displacement from 8 bits to 16 bits.
+The M65C02A gains much of its power from six (6) prefix instructions: OSX, 
+IND, SIZ, ISZ, OAX, OAY. (Note: the OSZ and OIS prefix instructions can be 
+added if the WAI and STP instructions are removed.) The IND and SIZ 
+instructions add indirection and promote ALU operations to 16 bits, 
+respectively. The ISZ prefix instruction applies IND and SIZ simultaneously. 
+These three prefix instructions can also be applied to implicit addressing 
+mode instructions in order to increase the opcode space. In general, however, 
+IND, SIZ, and ISZ are intended to be applied to logic, shift/rotate, and 
+arithmetic instructions. IND converts a direct addressing mode to an indirect 
+addressing mode. When applied to an indirect addressing mode, IND adds an 
+additional level of indirection. When IND is applied to the branch 
+instructions, it extends the displacement from 8 bits to 16 bits.
 
-When SIZ is applied to an instruction, the operation is doubled in size. While 
-operating on 8-bit quantities, the upper half of registers and/or ALU results 
-is forced to zero. This has the consequence that when mixing 8-bit and 16-bit 
-operations, the 8-bit registers/values will appear to be unsigned to the 16-
-bit registers/values. There is one limitations regarding promotion of ALU 
-operations to 16-bit widths: BCD arithmetic is only valid for 8-bit 
+When SIZ is applied to an ALU instruction, the operation is doubled in size. 
+While operating on 8-bit quantities, the upper half of registers and/or ALU 
+results is forced to zero. This has the consequence that when mixing 8-bit and 
+16-bit operations, the 8-bit registers/values will appear to be unsigned to 
+the 16- bit registers/values. There is one limitations regarding promotion of 
+ALU operations to 16-bit widths: BCD arithmetic is only valid for 8-bit 
 quantities. When SIZ is applied to the branch instructions, it converts the 
 single flag test into a multi-flag test to support 8 additional 
 signed/unsigned conditions.
@@ -334,16 +337,15 @@ prove to be beneficial.)
 
 When multiple prefix instructions are necessary, the pair OSX and OAX, and the 
 pair OAX and OAY are mutually exclusive. Internal flags record the execution 
-of the six prefix instructions. Excution of a mutually exclusive prefix 
-instruction will result in the flag register of the previously set mutually 
-exclusive instruction being reset. Furthermore, the flag registers for prefix 
-instructions are sticky, and remain set until the completion of the 
-immediately following non-prefix instruction. Finally, no protection is 
-provided against an infinite long series of prefix instructions, all of which 
-are uninterruptable, or application of prefix instructions to create an 
-existing addressing mode.
+of the prefix instructions. Excution of mutually exclusive prefix instructions 
+will result in the flag register of the previously set prefix instruction 
+being reset. Furthermore, the flag registers for prefix instructions are 
+sticky, and remain set until the completion of the immediately following non-
+prefix instruction. Finally, no protection is provided against an infinite 
+long series of prefix instructions, all of which are uninterruptable, or 
+application of prefix instructions to create an existing addressing mode.
 
-###Access to User Stack Pointer (SU) from Kernel Mode
+### Access to User Stack Pointer (SU) from Kernel Mode
 
 When in Kernel mode, access to SU is provided by applying IND or ISZ to the 
 instruction sequences that access the system stack pointer:
@@ -375,7 +377,7 @@ IND will transfer only the lower 8-bits of SU. Adding SIZ by using ISZ will
 transfer the complete 16-bit value of SU; if only SIZ is used, then only SK 
 will be accessed.
 
-##Register Stack Manipulation Instructions
+## Register Stack Manipulation Instructions
 
 A unique feature of the M65C02A soft-core processor are the three level push-
 down stacks used to implement each of the three primary registers. Load and 
@@ -408,7 +410,7 @@ to memory by rotating the stack:
 Although this preserves the TOS in BOS, it provides the needed popping of the 
 register stack.
 
-###Special Behavior of the A Register Stack
+### Special Behavior of the A Register Stack
 
 In addition to the operations discussed above, the A register stack provides 
 several special behaviors. Using the IND prefix instruction, the bytes of the 
@@ -436,7 +438,7 @@ IP register can be exchanged:
 
     ISZ DUP :   ATOS <= IP; IP <= ATOS;             => XAI
     
-###Special Behavior of the X Register Stack
+### Special Behavior of the X Register Stack
 
 In addition to the behaviors discussed above, the X TOS register implements a 
 counter function that allows it to operate as a third stack pointer. Further, 
@@ -449,7 +451,7 @@ is set and X is not the default stack pointer. The M65C02A move byte
 instruction uses this functionality to implement the source pointer increment, 
 decrement, or hold operations.
 
-###Special Behavior of the Y Register Stack
+### Special Behavior of the Y Register Stack
 
 In addition to the behaviors discussed above, the Y TOS register implements a 
 counter function that allows it to operate as the destination pointer for the 
@@ -458,7 +460,7 @@ implementation as the X TOS register. The M65C02A move byte instruction uses
 this functionality to implement the destination pointer increment, decrement, 
 or hold operations.
 
-##BP-Relative Addressing Mode Instructions
+## BP-Relative Addressing Mode Instructions
 
 The M65C02A supports base-relative addressing whenever the upper byte of X is 
 not zero. Base-pointer relative addressing supports the stack frames such as 
@@ -477,7 +479,7 @@ If the OSX prefix instruction is applied to any pre-indexed zero page or pre-
 indexed absolute ALU instructions, then the addressing mode becomes stack-
 relative. 
 
-##SP-Relative Addressing Mode Instructions
+## SP-Relative Addressing Mode Instructions
 
 The system stack pointer may be indexed to implement a stack pointer relative 
 addressing mode. The OSX/OSZ/OIS (or OSX plus IND, SIZ, or ISZ) prefix 
@@ -497,7 +499,7 @@ Since OSX/OSZ/OIS overrides the X register, any pre-indexed (BP-relative)
 addressing mode instructions can be converted into SP-relative addressing mode 
 instructions without limitation.
 
-##M65C02A-specific Stack Instructions
+## M65C02A-specific Stack Instructions
 
 The M65C02A provides four push instructions and two pop/pull instructions not 
 found on the 6502/65C02 processors. These instructions push/pull 8-/16-bit 
@@ -527,7 +529,7 @@ rel16 parameter is the distance from the address of the next instruction to
 the target, i.e. relative to the PC. The stack used (SK/SU or SX) by this 
 instruction can be changed by adding the OSX prefix instruction. If prefixed 
 by IND (OIS), the PHR rel16 instruction becomes a PC-relative subroutine 
-instruction, CSR rel16. 
+instruction, BSR rel16. 
 
 The primary use of the PHR rel16 is to resolve, in a PC-relative manner, the 
 address of constant or variable needed at run time, when the program can be 
@@ -555,7 +557,7 @@ do not support SP-relative addressing because OSX is being used to override
 the default stack pointer rather than determine the addressing mode of the 
 memory operand.)
 
-##FORTH VM Support
+## FORTH VM Support
 
 The 6502/65C02 processors have long supported FORTH. The FORTH inner 
 interpreter can be implemented using the native instruction set. The 65C02-
@@ -580,9 +582,10 @@ several instructions to directly support the implementation of the FORTH VM:
     PLI         ; Pull IP from RS
     INI         ; Increment IP
     
-NXT and ENT implement the NEXT and ENTER/CALL/DOCOLON functionality needed to 
-implement a Direct Threaded Code (DTC) FORTH VM. If these instructions are 
-prefixed by IND, then an Indirect Threaded Code (ITC) FORTH VM is the result.
+NXT and ENT implement the NEXT and ENTER/CALL/DOCOLON functionality, 
+respectively, needed to implement a Direct Threaded Code (DTC) FORTH VM. If 
+these instructions are prefixed by IND, then an Indirect Threaded Code (ITC) 
+FORTH VM is the result.
 
 The FORTH VM supported by the M65C02A will provide the following mapping of 
 the various FORTH VM registers (as described by Brad Rodriguez):
@@ -624,7 +627,7 @@ other dedicated instructions:
     PLI             PLI
     IND NXT         NXT
     
-Only a one (or two) cycle performance penalty is incurred by not providing a
+Only a three (or four) cycle performance penalty is incurred by not providing a
 dedicated instruction for EXIT.
 
 ENT, PHI, and PLI all default to the RS, which is implemented by the 
@@ -662,7 +665,7 @@ The LDA ip,I++ instruction is matched by the STA ip,I++. Without indirection,
 the STA ip,I++ instruction will write directly into the FORTH VM instruction 
 stream. With indirection, the STA (ip,I++) instruction can be used for 
 directly updating byte/word variables whose pointers are stored in the FORTH 
-VM instruction stream. (Although, the ability to create self-modifying FORTH 
+VM instruction stream. (Note: the ability to create self-modifying FORTH 
 programs may be useful when compiling FORTH programs, the STA ip,I++ 
 instruction is expected to be prefixed with IND or ISZ under normal usage.) 
 
@@ -711,7 +714,7 @@ the absolute address branches and jumps provide greater performance.
 Another use for the IP-relative instructions is to support threaded compilers 
 and VMs other than the FORTH VM. 
     
-##PC-relative 16-bit Jumps
+## PC-relative 16-bit Jumps
 
 The M65C02A provides 16-bit PC-relative, conditional/unconditional, jumps:
 
@@ -723,7 +726,7 @@ conditional/unconditional branch instructions. When the 8-bit branch
 instructions are prefixed with IND (or ISZ), the relative offset is extended 
 from 8 bits to 16 bits.
 
-##Move Byte Instruction
+## Move Byte Instruction
 
 The M65C02A provides a move byte instruction. The instruction includes an 
 immediate parameter which specifies whether uninterruptable block moves or 
