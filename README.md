@@ -63,43 +63,43 @@ processor provides the following enhancements to 6502/65C02 processors:
     pointer for base-relative addressing when it is used as a 16-bit index 
     register. Base-relative addressing supports the stack frames needed by 
     programming languages like C and Pascal, and which must be emulated by 
-    6502/65C02 microprocessors. (Note: *Base-relative addressing using XTOS is 
+    6502/65C02 microprocessors. (Note: Base-relative addressing using XTOS is 
     generally associated with the system stack, but can be used in a more general 
-    way with any data structures in memory.*)
+    way with any data structures in memory.)
     
     (5)     The M65C02A core supports stack-relative addressing for almost any 
     6502/65C02 instruction that uses (a) zero page, (b) pre-indexed zero page, (c) 
     absolute, (d) pre-indexed absolute (and the indirect versions of these 
     addressing modes) through the application of the OSX prefix instruction plus 
-    the SIZ or ISZ prefix instructions. (Note: _WAI and STP can be replaced with 
+    the SIZ or ISZ prefix instructions. (Note: WAI and STP can be replaced with 
     the OSZ (OSX+SIZ), and the OIS (OSX+ISZ) prefix instructions to reduce the 
-    instruction size and number of cycles._) 
+    instruction size and number of cycles.) 
     
     (6)     M65C02A core’s XTOS can function as a third (auxiliary) stack pointer, 
-    SX, when stack instructions are prefixed with the OSX instruction. (Note: _When 
+    SX, when stack instructions are prefixed with the OSX instruction. (Note: When 
     used as the auxiliary stack pointer, S becomes the source/target for all of 
     the 6502/65C02 instructions specific to the X register: ldx, stx, cpx, txa, 
     tax, plx, phx. This feature provides seven more ways to affect the system 
     stack pointer: lds, sts, cps, tsa, tas, pls, phs. With the OSZ and OIS prefix 
     instructions included, the width and addressing modes of these instructions 
-    can be controlled with fewer instruction bytes and instruction cycles._)
+    can be controlled with fewer instruction bytes and instruction cycles.)
     
     (7)     The M65C02A core provides support for kernel and user modes. The 
     previously unused and unimplemented bit of the processor status word (P), bit 
     5, is used to indicate the processor mode, M. The M65C02A core provides kernel 
     mode and user mode stack pointers, SK and SU, respectively, for this purpose. 
     SU may be manipulated from kernel mode routines, but SK is inaccessible to 
-    user mode routines. (Note: _A 6502/65C02 program will stay in the kernel mode 
+    user mode routines. (Note: A 6502/65C02 program will stay in the kernel mode 
     unless bit 5 (kernel mode) of the PSW on the system stack is cleared when an 
     rti instruction is performed. On reset, the M65C02A defaults to kernel mode 
-    for compatibility with 6502/65C02 microprocessors._)
+    for compatibility with 6502/65C02 microprocessors.)
     
     (8)     M65C02A core provides automatic support for stacks greater than 256 
     bytes. This feature is automatically activated whenever stacks are allocated 
     in memory outside of memory page 0 (0x0000-0x00FF) or memory page 1 (0x0100-
-    0x01FF). (Note: _A limitation of this feature is that if the stack grows into 
+    0x01FF). (Note: A limitation of this feature is that if the stack grows into 
     page 1, then the mod 256 behavior of normal 6502/65C02 stacks will be 
-    automatically restored._)
+    automatically restored.)
     
     (9)     M65C02A core provides prefix instructions, IND, ISZ (OIS), to add 
     indirection to an addressing mode. Previously, when prefix-selected 
@@ -122,12 +122,12 @@ processor provides the following enhancements to 6502/65C02 processors:
     branches support four signed (multi-flag) conditional branches: Than (LT), 
     Less Than or Equal (LE), Greater Than (GT), and Greater Than or Equal (GE). In 
     addition, four unsigned (multi-flag) conditional branches are supported: lower 
-    (LO), lower or same (LS), higher (HI), and Higher or Same (HS). (Note: _These 
+    (LO), lower or same (LS), higher (HI), and Higher or Same (HS). (Note: These 
     multi-flag branch instructions are enabled using the SIZ prefix instruction. 
     In addition, application of the IND prefix instruction changes the PC-relative 
     displacement from 8 bits to 16-bits. The ISZ (OIS) prefix instruction can also 
     be applied to select the multi-flag tests and the increased displacement 
-    branch instructions._)
+    branch instructions.)
     
     (12)    M65C02A core provides support for the implementation of virtual 
     machines (VMs) for threaded interpreter’s such FORTH. The M65C02A core’s IP 
@@ -282,7 +282,7 @@ the microprogram listings, and the User Guide (under development).
 ## Prefix Instructions
 
 The M65C02A gains much of its power from six (6) prefix instructions: OSX, 
-IND, SIZ, ISZ, OAX, OAY. (Note: the OSZ and OIS prefix instructions can be 
+IND, SIZ, ISZ, OAX, OAY. (Note: The OSZ and OIS prefix instructions can be 
 added if the WAI and STP instructions are removed.) The IND and SIZ 
 instructions add indirection and promote ALU operations to 16 bits, 
 respectively. The ISZ prefix instruction applies IND and SIZ simultaneously. 
@@ -552,7 +552,7 @@ The last four extended stack operations support the zero page direct and
 absolute addressing modes to write/read 8-/16-bit values to/from memory. They 
 support the IND and the OSX prefix instructions with the expected results to 
 the addressing mode (IND) and default stack pointer (OSX). Other prefix 
-instructions have no affect on these instructions. (Note: these instructions 
+instructions have no affect on these instructions. (Note: These instructions 
 do not support SP-relative addressing because OSX is being used to override 
 the default stack pointer rather than determine the addressing mode of the 
 memory operand.)
@@ -665,7 +665,7 @@ The LDA ip,I++ instruction is matched by the STA ip,I++. Without indirection,
 the STA ip,I++ instruction will write directly into the FORTH VM instruction 
 stream. With indirection, the STA (ip,I++) instruction can be used for 
 directly updating byte/word variables whose pointers are stored in the FORTH 
-VM instruction stream. (Note: the ability to create self-modifying FORTH 
+VM instruction stream. (Note: The ability to create self-modifying FORTH 
 programs may be useful when compiling FORTH programs, the STA ip,I++ 
 instruction is expected to be prefixed with IND or ISZ under normal usage.) 
 
@@ -699,7 +699,7 @@ the unconditional absolute jump only requires 7 clock cycles. Clearly, if the
 position independence of IP-relative branches and jumps is not required, then 
 the absolute address branches and jumps provide greater performance.
 
-    (Note: the M65C02A supports the eight 6502/65C02 branch instructions which 
+    (Note: The M65C02A supports the eight 6502/65C02 branch instructions which 
     perform true/false tests of the four ALU flags. When prefixed by SIZ, the 
     eight branch instructions support additional tests of the ALU flags which 
     support both signed and unsiged comparisons. The four signed conditional 
@@ -709,7 +709,7 @@ the absolute address branches and jumps provide greater performance.
     conditional branches are enabled by letting the 16-bit comparison instructions 
     set the V flag.)
     
-    (Note: a general use of the ip,I++ addressing mode is for string operations.)
+    (Note: A general use of the ip,I++ addressing mode is for string operations.)
     
 Another use for the IP-relative instructions is to support threaded compilers 
 and VMs other than the FORTH VM. 
