@@ -63,9 +63,9 @@ processor provides the following enhancements to 6502/65C02 processors:
     pointer for base-relative addressing when it is used as a 16-bit index 
     register. Base-relative addressing supports the stack frames needed by 
     programming languages like C and Pascal, and which must be emulated by 
-    6502/65C02 microprocessors. (Note: _Base-relative addressing using XTOS is 
+    6502/65C02 microprocessors. (Note: *Base-relative addressing using XTOS is 
     generally associated with the system stack, but can be used in a more general 
-    way with any data structures in memory._)
+    way with any data structures in memory.*)
     
     (5)     The M65C02A core supports stack-relative addressing for almost any 
     6502/65C02 instruction that uses (a) zero page, (b) pre-indexed zero page, (c) 
