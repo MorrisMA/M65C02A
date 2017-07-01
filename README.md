@@ -1,7 +1,7 @@
 M65C02A Microprocessor Core
 =======================
 
-Copyright (C) 2014-2016, Michael A. Morris <morrisma@mchsi.com>.
+Copyright (C) 2014-2017, Michael A. Morris <morrisma@mchsi.com>.
 All Rights Reserved.
 
 Released under GPL v3.
@@ -47,19 +47,20 @@ processor provides the following enhancements to 6502/65C02 processors:
     Internally, the upper byte of any register (A, X, Y, S) or the memory operand 
     register (M) is forced to logic 0 (except for S which is forced to 0x01) 
     unless the programmer explicitly extends the width of the operation with a 
-    prefix instruction;
+    prefix instruction. (Note: the default operand width can be set to 16, and 8
+    operands/operations must be explicitly selected by the programmer.);
     
-    (3)     M65C02A core’s ALU registers (A, X, and Y) are implemented using a 
+    (3)     M65C02A core's ALU registers (A, X, and Y) are implemented using a 
     modified, three level push-down register stack. This provides the programmer 
     the ability to preserve intermediate results on-chip. The operation of the 
-    register stack is modification to the so that load and store instructions only 
-    affect the TOS locations of the A, X, and Y register stacks. In other words, 
-    the TOS location of the register stacks is not automatically pushed on loads 
-    from memory, nor is it automatically popped on stores to memory. Explicit 
-    actions are required by the programmer to manage the contents of the register 
-    stacks associated with A, X, and Y;
+    register stack is modified so that load and store instructions only affect
+    the TOS locations of the A, X, and Y register stacks. In other words, the TOS
+    location of the register stacks is not automatically pushed on loads from
+    memory, nor is it automatically popped on stores to memory. Explicit actions
+    are required by the programmer to manage the contents of the register stacks
+    associated with A, X, and Y;
     
-    (4)     M65C02A core’s X Top-Of-Stack register, XTOS, can serve as a base 
+    (4)     M65C02A core's X Top-Of-Stack register, XTOS, can serve as a base 
     pointer for base-relative addressing when it is used as a 16-bit index 
     register. Base-relative addressing supports the stack frames needed by 
     programming languages like C and Pascal, and which must be emulated by 
@@ -75,7 +76,7 @@ processor provides the following enhancements to 6502/65C02 processors:
     the OSZ (OSX+SIZ), and the OIS (OSX+ISZ) prefix instructions to reduce the 
     instruction size and number of cycles.) 
     
-    (6)     M65C02A core’s XTOS can function as a third (auxiliary) stack pointer, 
+    (6)     M65C02A core's XTOS can function as a third (auxiliary) stack pointer, 
     SX, when stack instructions are prefixed with the OSX instruction. (Note: When 
     used as the auxiliary stack pointer, S becomes the source/target for all of 
     the 6502/65C02 instructions specific to the X register: ldx, stx, cpx, txa, 
@@ -108,8 +109,8 @@ processor provides the following enhancements to 6502/65C02 processors:
     converted into post-indexed indirect addressing like that available with the Y 
     register. Now, in the latest release, prefix-selected indirection will result 
     in pre-indexed indirect addressing if X is the index register, and post-
-    indexed indirect addressing if Y is the index register: lable,x => (lable,x); 
-    (lable,x) => ((label,x)); lablely => (lable),y; (lable),y => ((lable),y)
+    indexed indirect addressing if Y is the index register: label,x => (label,x); 
+    (label,x) => ((label,x)); lablely => (label),y; (label),y => ((label),y)
     
     (10)    M65C02A core provides a prefix instruction, SIZ, ISZ (OSZ), which 
     promotes the width of the ALU operation from 8 to 16 bits. The only 
@@ -130,14 +131,13 @@ processor provides the following enhancements to 6502/65C02 processors:
     branch instructions.)
     
     (12)    M65C02A core provides support for the implementation of virtual 
-    machines (VMs) for threaded interpreter’s such FORTH. The M65C02A core’s IP 
-    and W are 16-bit registers which support the implementation of DTC/ITC FORTH 
-    VMs using several dedicated M65C02A instructions. The core's microprogram 
-    implements the DTC FORTH inner interpreter with single byte instruction, and 
-    it also implements the ENTER/DOCOLON operation with another single byte 
-    instruction. The ITC FORTH version of these operations are supported using the 
-    IND prefix instruction. Instructions for pushing, popping, and incrementing IP 
-    and W are also included. 
+    machines (VMs) for threaded interpreter's such FORTH. The M65C02A core's 16-bit
+    IP and W registers support the implementation of DTC/ITC FORTH VMs using several
+    dedicated M65C02A instructions. The core's microprogram implements the DTC FORTH
+    inner interpreter with single byte instruction, and it also implements the
+    ENTER/DOCOLON operation with another single byte instruction. The ITC FORTH
+    version of these operations are supported using the IND prefix instruction.
+    Instructions for pushing, popping, and incrementing IP and W are also included. 
             
     (13)    M65C02A core provides transfers between IP and the ATOS: TAI, TIA,
     and XAI. XAI allows the exchange of IP and ATOS. These instructions are useful

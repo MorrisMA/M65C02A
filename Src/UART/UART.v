@@ -572,7 +572,7 @@ UART_TXSM   XMT (
                 .Len(Len), 
                 .ParEn(ParEn), 
                 .Par(Par),
-                .StartDly(5'b0),
+//                .StartDly(5'b0),
                 
                 .TF_RE(RE_THR), 
                 .THR(THR), 
