@@ -47,8 +47,9 @@ processor provides the following enhancements to 6502/65C02 processors:
     Internally, the upper byte of any register (A, X, Y, S) or the memory operand 
     register (M) is forced to logic 0 (except for S which is forced to 0x01) 
     unless the programmer explicitly extends the width of the operation with a 
-    prefix instruction. (Note: the default operand width can be set to 16, and 8
-    operands/operations must be explicitly selected by the programmer.);
+    prefix instruction. (Note: the default operand/operations width can be set to
+    16 bits, and 8-bit operands/operations must be explicitly selected by the
+    programmer.);
     
     (3)     M65C02A core's ALU registers (A, X, and Y) are implemented using a 
     modified, three level push-down register stack. This provides the programmer 
