@@ -1,0 +1,34 @@
+Effect of OSX and OSX IND prefix instructions on instructions with X or S as
+the destination:
+
+OSX LDX #imm    =>  (3) LDS #imm    |   (4) OSX IND LDX #imm    =>  LDS #imm
+OSX CPX #imm    =>  (3) CPS #imm    |   (4) OSX IND CPX #imm    =>  CPS #imm
+OSX STX zp      =>  (4) STS zp      |   (7) OSX IND STX zp      =>  STS (zp)
+OSX STX zp,Y    =>  (4) STS zp,Y    |   (7) OSX IND STX zp,Y    =>  STS (zp),Y
+OSX LDX zp      =>  (4) LDS zp      |   (7) OSX IND LDX zp      =>  LDS (zp)
+OSX LDX zp,Y    =>  (4) LDS zp,Y    |   (7) OSX IND LDX zp,Y    =>  LDS (zp),Y
+OSX CPX zp      =>  (4) CPS zp      |   (7) OSX IND CPX zp      =>  CPS (zp)
+OSX DEX         =>  (2) DES         |   (3) OSX IND DEX         =>  DES
+OSX TAX         =>  (2) TAS         |   (3) OSX IND TAX         =>  TAS
+OSX INX         =>  (2) INS         |   (3) OSX IND INX         =>  INS
+OSX PLX         =>  (3) PLS         |   (4) OSX IND PLX         =>  PLS
+OSX TSX         =>  (2) TXS         |   (3) OSX IND TSX         =>  TXS
+OSX STX abs     =>  (5) STS abs     |   (8) OSX IND STX abs     =>  STS (abs)
+OSX LDX abs     =>  (5) LDS abs     |   (8) OSX IND LDX abs     =>  LDS (abs)
+OSX CPX abs     =>  (5) CPS abs     |   (8) OSX IND CPX abs     =>  CPS (abs)
+
+Effect of OSX and OSX IND on instructions using the stack:
+
+OSX BRK imm     =>  ( 7) (X--) <= PC            | (Y--) <= P            | PC    <= Vec(BRK)             |               |
+OSX JSR abs     =>  ( 7) (X--) <= PC            | PC    <= OP           |                               |               |
+OSX IND JSR abs =>  (10) (X--) <= PC            | OP    <= (OP)         | PC    <= OP                   |               |
+OSX RTI         =>  ( 6) P     <= (++X)         | OP    <= (++X)        | PC    <= OP                   |               | 
+OSX RTS         =>  ( 5) OP    <= (++X)         | PC    <= OP           |                               |               |
+OSX COP imm     =>  ( 7) (X--) <= PC            | (Y--) <= P            | PC    <= Vec(COP), Y <= imm   |               |
+OSX PHR rel16   =>  ( 7) MAR   <= PC + 3 + OP   | (Y--) <= MAR          |                               |               |
+OSX JMP (s,S),Y =>  ( 6) OP    <= ({0,X} + OPL) | PC    <= OP + {0,Y}   |                               |               |
+OSX PLW zp      =>  ( 8) MAR   <= {0,OPL}       | OP    <= (++X)        | (MAR) <= OP                   |               |
+OSX IND PLW zp  =>  (11) MAR   <= {0,OPL}       | MAR   <= (MAR)        | OP    <= (++X)                | (MAR) <= OP   |
+OSX PLW abs     =>  ( 9) MAR   <= OP            | OP    <= (++X)        | (MAR) <= OP                   |               |
+OSX IND PLW abs =>  (12) MAR   <= OP            | MAR   <= (MAR)        | OP    <= (++X)                | (MAR) <= OP   |
+OSX ORA s,S     =>  (  ) 

@@ -1,0 +1,9 @@
+NET "Clk" TNM_NET = Clk;
+#TIMESPEC TS_Clk = PERIOD "Clk" 25.000 ns HIGH 50%;
+TIMESPEC TS_Clk = PERIOD "Clk" 24.660 ns HIGH 50%;
+#TIMESPEC TS_Clk = PERIOD "Clk" 20.000 ns HIGH 50%;
+#TIMESPEC TS_Clk = PERIOD "Clk" 16.954 ns HIGH 50%;      
+#TIMESPEC TS_Clk = PERIOD "Clk" 16.666 ns HIGH 50%;      # S3A -4
+#TIMESPEC TS_Clk = PERIOD "Clk" 15.125 ns HIGH 50%;      # S6 -2
+#TIMESPEC TS_Clk = PERIOD "Clk" 15.000 ns HIGH 50%;      # S6 -3; S3A -5
+#TIMESPEC TS_Clk = PERIOD "Clk" 13.563 ns HIGH 50%;      # S6 -2; S3A -5

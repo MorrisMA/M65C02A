@@ -1,0 +1,34 @@
+Effect of OSY and OSY IND prefix instructions on instructions with Y or S as
+the destination:
+
+OSY LDY #imm    =>  (3) LDS #imm    |   (4) OSY IND LDY #imm    =>  LDS #imm
+OSY CPY #imm    =>  (3) CPS #imm    |   (4) OSY IND CPY #imm    =>  CPS #imm
+OSY STY zp      =>  (4) STS zp      |   (7) OSY IND STY zp      =>  STS (zp)
+OSY STY zp,X    =>  (4) STS zp,X    |   (7) OSY IND STY zp,X    =>  STS (zp,X)
+OSY LDY zp      =>  (4) LDS zp      |   (7) OSY IND LDY zp      =>  LDS (zp)
+OSY LDY zp,X    =>  (4) LDS zp,X    |   (7) OSY IND LDY zp,X    =>  LDS (zp,X)
+OSY CPY zp      =>  (4) CPS zp      |   (7) OSY IND CPY zp      =>  CPS (zp)
+OSY DEY         =>  (2) DES         |   (3) OSY IND DEY         =>  DES
+OSY TAY         =>  (2) TAS         |   (3) OSY IND TAY         =>  TAS
+OSY INY         =>  (2) INS         |   (3) OSY IND INY         =>  INS
+OSY PLY         =>  (3) PLS         |   (4) OSY IND PLY         =>  PLS
+OSY TXS         =>  (2) TXY         |   (3) OSY IND TXS         =>  TXY
+OSY STY abs     =>  (5) STS abs     |   (8) OSY IND STY abs     =>  STS (abs)
+OSY LDY abs     =>  (5) LDS abs     |   (8) OSY IND LDY abs     =>  LDS (abs)
+OSY CPY abs     =>  (5) CPS abs     |   (8) OSY IND CPY abs     =>  CPS (abs)
+
+Effect of OSY and OSY IND on instructions using the stack:
+
+OSY BRK imm     =>  ( 7) (Y--) <= PC            | (Y--) <= P            | PC    <= Vec(BRK)             |               |
+OSY JSR abs     =>  ( 7) (Y--) <= PC            | PC    <= OP           |                               |               |
+OSY IND JSR abs =>  (10) (Y--) <= PC            | OP    <= (OP)         | PC    <= OP                   |               |
+OSY RTI         =>  ( 6) P     <= (++Y)         | OP    <= (++Y)        | PC    <= OP                   |               | 
+OSY RTS         =>  ( 5) OP    <= (++Y)         | PC    <= OP           |                               |               |
+OSY COP imm     =>  ( 7) (Y--) <= PC            | (Y--) <= P            | PC    <= Vec(COP), X <= imm   |               |
+OSY PHR rel16   =>  ( 7) MAR   <= PC + 3 + OP   | (Y--) <= MAR          |                               |               |
+OSY JMP (s,S),X =>  ( 6) OP    <= ({0,Y} + OPL) | PC    <= OP + {0,X}   |                               |               |
+OSY PLW zp      =>  ( 8) MAR   <= {0,OPL}       | OP    <= (++Y)        | (MAR) <= OP                   |               |
+OSY IND PLW zp  =>  (11) MAR   <= {0,OPL}       | MAR   <= (MAR)        | OP    <= (++Y)                | (MAR) <= OP   |
+OSY PLW abs     =>  ( 9) MAR   <= OP            | OP    <= (++Y)        | (MAR) <= OP                   |               |
+OSY IND PLW abs =>  (12) MAR   <= OP            | MAR   <= (MAR)        | OP    <= (++Y)                | (MAR) <= OP   |
+OSY ORA s,S     =>  (  ) 
