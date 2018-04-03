@@ -1,6 +1,6 @@
 header
 Project: M65C02A_IDecode_ROMa
-File Revision: 0021
+File Revision: 0022
 Author(s): Michael A. Morris
 Description: M65C02A Instruction Decoder - HLL-optimized Instruction Set
 endh
@@ -225,6 +225,8 @@ endh
 --                          ($DB) to be restored if W65C02S compatibility is 
 --                          needed.
 --
+--  0022    18C09   MAM     Removed duplicate label.
+--
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 -- Mode Field
@@ -366,8 +368,8 @@ INC     .equ    0   -- ALU <= Q +  K + 1; N <= ALU[7]; Z <= ~|ALU;
 DEC     .equ    1   -- ALU <= Q + ~K + 0; N <= ALU[7]; Z <= ~|ALU;
 CMP     .equ    3   -- ALU <= Q + ~M + 1; N <= ALU[7]; Z <= ~|ALU;
 --                                                     C <= COut;
-ADD     .equ    0   -- ALU <= Q +  M + 0; N <= ALU[7]; Z <= ~|ALU;
---                                                     C <= COut;
+--ADD     .equ    0   -- ALU <= Q +  M + 0; N <= ALU[7]; Z <= ~|ALU;
+----                                                     C <= COut;
 
 --------------------------------------------------------------------------------
 --  ALU Left (L/Q) Operand Select

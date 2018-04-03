@@ -1,6 +1,6 @@
 header
 Project: M65C02A_uPgm_ROM
-File Revision: 0020
+File Revision: 0021
 Author(s): Michael A. Morris
 Description: M65C02A HLL-Optimized Microprogram
 endh
@@ -203,6 +203,9 @@ endh
 --                          vert into a PC-relative subroutine call instruction:
 --                          CSR rel16.
 --
+--  0021    18C09   MAM     Corrected spelling in comments, and removed dupli-
+--                          cate labels.
+--
 --------------------------------------------------------------------------------
 --  Comments
 --------------------------------------------------------------------------------
@@ -292,14 +295,15 @@ endh
 --  256-way branch table in the microprogram ROM, and simultaneously a second
 --  decode ROM/RAM that provides the fixed portion of each instructions opera-
 --  tion. That is, the 256-way instruction decoder built into the microprogram
---  ROM is the decoder for the variable microprogram, and the second ROM is the
---  decoder for the fixed portion of the microword. The variable microprogram
---  implements the control sequences necessary for an instruction from the pers-
---  pective of the addressing mode of the instruction, and the fixed micropro-
---  gram word defines the ALU operation to be performed when all operands are
---  available. The fixed microword is applied to the ALU under control of the
---  microprogram. Altogether, the number of bits required is 36 for the variable
---  microwords, and 36 for the fixed microword, or 72 bits total.
+--  ROM is the decoder for the variable sequence portion of the microprogram,
+--  and the second ROM is the decoder for the fixed portion of the microword.
+--  The variable portion of the microprogram implements the control sequences
+--  necessary for an instruction from the perspective of the addressing mode of
+--  the instruction, and the fixed microprogram word defines the ALU operation
+--  to be performed when all operands are available. The fixed microword is
+--  applied to the ALU under control of the variable microprogram. Altogether,
+--  the number of bits required is 36 for the variable microprogram, and 36 for
+--  the fixed microprogram, or 72 bits total.
 --
 --  The 2-way jump table, which is the target of the first unconditional branch,
 --  has two locations which are expected to be accessed by a BMW instruction.
@@ -309,13 +313,15 @@ endh
 --  interrupt handler is expected to determine if an NMI or unmasked IRQ inter-
 --  rupt should be taken. If INT is asserted, then the BRV2 instruction in the
 --  second location of the jump table will capture the interrupt vector and jump
---  to the microprogram's interrupt handler.
+--  to the variable microprogram's interrupt handler.
 --
 --  Following the jump table are microroutines for handling specific instruc-
 --  tions, or for handling specific addressing modes. The most significant 256
 --  locations in the microprogram ROM/RAM constitute the initial microstate for
 --  each of the 256 possible instruction opcodes. In the M65C02A implementation,
---  256 of these instructions represent valid instructions.
+--  all 256 opcodes represent valid instructions; at the present time, only 4
+--  opcodes in column 2 are unused, but they are implemented as single cycle 
+--  NOPs.
 --
 --  A second 2-way jump table is included specifically for the RMW instructions.
 --  The purpose of the microword with the BRV1 instruction is to complete the
@@ -325,36 +331,35 @@ endh
 --  Reg_WE asserted. For RMW instructions, the ALU operation initiated by the
 --  Reg_WE control field occurs before the write back to memory of the computed
 --  result. To use a BMW instruction to jump to the same 2-way jump table used
---  for RO or WO multicycle instructions may result in the M65C02A registers,
+--  for RO or WO multi-cycle instructions may result in the M65C02A registers,
 --  including the PSW, being written twice during a cycle. To avoid this issue,
 --  a second BRV1/BRV2 2-way jump table accessed by a BMW instruction is used
 --  for the RMW instructions. The BRV1 microstate in the RMW jump table does not
 --  assert Reg_WE. This allows a RMW instruction to complete in the same manner
---  as other multicycle instructions, and prevents any of the registers from
+--  as other multi-cycle instructions, and prevents any of the registers from
 --  being written more than once per instruction cycle.
 --
 --  To support the extended instruction set of the M65C02A microprocessor, the
 --  F9408A instruction set was modified. The base instructions, BTLx, have been
 --  redefined as BMWx, respectively. Furthermore, the method used to implement
---  multiway branching has also been changed. Instead of bit stuffing the multi-
---  way data into the microprogram Branch Address (BA) field, the multi-way data
---  is added to the BA field. Multi-way branching using bit stuffing requires
---  that the multi-way jump tables be aligned on 2, 4, or 8 word boundaries
---  based on the number of multi-way branch bits used. Multi-way branching using
---  addition removes the alignment restriction, which greatly simplifies the
---  microprogram, and allows multi-way branch tables to be placed at any loca-
---  tion in the microprogram.
+--  multi-way branching has been changed. Instead of bit stuffing the multi-way
+--  data into the microprogram Branch Address (BA) field, the multi-way data is
+--  added to the BA field. Multi-way branching using bit stuffing requires that
+--  the multi-way jump tables be aligned on 2, 4, or 8 word boundaries based on
+--  the number of multi-way branch bits used. Multi-way branching using addition
+--  removes the alignment restriction, which greatly simplifies the micro-
+--  program, and allows multi-way branch tables to be placed at any location in
+--  the microprogram.
 --
 --  The IND prefix instruction is used to convert direct (zero page or absolute)
---  addressing modes into indirect addressing modes. Since the address indirec-
---  tion operation must be performed first, IND is tested using one of the new
---  multi-way branch instructions added to the F9409A MPC. Furthermore, the com-
---  plement of IND is used as the test rather than IND in order to place the
---  extra address indirection step before the operand fetch microsequence. This
---  allows the microprogram to use fewer branches, which makes for a shorter and
---  and more readable microprogram.
+--  addressing modes into indirect addressing modes. IND is tested using one of
+--  the new multi-way branch instructions added to the F9409A MPC. Furthermore,
+--  the complement of IND is used as the test rather than IND in order to place
+--  the extra address indirection step before the operand fetch microsequence.
+--  This allows the microprogram to use fewer branches, which makes for a
+--  shorter and and more readable microprogram.
 --
---  Controlling the length of the instruction cycle to accomodate the SIZ pre-
+--  Controlling the length of the instruction cycle to accommodate the SIZ pre-
 --  fix instruction is accomplished using two techniques: (1) multi-way branch-
 --  ing, and (2) MPC instruction substitution. The first technique is used when
 --  dispatching the instruction requires branching to different sequences. The
@@ -609,8 +614,8 @@ _Rst:
 --------------------------------------------------------------------------------
 -- 2-Way Jump Table: _Nxt and _Int; Instruction Fetch and Execute Microstate
 --------------------------------------------------------------------------------
-
-_Nxt:       .org    8
+            .org    8
+_Nxt:       --.org    8
 _Php:
 _Plp:
     BRV1    _Nxt,, Inc, IF, IR, WE_R                -- Instruction Fetch/Execute
@@ -726,7 +731,7 @@ _Jmp_Exit:
 -- Immediate Operand: ORA/ANL/EOR/ADC/LDA/CMP/SBC, LDX/CPX, LDY/CPY, BIT, ADJ
 --
 --  BMW0 uses MW <= {1'b0, SIZ, 1'b0}.
---      #imm8  : Listed immediate instructions complete execution mormally.
+--      #imm8  : Listed immediate instructions complete execution normally.
 --      #imm16 : Listed immediate instructions complete execution with extra
 --               read cycle to read the high byte of the immediate operand.
 --------------------------------------------------------------------------------
@@ -992,7 +997,6 @@ _RO_absXI:
     FTCH    $,SPR, LDAX, RD, OP1                    -- Read Mem Ptr Lo
     BRV0    _RO_abs_Exit,, Nxt, RD, OP2             -- Read Mem Ptr Hi
 --
-_RO_absX:
     BMW     _Nxt,RSZ, LDAX, RD, OP1                 -- Read Operand Lo
     BMW     _Nxt,, Nxt, RD, OP2                     -- Read Operand Hi
 
@@ -1147,7 +1151,7 @@ _RMW_S_Exit:
     BMW     _RMW,, Nxt, WR, ALU, WE_R               -- Write 16-bit Result Hi
 --
 _RMW_I_Exit:
-    FTCH    _$,, LDA, RD, OP1                       -- Read 8-bit Operand
+    FTCH    $,, LDA, RD, OP1                        -- Read 8-bit Operand
     BMW     _RMW,, MAR, WR, ALU, WE_R               -- Write 8-bit Result
 
 --------------------------------------------------------------------------------
@@ -1193,9 +1197,9 @@ _STP:
 --------------------------------------------------------------------------------
 
 _WAI:
-    BTH3  _Nxt,, PC             -- xIRQ asserted with IRQ_Msk asserted, cont.
-    BTH2  _Int,, PC             -- Int asserted by NMI or IRQ, do IRQ interrupt
-    BMW   _WAI,, PC             -- No external interrupts asserted, check xIRQ
+    BTH3    _Nxt,, PC           -- xIRQ asserted with IRQ_Msk asserted, cont.
+    BTH2    _Int,, PC           -- Int asserted by NMI or IRQ, do IRQ interrupt
+    BMW     _WAI,, PC           -- No external interrupts asserted, check xIRQ
 
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
@@ -1317,7 +1321,7 @@ _PUL_S_Exit:                                        -- 16-bit PUL operation
 --  ENTER - FORTH VM Inner Interpreter Call/Enter   (Not Interruptable)
 --------------------------------------------------------------------------------
 
-_ENTER:
+_Enter:
     FTCH    $,SMD, Psh, WR, DOL, WE_R,, W2I         -- Push FORTH Addrs Ptr Hi
 --
     FTCH    $,, IPN, RD, OP1,,, IP1                 -- Read FORTH Addrs Ptr Lo
@@ -1326,7 +1330,7 @@ _ENTER:
 --  NEXT - FORTH VM Inner Interpreter               (Not Interruptable)
 --------------------------------------------------------------------------------
 
-_NEXT:
+_Next:
     BMW2    _ITC,, IPN, RD, OP2,,, IP1              -- Read FORTH Addrs Ptr Hi
 _ITC:
     FTCH    $,, LDA, RD, OP1,,, M2W                 -- Read FORTH Word CFA Lo
@@ -1340,17 +1344,17 @@ _ITC_EXIT:
 --  Push 16-bit IP/W - PSH I (PHI); PSH W (IND PHI)
 --------------------------------------------------------------------------------
 
-_PHI:
+_Phi:
     BMW     _Nxt,MOD, Psh, WR, DOL, WE_R            -- Push IP/W Lo
 
 --------------------------------------------------------------------------------
 --  Pull 16-bit IP/W - PUL I (PLI); PUL W (PLW) (IND PLI)
 --------------------------------------------------------------------------------
 
-_PLI:
-    BMW     _PLI_Exit,MOD, Pop, RD, OP2             -- Read Operand Hi
+_Pli:
+    BMW     _Pli_Exit,MOD, Pop, RD, OP2             -- Read Operand Hi
 
-_PLI_Exit:
+_Pli_Exit:
     BRV1    $,, Nxt, IF, IR,,, M2I                  -- Fetch next instruction
     BRV2    _PshPCL,MOD, Psh, WR, DMH, WE_R,, M2I   -- {OP2, OP1} <= Vector(INT)
                                                     -- Push PCH
@@ -1530,7 +1534,7 @@ _BVS_rel:
     BMW3    _Rel,, Inc, IF, SGN                     -- Read rel Value
 _BRA_rel:
     BMW3    _Rel,, Inc, IF, SGN                     -- Read rel Value
-_BCC_rel
+_BCC_rel:
     BMW3    _Rel,, Inc, IF, SGN                     -- Read rel Value
 _LDY_imm:
     BMW0    _Imm,, Inc, IF, OP1                     -- Read #imm Value
@@ -1609,7 +1613,7 @@ _LDX_imm:
 _LDA_zpi:
     BMW2    _RO_zpII,, Inc, IF, OP1                 -- Read zp address
 _ADJimm:
-    BMW0    _Imm,, Inc, IF, SGN                     -- Read Imm Op, sign extend                 -- Read #imm
+    BMW0    _Imm,, Inc, IF, SGN                     -- Read Imm Op, sign extend
 _CMP_zpi:
     BMW2    _RO_zpII,, Inc, IF, OP1                 -- Read zp address
 _PSHimm:
@@ -1915,15 +1919,15 @@ _SWP:
 _ROT:
     BRV3    $,, Inc, IF, IR, WE_R                   -- Rotate Register Stack
 _NXT:
-    BRV0    _NEXT,, IPN, RD, OP1,,, IP1             -- Read FORTH Addrs Ptr Lo
+    BRV0    _Next,, IPN, RD, OP1,,, IP1             -- Read FORTH Addrs Ptr Lo
 _PHI:
-    BRV0    _PHI,MOD, Psh, WR, DOH, WE_R            -- Psh IP/W
+    BRV0    _Phi,MOD, Psh, WR, DOH, WE_R            -- Psh IP/W
 _INI:
     BRV3    $,, Inc, IF, IR,,, IP1                  -- Increment IP by 1
 _PLI:
-    BRV0    _PLI,MOD, Pop, RD, OP1                  -- Pop IP/W
+    BRV0    _Pli,MOD, Pop, RD, OP1                  -- Pop IP/W
 _ENT:
-    BRV0    _ENTER,SMD, Psh, WR, DOH, WE_R,, WP2    -- FORTH VM ENTER (DOCOL)
+    BRV0    _Enter,SMD, Psh, WR, DOH, WE_R,, WP2    -- FORTH VM ENTER (DOCOL)
 _OSX:
     BRV1    $,, Inc, IF, IR                         -- Prefix 1 - OSX
 _IND:
@@ -1970,11 +1974,11 @@ _LDY_absX:
     BRV0    _RO_absX,, Inc, IF, OP1                 -- Read Dst Ptr Lo
 _CPY_abs:
     BRV0    _RO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
-_PSH_DC:
+_PSHabs:
     BRV0    _PSH_abs,, Inc, IF, OP1                 -- Read Src Ptr Lo
 _CPX_abs:
     BRV0    _RO_abs,, Inc, IF, OP1                  -- Read Dst Ptr Lo
-_PUL_FC:
+_PULabs:
     BRV0    _PUL_abs,, Inc, IF, OP1                 -- Read Dst Ptr Lo
 --------------------------------------------------------------------------------
 -- Row D : 0x0D-0xFD

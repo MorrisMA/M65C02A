@@ -561,8 +561,8 @@ assign Stk_Op = {NA_Op[6] & ~NA_Op[1], NA_Op[0]};   // 0x=>NOP; 10=>PSH; 11=>POP
 
 //  Decode DI_Op Control Field
 
-assign Ld_OP1 = IO_Op[1] &  DI_Op[2];
-assign Ld_OP2 = IO_Op[1] &  DI_Op[1];
+assign Ld_OP1 = IO_Op[1] & DI_Op[2];
+assign Ld_OP2 = IO_Op[1] & DI_Op[1];
 assign SignDI = DI_Op[0];
 
 //  Operand Register 1 (Low Byte)
@@ -586,7 +586,8 @@ begin
     if(Rst | BRV2)
         OP2 <= #1 Vector[15:8];
     else if(CE_OP2)
-        OP2 <= #1 ((Ld_OP1) ? ((SignDI) ? {8{DI[7]}} : {8{1'b0}}) : DI);
+//        OP2 <= #1 ((Ld_OP1) ? ((SignDI) ? {8{DI[7]}} : {8{1'b0}}) : DI);
+        OP2 <= #1 ((Ld_OP1) ? {8{DI[7]}} : DI);
 end
 
 //  Instruction Register
@@ -738,12 +739,13 @@ assign Kernel = (P[pMode] | ((BRV2 | rBRV2 | RTI) & ~Done));
 //      OSX - Override: X <=> S; X => SP
 //
 //  IND, SIZ, OAX, OAY, and OSX are sticky flags which retain their programmed
-//  until the completion of the following non-prefix instruction.
+//  state until the completion of the following non-prefix instruction.
 //
 //  OAX and OSX are mutually exclusive, and OAX and OAY are also mutually exclu-
 //  sive. Applying OSX while OAX is set, will reset OAX; applying OAX while OSX
 //  is set will reset OSX. Similarly, applying OAX while OAY is set will reset 
-//  OAY; applying OAY while OAX is set will reset OAX. 
+//  OAY; applying OAY while OAX is set will reset OAX. applying OAY while OSX is
+//  set is allowed.
 //
 //  The PFX mode indicator will be set after the fetch of the first non-prefix
 //  instruction, and will therefore preserve the state of the prefix flags. On
@@ -753,22 +755,22 @@ assign Kernel = (P[pMode] | ((BRV2 | rBRV2 | RTI) & ~Done));
 always @(posedge Clk)
 begin
     if(Rst) begin
-        OAY <= #1 0;                  // Initialize FFs
+        OSX <= #1 0;                  // Initialize FFs
         IND <= #1 0;
         SIZ <= #1 pSIZ;
         OAX <= #1 0;
-        OSX <= #1 0;
+        OAY <= #1 0;
     end else if(CE_IR) begin
-        // OAY: 8B
-        OAY <= #1 ((PFX) ? iOAY | OAY &         ~iOAX : 0);
-        // IND: 9B | BB      | FB
-        IND <= #1 ((PFX) ? iIND | IND                 : 0);     
-        // SIZ: AB | BB | EB | FB
-        SIZ <= #1 ((PFX) ? ((pSIZ ^ iSIZ) | SIZ)      : pSIZ);  
-        // OAX: CB
-        OAX <= #1 ((PFX) ? iOAX | OAX & ~iOSX & ~iOAY : 0);
-        // OSX: DB      | EB | FB
+        // OSX: 8B      | CB | DB
         OSX <= #1 ((PFX) ? iOSX | OSX & ~iOAX         : 0);     
+        // IND: 9B | BB      | DB
+        IND <= #1 ((PFX) ? iIND | IND                 : 0);     
+        // SIZ: AB | BB | CB | DB
+        SIZ <= #1 ((PFX) ? ((pSIZ ^ iSIZ) | SIZ)      : pSIZ);  
+        // OAX: EB
+        OAX <= #1 ((PFX) ? iOAX | OAX & ~iOSX & ~iOAY : 0);
+        // OAY: FB
+        OAY <= #1 ((PFX) ? iOAY | OAY &         ~iOAX : 0);
     end
 end
 
