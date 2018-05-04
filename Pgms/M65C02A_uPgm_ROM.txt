@@ -1,6 +1,6 @@
 header
 Project: M65C02A_uPgm_ROM
-File Revision: 0021
+File Revision: 0022
 Author(s): Michael A. Morris
 Description: M65C02A HLL-Optimized Microprogram
 endh
@@ -174,13 +174,13 @@ endh
 --
 --  0018    16L05   MAM     Modified to conform with the Excel spreadsheet:
 --                          MOV #imm instruction moved to $54; XMA instruction
---                          changed to ZP direct with support for IND, SIZ, ISZ,
---                          OSX, OSZ, and OIS prefix instructions; Moved ip,I++
---                          from column 15 to column 3 and moved ADD/STA/LDA
---                          ip,I++ instructions from column 2 into column 3;
---                          restored Rockwell instructions to column 7 and 15;
---                          Replaced WAI and STP instructions and reordered
---                          prefix instructions in column B.
+--                          changed to ZP,X direct with support for IND, SIZ,
+--                          ISZ, OSX, OSZ, and OIS prefix instructions; Moved
+--                          ip,I++ from column 15 to column 3 and moved
+--                          ADD/STA/LDA ip,I++ instructions from column 2 into
+--                          column 3; restored Rockwell instructions to column
+--                          7 and 15; Replaced WAI and STP instructions and re-
+--                          ordered prefix instructions in column B.
 --
 --  0019    17A01   MAM     Restored original order to prefix instructions so
 --                          that OSZ ($CB) and OIS ($DB) prefix instructions can
@@ -205,6 +205,17 @@ endh
 --
 --  0021    18C09   MAM     Corrected spelling in comments, and removed dupli-
 --                          cate labels.
+--
+--  0022    18E02   MAM     Cleaned up some comments, corrected the label of the
+--                          XMA instruction, and modified the OP1 operand load
+--                          field for all indexed by X instruction to SGN. This
+--                          sets up the use of indexed by X addressing modes as
+--                          BP-relative addressing modes. If X < 512, the sign
+--                          extension in OP2 will not have an affect on the cal-
+--                          culated page 0/1 address because the upper 8-bits of
+--                          the address are replaced by the upper 8-bits of X
+--                          when X < 512. Same result occurs when OSX replaces
+--                          X with Sk/Su in the indexed address calculation.
 --
 --------------------------------------------------------------------------------
 --  Comments
@@ -382,6 +393,60 @@ endh
 --  allow additional instructions to be added to the M65C02A core without addi-
 --  tional core logic changes.
 --
+--  ----------------------------------------------------------------------------
+--  Note regarding the implementation of BP-relative and SP-relative addressing
+--
+--  The latest version of the M65C02A core supports both BP-relative and
+--  SP-relative addressing modes. The BP-relative addressing mode is based on
+--  the native indexed by X addressing modes. It is implemented for both the 
+--  zero page and absolute versions of the indexed by X addressing modes. The
+--  SP-relative addressing mode is implemented with all native addressing modes.
+--  It is selected by the OSX (OSZ, and OIS) prefix instruction(s). It applies
+--  to both the indexed and non-indexed addressing modes.
+--
+--  Two modifications are required to the HDL and the microprogram to implement
+--  these two addressing modes completely for the M65C02A. First, the micropro-
+--  gram utilizes a previously reserved field to signal to the address generator
+--  that the stack pointer, Sk/Su, is to be added to the offset/address formed
+--  during the instruction operand address fetch cycles. For zero page address-
+--  ing modes, the single byte address is fetched from program memory following
+--  the opcode. Since it does not make sense to access memory below that pointed
+--  to by S, the single byte address read into {OP2, OP1} is not sign extended:
+--  OP2 <= 0.
+--
+--  However, the single byte address fetched by an instruction using an indexed
+--  by X addressing mode must be sign extended into OP2: OP2 <= sign(OP1). This
+--  requirements comes about by the nature of how a base pointer (BP) is set in
+--  in order to form a stack frame as used by C/C++, Pascal, and other similar
+--  HLLs. The BP, one of the registers in the X register stack (usually the top
+--  register), is written with the value of the system stack pointer on entry
+--  into the function/subroutine. Local variables are allocated below that point
+--  in the memory region allocated to the stack. Thus, accessing the local,
+--  dynamically created variables relative to the BP requires negative offsets.
+--  Hence the requirement that the value loaded into OP1 be sign extended into 
+--  OP2 for any zero page indexed by X addressing modes.
+--
+--  Page 1/0 address and data fetches require modulo 256 operation. IOW, the
+--  address is wrapped at the page boundaries rather than extended into the next
+--  higer or lower page in memory. The address generator in the M65C02A wraps
+--  addresses for these two pages at the page boundaries by only using the lower
+--  8-bits of the calculated (indexed) address, and stuffing the upper byte with
+--  the upper byte of the index register: X or S. This allows the M65C02A to
+--  emulate the behavior of the 6502/65C02 processors with respect to zero page
+--  and stack page addressing.
+--
+--  Within the microprogram, the SPR sub-field, bit 0 of the uP_Cntl field, is
+--  set whenever an instruction uses an addressing mode that can be converted to
+--  SP-relative if the OSX prefix precedes the opcode. If the OSX flag is pre-
+--  sent, then S is used as the base of the address instead of the default of 0.
+--
+--  A word of caution, only one index operation can be implemented at a time.
+--  This means that an addressing mode like zp,Y cannot be modified to support
+--  SP-relative unless indirection is involved. Therefore, (zp),Y can be modi-
+--  fied to support SP-relative addressing: (sp),Y => (sp,S),Y. The SP-relative
+--  post-indexed by Y is a powerful addressing mode very useful for manipulating
+--  objects larger than 8/16-bits, especially if the value of Y > 255.
+--
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --
@@ -444,8 +509,8 @@ Rel     .equ    131     -- 0_1000_001_1; Rel:  NA  <= PC  + M + 1;    MAR <= NA
 --------------------------------------------------------------------------------
 Psh     .equ     64     -- 0_0100_000_0; Psh:  NA  <= S       + 0; MAR <= NA
 Pop     .equ     65     -- 0_0100_000_1; Pop:  NA  <= S       + 1; MAR <= NA
-SPM     .equ     67     -- 0_0100_001_1; BP:   NA  <= S   + M + 1; MAR <= NA
-BPM     .equ     11     -- 0_0000_101_1; BP:   NA  <= X   + M + 1; MAR <= NA
+--SPM     .equ     67     -- 0_0100_001_1; BP:   NA  <= S   + M + 1; MAR <= NA
+--BPM     .equ     11     -- 0_0000_101_1; BP:   NA  <= X   + M + 1; MAR <= NA
 --------------------------------------------------------------------------------
 IPN     .equ     32     -- 0_0010_000_0; IP:   NA  <= IP      + 0; MAR <= NA
 --------------------------------------------------------------------------------
@@ -997,7 +1062,7 @@ _RO_absXI:
     FTCH    $,SPR, LDAX, RD, OP1                    -- Read Mem Ptr Lo
     BRV0    _RO_abs_Exit,, Nxt, RD, OP2             -- Read Mem Ptr Hi
 --
-    BMW     _Nxt,RSZ, LDAX, RD, OP1                 -- Read Operand Lo
+    BMW     _Nxt,SIZ, LDAX, RD, OP1                 -- Read Operand Lo
     BMW     _Nxt,, Nxt, RD, OP2                     -- Read Operand Hi
 
 --------------------------------------------------------------------------------
@@ -1015,7 +1080,7 @@ _RO_absIY:
     FTCH    $,SPR, LDA, RD, OP1                     -- Read Mem Ptr Lo
     FTCH    $,, Nxt, RD, OP2                        -- Read Mem Ptr Hi
 _RO_absY_Exit:
-    BMW     _Nxt,RSZ, LDAY, RD, OP1                 -- Read Operand Lo
+    BMW     _Nxt,SIZ, LDAY, RD, OP1                 -- Read Operand Lo
     BMW     _Nxt,, Nxt, RD, OP2                     -- Read Operand Hi
 
 --------------------------------------------------------------------------------
@@ -1051,7 +1116,7 @@ _WO_absIX:
     FTCH    $,SPR, LDAX, RD, OP1                    -- Read Mem Ptr Lo
     BRV0    _WO_abs_Exit,, Nxt, RD, OP2             -- Read Mem Ptr Hi
 --
-    BMW     _Nxt,RSZ, LDAX, WR, ALU, WE_R           -- Write Memory Lo
+    BMW     _Nxt,SIZ, LDAX, WR, ALU, WE_R           -- Write Memory Lo
     BMW     _Nxt,, Nxt, WR, ALU, WE_R               -- Write Memory Hi
 
 --------------------------------------------------------------------------------
@@ -1070,7 +1135,7 @@ _WO_absIY:
     FTCH    $,, Nxt, RD, OP2                        -- Read Mem Ptr Hi
 --
 _WO_absY_Exit:
-    BMW     _Nxt,RSZ, LDAY, WR, ALU, WE_R           -- Write Memory Lo
+    BMW     _Nxt,SIZ, LDAY, WR, ALU, WE_R           -- Write Memory Lo
     BMW     _Nxt,, Nxt, WR, ALU, WE_R               -- Write Memory Hi
 
 --------------------------------------------------------------------------------
@@ -1553,35 +1618,35 @@ _BEQ_rel:
 --  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
 --------------------------------------------------------------------------------
 _ORA_zpXi:
-    BMW2    _RO_zpXII,, Inc, IF, OP1                -- Read zp Ptr
+    BMW2    _RO_zpXII,, Inc, IF, SGN                -- Read zp Ptr
 _ORA_zpiY:
     BMW2    _RO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
 _ANL_zpXi:
-    BMW2    _RO_zpXII,, Inc, IF, OP1                -- Read zp Ptr
+    BMW2    _RO_zpXII,, Inc, IF, SGN                -- Read zp Ptr
 _ANL_zpiY:
     BMW2    _RO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
 _EOR_zpXi:
-    BMW2    _RO_zpXII,, Inc, IF, OP1                -- Read zp Ptr
+    BMW2    _RO_zpXII,, Inc, IF, SGN                -- Read zp Ptr
 _EOR_zpiY:
     BMW2    _RO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
 _ADC_zpXi:
-    BMW2    _RO_zpXII,, Inc, IF, OP1                -- Read zp Ptr
+    BMW2    _RO_zpXII,, Inc, IF, SGN                -- Read zp Ptr
 _ADC_zpiY:
     BMW2    _RO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
 _STA_zpXi:
-    BMW2    _WO_zpXII,, Inc, IF, OP1                -- Read zp Ptr
+    BMW2    _WO_zpXII,, Inc, IF, SGN                -- Read zp Ptr
 _STA_zpiY:
     BMW2    _WO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
 _LDA_zpXi:
-    BMW2    _RO_zpXII,, Inc, IF, OP1                -- Read zp Ptr
+    BMW2    _RO_zpXII,, Inc, IF, SGN                -- Read zp Ptr
 _LDA_zpiY:
     BMW2    _RO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
 _CMP_zpXi:
-    BMW2    _RO_zpXII,, Inc, IF, OP1                -- Read zp Ptr
+    BMW2    _RO_zpXII,, Inc, IF, SGN                -- Read zp Ptr
 _CMP_zpiY:
     BMW2    _RO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
 _SBC_zpXi:
-    BMW2    _RO_zpXII,, Inc, IF, OP1                -- Read zp Ptr
+    BMW2    _RO_zpXII,, Inc, IF, SGN                -- Read zp Ptr
 _SBC_zpiY:
     BMW2    _RO_zpIIY,, Inc, IF, OP1                -- Read zp Ptr
 --------------------------------------------------------------------------------
@@ -1637,15 +1702,15 @@ _EOR_ipp:
 _LSR_ipp:
     BRV0    _RMW_ip,, Inc, IF, SGN                  -- Read ip Offset
 _ADD_ipp:
-    BMW2    _RO_ipI,, Inc, IF, OP1                  -- Read ip Offset
+    BMW2    _RO_ipI,, Inc, IF, SGN                  -- Read ip Offset
 _ROR_ipp:
     BRV0    _RMW_ip,, Inc, IF, SGN                  -- Read ip Offset
 _STA_ipp:
-    BMW2    _WO_ipI,, Inc, IF, OP1                  -- Read ip Offset
+    BMW2    _WO_ipI,, Inc, IF, SGN                  -- Read ip Offset
 _TSB_ipp:
     BRV0    _RMW_ip,, Inc, IF, SGN                  -- Read ip Offset
 _LDA_ipp:
-    BMW2    _RO_ipI,, Inc, IF, OP1                  -- Read ip Offset
+    BMW2    _RO_ipI,, Inc, IF, SGN                  -- Read ip Offset
 _TRB_ipp:
     BRV0    _RMW_ip,, Inc, IF, SGN                  -- Read ip Offset
 _CMP_ipp:
@@ -1667,23 +1732,23 @@ _TRB_zp:
 _BIT_zp:
     BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _BIT_zpX:
-    BMW2    _RO_zpXI,, Inc, IF, OP1                 -- Read ZP Pointer
+    BMW2    _RO_zpXI,, Inc, IF, SGN                 -- Read ZP Pointer
 _XMA_zp:
-    BRV0    _XMA_zp,, Inc, IF, SGN                  -- Read ZP Offset
+    BRV0    _XMA_zpX,, Inc, IF, SGN                  -- Read ZP Offset
 _MOV_54:
     BRV0    _MOV,, Inc, IF, OP2                     -- Read MOV operand
 _STZ_zp:
     BMW2    _WO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _STZ_zpX:
-    BMW2    _WO_zpXI,, Inc, IF, OP1                 -- Read ZP Pointer
+    BMW2    _WO_zpXI,, Inc, IF, SGN                 -- Read ZP Pointer
 _STY_zp:
     BMW2    _WO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _STY_zpX:
-    BMW2    _WO_zpXI,, Inc, IF, OP1                 -- Read ZP Pointer
+    BMW2    _WO_zpXI,, Inc, IF, SGN                 -- Read ZP Pointer
 _LDY_zp:
     BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _LDY_zpX:
-    BMW2    _RO_zpXI,, Inc, IF, OP1                 -- Read ZP Pointer
+    BMW2    _RO_zpXI,, Inc, IF, SGN                 -- Read ZP Pointer
 _CPY_zp:
     BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _PSHzp:
@@ -1699,35 +1764,35 @@ _PULzp:
 _ORA_zp:
     BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _ORA_zpX:
-    BMW2    _RO_zpXI,, Inc, IF, OP1                 -- Read ZP Pointer
+    BMW2    _RO_zpXI,, Inc, IF, SGN                 -- Read ZP Pointer
 _ANL_zp:
     BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _ANL_zpX:
-    BMW2    _RO_zpXI,, Inc, IF, OP1                 -- Read ZP Pointer
+    BMW2    _RO_zpXI,, Inc, IF, SGN                 -- Read ZP Pointer
 _EOR_zp:
     BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _EOR_zpX:
-    BMW2    _RO_zpXI,, Inc, IF, OP1                 -- Read ZP Pointer
+    BMW2    _RO_zpXI,, Inc, IF, SGN                 -- Read ZP Pointer
 _ADC_zp:
     BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _ADC_zpX:
-    BMW2    _RO_zpXI,, Inc, IF, OP1                 -- Read ZP Pointer
+    BMW2    _RO_zpXI,, Inc, IF, SGN                 -- Read ZP Pointer
 _STA_zp:
     BMW2    _WO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _STA_zpX:
-    BMW2    _WO_zpXI,, Inc, IF, OP1                 -- Read ZP Pointer
+    BMW2    _WO_zpXI,, Inc, IF, SGN                 -- Read ZP Pointer
 _LDA_zp:
     BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _LDA_zpX:
-    BMW2    _RO_zpXI,, Inc, IF, OP1                 -- Read ZP Pointer
+    BMW2    _RO_zpXI,, Inc, IF, SGN                 -- Read ZP Pointer
 _CMP_zp:
     BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _CMP_zpX:
-    BMW2    _RO_zpXI,, Inc, IF, OP1                 -- Read ZP Pointer
+    BMW2    _RO_zpXI,, Inc, IF, SGN                 -- Read ZP Pointer
 _SBC_zp:
     BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _SBC_zpX:
-    BMW2    _RO_zpXI,, Inc, IF, OP1                 -- Read ZP Pointer
+    BMW2    _RO_zpXI,, Inc, IF, SGN                 -- Read ZP Pointer
 --------------------------------------------------------------------------------
 -- Row 6 : 0x06-0xF6
 --  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
@@ -1735,19 +1800,19 @@ _SBC_zpX:
 _ASL_zp:
     BRV0    _RMW_zp,, Inc, IF, OP1                  -- Read ZP Pointer
 _ASL_zpX:
-    BRV0    _RMW_zpX,, Inc, IF, OP1                 -- Read ZP Pointer
+    BRV0    _RMW_zpX,, Inc, IF, SGN                 -- Read ZP Pointer
 _ROL_zp:
     BRV0    _RMW_zp,, Inc, IF, OP1                  -- Read ZP Pointer
 _ROL_zpX:
-    BRV0    _RMW_zpX,, Inc, IF, OP1                 -- Read ZP Pointer
+    BRV0    _RMW_zpX,, Inc, IF, SGN                 -- Read ZP Pointer
 _LSR_zp:
     BRV0    _RMW_zp,, Inc, IF, OP1                  -- Read ZP Pointer
 _LSR_zpX:
-    BRV0    _RMW_zpX,, Inc, IF, OP1                 -- Read ZP Pointer
+    BRV0    _RMW_zpX,, Inc, IF, SGN                 -- Read ZP Pointer
 _ROR_zp:
     BRV0    _RMW_zp,, Inc, IF, OP1                  -- Read ZP Pointer
 _ROR_zpX:
-    BRV0    _RMW_zpX,, Inc, IF, OP1                 -- Read ZP Pointer
+    BRV0    _RMW_zpX,, Inc, IF, SGN                 -- Read ZP Pointer
 _STX_zp:
     BMW2    _WO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _STX_zpY:
@@ -1759,11 +1824,11 @@ _LDX_zpY:
 _DEC_zp:
     BRV0    _RMW_zp,, Inc, IF, OP1                  -- Read ZP Pointer
 _DEC_zpX:
-    BRV0    _RMW_zpX,, Inc, IF, OP1                 -- Read ZP Pointer
+    BRV0    _RMW_zpX,, Inc, IF, SGN                 -- Read ZP Pointer
 _INC_zp:
     BRV0    _RMW_zp,, Inc, IF, OP1                  -- Read ZP Pointer
 _INC_zpX:
-    BRV0    _RMW_zpX,, Inc, IF, OP1                 -- Read ZP Pointer
+    BRV0    _RMW_zpX,, Inc, IF, SGN                 -- Read ZP Pointer
 --------------------------------------------------------------------------------
 -- Row 7 : 0x07-0xF7 (Rockwell Instructions: RMBx/SMBx zp)
 --  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, VM
