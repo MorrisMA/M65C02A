@@ -1303,7 +1303,7 @@ _PSH_Imm:
 --------------------------------------------------------------------------------
 
 _PSH_zp:
-    BMW1    _PSH_IS,RMD, ZPM, RD, OP1               -- Read Op/Op Ptr Lo
+    BMW1    _PSH_IS,MOD, ZPM, RD, OP1               -- Read Op/Op Ptr Lo
 
 --------------------------------------------------------------------------------
 --  Push Absolute Value - PSH abs; PSH (abs); PSH.w abs; PSH.w (abs)
@@ -1311,7 +1311,7 @@ _PSH_zp:
 
 _PSH_abs:
     FTCH    $,, Inc, IF, OP2                        -- Read Data Ptr Hi
-    BMW1    _PSH_IS,SPR, LDA, RD, OP1               -- Read Op/Op Ptr Lo
+    BMW1    _PSH_IS,, LDA, RD, OP1                  -- Read Op/Op Ptr Lo
 
 --------------------------------------------------------------------------------
 --  Common Jump Table - PSH zp;  PSH (zp);  PSH.w zp;  PSH.w (zp)
@@ -1345,10 +1345,10 @@ _PSH_S_Exit:
 --------------------------------------------------------------------------------
 
 _PUL_zpI:
-    FTCH    $,RMD, ZPM, RD, OP1                     -- Read Data Ptr Lo
+    FTCH    $,MOD, ZPM, RD, OP1                     -- Read Data Ptr Lo
     BRV0    _PUL_I_Exit,MOD, Nxt, RD, OP2           -- Read Data Ptr Hi
 _PUL_zp:
-    BMW0    _PUL_Exit,RMD, ZPM                      -- MAR = {0, OP1}
+    BMW0    _PUL_Exit,MOD, ZPM                      -- MAR = {0, OP1}
 
 --------------------------------------------------------------------------------
 --  Pull Absolute Value - PUL abs; PUL (abs); PUL.w abs; PUL.w (abs)
@@ -1357,10 +1357,10 @@ _PUL_zp:
 _PUL_abs:
     BMW2    _PUL_absI,, Inc, IF, OP2                -- Read Data Ptr Hi
 _PUL_absI:
-    FTCH    $,SPR, LDA, RD, OP1                     -- Read Data Ptr Lo
+    FTCH    $,, LDA, RD, OP1                        -- Read Data Ptr Lo
     BMW0    _PUL_Exit,, Nxt, RD, OP2                -- Read Data Ptr Hi
 _PUL_I_Exit:
-    BMW0    _PUL_Exit,SPR, LDA                      -- MAR = {OP2, OP1}
+    BMW0    _PUL_Exit,, LDA                         -- MAR = {OP2, OP1}
 
 --------------------------------------------------------------------------------
 --  Common Exit Table - PUL zp;  PUL (zp);  PUL.w zp;  PUL.w (zp)
@@ -1752,11 +1752,11 @@ _LDY_zpX:
 _CPY_zp:
     BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _PSHzp:
-    BRV0    _PSH_zp,, Inc, IF, OP1                  -- Read zp address
+    BMW2    _PSH_zp,, Inc, IF, OP1                  -- Read zp address
 _CPX_zp:
     BMW2    _RO_zpI,, Inc, IF, OP1                  -- Read ZP Pointer
 _PULzp:
-    BRV0    _PUL_zp,, Inc, IF, OP1                  -- Read zp address
+    BMW2    _PUL_zp,, Inc, IF, OP1                  -- Read zp address
 --------------------------------------------------------------------------------
 -- Row 5 : 0x05-0xF5
 --  I   BA, uPCntl, NA, IO, DI, Reg_WE, ISR, uMCntl
