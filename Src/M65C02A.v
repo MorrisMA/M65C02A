@@ -174,12 +174,12 @@ module M65C02A #(
     parameter pMode           = 4'd5,       // Kernel Mode bit number
     
     parameter pVAL            = 3'b000,     // VALid instructions
-    parameter pINV            = 3'b001,     // INValid instructions
+    parameter pSPC2           = 3'b001,     // Special #2 instructions
     parameter pCOP            = 3'b010,     // CO-Processor instruction
     parameter pBRK            = 3'b011,     // BRK instruction
     parameter pFTH            = 3'b100,     // FORTH VM instructions
-    parameter pPFX            = 3'b101,     // PreFiX instructions
-    parameter pSPC            = 3'b110,     // Special instructions
+    parameter pSPC1           = 3'b101,     // Special #1 instructions
+    parameter pPFX            = 3'b110,     // PreFiX instructions
     parameter pWAI            = 3'b111,     // WAI instruction
 
     parameter pNOP            = 8'hEA,      // M65C02 Core NOP instruction
@@ -210,7 +210,8 @@ module M65C02A #(
     parameter pROM1_File      = "Pgms/figFRTHb.txt",
     parameter pROM0_AddrWidth = 8'd12,      // Internal RAM Address Width:  4 kB
     parameter pROM0_File      = "Pgms/figFRTHa.txt",
-    parameter pRAM_AddrWidth  = 8'd14,      // Internal RAM Address Width: 16 kB
+    //parameter pRAM_AddrWidth  = 8'd14,      // Internal RAM Address Width: 16 kB
+    parameter pRAM_AddrWidth  = 8'd15,      // Internal RAM Address Width: 32 kB
     parameter pRAM_File       = "Pgms/65C02_ft2.txt",
                                                                         
     parameter pM65C02A_uPgm   = "Pgms/M65C02A_uPgm_ROM.coe",    // SEQ   :  2 kB
@@ -666,7 +667,8 @@ BRAM_SP_mn  #(
             
 assign CPU_DI = ((Sel_ROM0) ? ROM0_DO : 0);
 
-//  RAM  - 0x0000-3FFF (16 kB)
+////  RAM  - 0x0000-3FFF (16 kB)
+//  RAM  - 0x0000-7FFF (32 kB)
 
 BRAM_SP_mn  #(
                 .pBRAM_AddrWidth(pRAM_AddrWidth),
@@ -812,7 +814,6 @@ assign Sync =  Done;
 assign nML  = ~RMW | Done;
 assign nVP  = ~VP;
 
-//assign nCE  = ~{CE[11], CE[15], CE[13], CE[8]};
 assign nCE  = ~{CE[4], CE[3], CE[2], CE[1]};
 assign nWR  = ~WE;
 assign nRD  = ~RE;

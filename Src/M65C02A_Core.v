@@ -117,7 +117,7 @@
 //                          output, can be used to trigger external watchdog
 //                          timers that will prevent the processor from halting
 //                          for extended periods of time. Adding the STP port
-//                          required adding a decoder on the IR sepcifically for
+//                          required adding a decoder on the IR specifically for
 //                          the STP instruction opcode.
 //
 //  1.32    15K12   MAM     Modified the OSX inputs to the address generator and
@@ -142,13 +142,14 @@
 //  1.50    16D10   MAM     Modified the instruction mode decode to support a
 //                          second special instruction group. Within this group
 //                          are located the ADJ instruction, and the selects
-//                          that allow IND prefix instruction enable the imple-
-//                          mentation of a true arithmetic left shift instruc-
-//                          tion using ASL (for 8/16-bit) and ROL for >16-bit,
-//                          and an arithmetic right shift instruction using LSR.
-//                          In addition, this new special instruction group
-//                          allows enabling INC/DEC A to set the carry flag in
-//                          order to support simple extended precision counters.
+//                          that allow IND prefix instruction to enable the
+//                          implementation of a true arithmetic left shift 
+//                          instruction using ASL (for 8/16-bit) and ROL for 
+//                          >16-bit, and an arithmetic right shift instruction 
+//                          using LSR.In addition, this new special instruction
+//                          group allows enabling INC/DEC A to set the carry
+//                          flag in order to support simple extended precision
+//                          counters.
 //
 //  1.51    16L25   MAM     Modified the bits in OP2 used to select the dst mode
 //                          from bits OP2[5:4] to OP2[3:2]. OP2[7] remains the
@@ -586,8 +587,7 @@ begin
     if(Rst | BRV2)
         OP2 <= #1 Vector[15:8];
     else if(CE_OP2)
-//        OP2 <= #1 ((Ld_OP1) ? ((SignDI) ? {8{DI[7]}} : {8{1'b0}}) : DI);
-        OP2 <= #1 ((Ld_OP1) ? {8{DI[7]}} : DI);
+        OP2 <= #1 ((Ld_OP1) ? ((SignDI) ? {8{DI[7]}} : {8{1'b0}}) : DI);
 end
 
 //  Instruction Register
@@ -618,22 +618,35 @@ assign COP_RA    = COP & OP2[2:1];
 assign COP_Dir   = COP & OP2[0];
 assign COP_DI    = COP & ALU_DO;
 
-assign COP_Start = COP & (OP2[4:3] == 2'b01);
-assign COP_Clear = COP & (OP2[4:3] == 2'b10);
-assign COP_Pulse = COP & (OP2[4:3] == 2'b11);
+assign COP_Start = COP & (OP2[4:3] == 2'b01) & (OP2[2:1] == 2'b00);
+assign COP_Clear = COP & (OP2[4:3] == 2'b10) & (OP2[2:1] == 2'b00);
+assign COP_Pulse = COP & (OP2[4:3] == 2'b11) & (OP2[2:1] == 2'b00);
 
-reg   COP_SO;
+//
+//  Co-Processor Status Interface
+//      As implemented sets the V flag in PSW according to the desired test.
+//
+//      Alternative implementation, which may be better, would be to map the
+//      Co-Processor status signals, Done and Busy, into N and V of PSW. A
+//      Co-Processor status poll instruction would set the N and V flags in the
+//      PSW so a normal processor branch instructions can be used to test the
+//      condition. In other words, treat a co-processor status check as a BIT
+//      instruction, setting N, V, and Z flags in the manner already defined in
+//      the ALU module. MAM, 18H12.
+//
 
-always @(*)
-begin
-    case({COP_En & (OP2[2:0] == 3'b001), OP2[4:3]})
-        3'b100  : COP_SO <= ~COP_Busy;  // Set V if Co-Processor not Busy
-        3'b101  : COP_SO <=  COP_Busy;  // Set V if Co-Processor Busy
-        3'b110  : COP_SO <= ~COP_Done;  // Set V if Co-Processor not Done
-        3'b111  : COP_SO <=  COP_Done;  // Set V if Co-Processor Done
-        default : COP_SO <= 0;          // Otherwise do not set V 
-    endcase
-end
+//reg   COP_SO;
+//
+//always @(*)
+//begin
+//    case({COP_En & (OP2[2:0] == 3'b001), OP2[4:3]})
+//        3'b100  : COP_SO <= ~COP_Busy;  // Set V if Co-Processor not Busy
+//        3'b101  : COP_SO <=  COP_Busy;  // Set V if Co-Processor Busy
+//        3'b110  : COP_SO <= ~COP_Done;  // Set V if Co-Processor not Done
+//        3'b111  : COP_SO <=  COP_Done;  // Set V if Co-Processor Done
+//        default : COP_SO <= 0;          // Otherwise do not set V 
+//    endcase
+//end
  
 //  Infer Instruction Decode ROM and initialize with file created by SMRTool
 
@@ -692,6 +705,8 @@ assign WRD  = (SPC1) & Opcode[0] | (COP_En & COP_SIZ);  // Set 16-bit op size
 assign SPC2 = (Mode == pMd_SPC2);   // Special 2 Instructions (Mode = 1)
 
 assign ADJ  = (SPC2) & Opcode[7];               // Adjust S: S <= S + M
+//
+assign LSCX = (SPC2) & Opcode[6];               // LDX/STX/CPX instruction
 //
 assign VEN  = (SPC2) & Opcode[1] & BRV3 & IND;  // Enable V for ASL/ROL A
 assign CEN  = (SPC2) & Opcode[0] & BRV3 & IND;  // Enable C for INC/DEC A
@@ -796,7 +811,7 @@ M65C02A_AddrGen     #(
                         .OAY(OAY),
                         .OSX(OSX ^ RSPX),   // Use X as RS if RSPX & ~OSX
                         
-                        .SPR(SPR),          // SP-Relative Addressing Enable
+                        .SPR(SPR & ~LSCX),  // SP-Relative Addressing Enable
 
                         .Mod(Mod),          // Mod 256 Addressing Flag
                         .Prv(Prv),          // Force complement of AR to dec NA
@@ -878,7 +893,8 @@ M65C02A_ALUv2   ALUv2 (
                     .SO(SO),            // M65C02A ALU Set oVerflow Flag in PSW
                     .Clr_SO(Clr_SO),    // M65C02A ALU Clr SO - Acknowledge
                     
-                    .COP_SO(COP_SO),    // M65C02A ALU COP Set oVerflow Strobe
+//                    .COP_SO(COP_SO),    // M65C02A ALU COP Set oVerflow Strobe
+                    .COP_SO(1'b0),      // M65C02A ALU COP Set oVerflow Strobe
                     
                     .MOV(MOV),          // M65C02A ALU MOV Instruction Flag
                     .uMCntl(uMCntl),    // M65C02A ALU MOV Microprogram Controls
