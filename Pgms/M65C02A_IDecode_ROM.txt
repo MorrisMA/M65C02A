@@ -1,6 +1,6 @@
 header
 Project: M65C02A_IDecode_ROMa
-File Revision: 0022
+File Revision: 0023
 Author(s): Michael A. Morris
 Description: M65C02A Instruction Decoder - HLL-optimized Instruction Set
 endh
@@ -227,6 +227,15 @@ endh
 --
 --  0022    18C09   MAM     Removed duplicate label.
 --
+--  0023    18H26   MAM     Modified the mode field for LDX/STX/CPX instructions
+--                          to support LSCX flag which overrides the SPR control
+--                          field in the microprogram. SPR enables sp-relative
+--                          addressing for zp/abs addressing mode. LSCX over-
+--                          rides this behavior in the address generator for
+--                          LDX/STX/CPX zp/zp,Y/abs/abs,Y instructions. Added
+--                          the modification to the LDX/CPX #imm instructions
+--                          for completeness rather than necessity.
+--
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 -- Mode Field
@@ -238,7 +247,7 @@ COP     .asm    2   -- COP Instruction  (CO-Processor instruction           )
 BRK     .asm    3   -- BRK Instruction
 FTH     .asm    4   -- FORTH VM Instructions
 SPC1    .asm    5   -- Special 1 Instructions  (See table below             )
-PFX     .asm    6   -- Prefix Instructions   (See table below               )
+PFX     .asm    6   -- Prefix Instructions     (See table below             )
 --WAI     .asm    7   -- WAI Instruction  (WAit for Interrupt                 )
 --
 --  One-hot encoding of the Opcode field for SPC1 mode instructions
@@ -256,13 +265,14 @@ PFX     .asm    6   -- Prefix Instructions   (See table below               )
 --
 --  One-hot encoding of the Opcode field for SPC2 mode instructions
 --
---  {ADJ, Rsvd[6:3], ASR, CEN, VEN}
+--  {ADJ, LSCX, Rsvd[5:3], ASR, CEN, VEN}
 --
---  ADJ - Adjust S: S <= S + {OP2, OP1}
+--  ADJ  - Adjust S: S <= S + {OP2, OP1}
+--  LSCX - LDX/STX/CPX zp/zp,Y/abs/abs,Y and  LDX/CPX #imm
 --
---  ASR - Enable Arithmetic Right Shift using LSR A: C_In <= Q[7]
---  CEN - Enable Carry for INC/DEC A
---  VEN - Enable V for ASL/ROL A
+--  ASR  - Enable Arithmetic Right Shift using LSR A: C_In <= Q[7]
+--  CEN  - Enable Carry for INC/DEC A
+--  VEN  - Enable V for ASL/ROL A
 --
 --  One-hot encoding of the Opcode field for PFX mode instructions
 --
@@ -531,7 +541,7 @@ _start:     .org    0
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BCS ,0xB0  -- B0: BCS rel
     VAL     0,IDC,CMP,Q_Y,R_M,Ci_1,WS_P,    ,NZC ,0xC0  -- C0: CPY #imm
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BNE ,0xD0  -- D0: BNE rel
-    VAL     0,IDC,CMP,Q_X,R_M,Ci_1,WS_P,    ,NZC ,0xE0  -- E0: CPX #imm
+    SPC2    0,IDC,CMP,Q_X,R_M,Ci_1,WS_P,    ,NZC ,0x40  -- E0: CPX #imm
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,BEQ ,0xF0  -- F0: BEQ rel
 
 --------------------------------------------------------------------------------
@@ -565,7 +575,7 @@ _start:     .org    0
     VAL     0,ADD,ADC,Q_A,R_M,Ci_C,WS_A,    ,NVZC,0x72  -- 72:*ADC (zp)
     VAL     0,   ,   ,   ,   ,    ,    ,    ,    ,0x82  -- 82:#NOP
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_A,    ,0x92  -- 92:*STA (zp)
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xA2  -- A2: LDX #imm
+    SPC2    0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0x40  -- A2: LDX #imm
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_A,OS_M,NZ  ,0xB2  -- B2:*LDA (zp)
     SPC2    0,ADD,ADC,Q_X,R_M,Ci_0,WS_S,    ,    ,0x80  -- C2:#ADJ #imm
     VAL     0,IDC,CMP,Q_A,R_M,Ci_1,WS_P,    ,NZC ,0xD2  -- D2:*CMP (zp)
@@ -607,7 +617,7 @@ _start:     .org    0
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0xB4  -- B4: LDY zp,X
     VAL     0,IDC,CMP,Q_Y,R_M,Ci_1,WS_P,    ,NZC ,0xC4  -- C4: CPY zp
     SPC1    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x80  -- D4:#PSH zp
-    VAL     0,IDC,CMP,Q_X,R_M,Ci_1,WS_P,    ,NZC ,0xE4  -- E4: CPX zp
+    SPC2    0,IDC,CMP,Q_X,R_M,Ci_1,WS_P,    ,NZC ,0x40  -- E4: CPX zp
     SPC1    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,NZ  ,0x00  -- F4:#PUL zp
 
 --------------------------------------------------------------------------------
@@ -639,10 +649,10 @@ _start:     .org    0
     VAL     1,SU ,LSR,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x56  -- 56: LSR zp,X
     VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x66  -- 66: ROR zp
     VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x76  -- 76: ROR zp,X
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_X,    ,0x86  -- 86: STX zp
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_X,    ,0x96  -- 96: STX zp,Y
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xA6  -- A6: LDX zp
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xB6  -- B6: LDX zp,Y
+    SPC2    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_X,    ,0x40  -- 86: STX zp
+    SPC2    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_X,    ,0x40  -- 96: STX zp,Y
+    SPC2    0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0x40  -- A6: LDX zp
+    SPC2    0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0x40  -- B6: LDX zp,Y
     VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- C6: DEC zp
     VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- D6: DEC zp,X
     VAL     1,IDC,INC,Q_M,R_K,Ci_1,WS_P,    ,NZ  ,0x00  -- E6: INC zp
@@ -650,22 +660,22 @@ _start:     .org    0
 
 --------------------------------------------------------------------------------
 
-    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_0   -- 07:+RMB0 dp
-    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_1   -- 17:+RMB1 dp
-    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_2   -- 27:+RMB2 dp
-    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_3   -- 37:+RMB3 dp
-    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_4   -- 47:+RMB4 dp
-    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_5   -- 57:+RMB5 dp
-    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_6   -- 67:+RMB6 dp
-    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_7   -- 77:+RMB7 dp
-    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_0   -- 87:+SMB0 dp
-    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_1   -- 97:+SMB1 dp
-    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_2   -- A7:+SMB2 dp
-    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_3   -- B7:+SMB3 dp
-    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_4   -- C7:+SMB4 dp
-    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_5   -- D7:+SMB5 dp
-    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_6   -- E7:+SMB6 dp
-    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_7   -- F7:+SMB7 dp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_0   -- 07:+RMB0 zp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_1   -- 17:+RMB1 zp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_2   -- 27:+RMB2 zp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_3   -- 37:+RMB3 zp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_4   -- 47:+RMB4 zp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_5   -- 57:+RMB5 zp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_6   -- 67:+RMB6 zp
+    VAL     1,LU ,RMB,L_K,R_M,Ci_C,    ,    ,    ,K_7   -- 77:+RMB7 zp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_0   -- 87:+SMB0 zp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_1   -- 97:+SMB1 zp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_2   -- A7:+SMB2 zp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_3   -- B7:+SMB3 zp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_4   -- C7:+SMB4 zp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_5   -- D7:+SMB5 zp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_6   -- E7:+SMB6 zp
+    VAL     1,LU ,SMB,L_K,R_M,Ci_C,    ,    ,    ,K_7   -- F7:+SMB7 zp
 
 --------------------------------------------------------------------------------
 
@@ -759,7 +769,7 @@ _start:     .org    0
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_Y,OS_M,NZ  ,0xBC  -- BC: LDY abs,X
     VAL     0,IDC,CMP,Q_Y,R_M,Ci_1,WS_P,    ,NZC ,0xCC  -- CC: CPY abs
     SPC1    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,    ,0x80  -- DC:#PSH abs
-    VAL     0,IDC,CMP,Q_X,R_M,Ci_1,WS_P,    ,NZC ,0xEC  -- EC: CPX abs
+    SPC2    0,IDC,CMP,Q_X,R_M,Ci_1,WS_P,    ,NZC ,0x40  -- EC: CPX abs
     SPC1    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_M,NZ  ,0x00  -- FC:#PUL abs
 
 --------------------------------------------------------------------------------
@@ -791,10 +801,10 @@ _start:     .org    0
     VAL     1,SU ,LSR,Q_M,R_M,Ci_0,WS_P,    ,NZC ,0x5E  -- 5E: LSR abs,X
     VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x6E  -- 6E: ROR abs
     VAL     1,SU ,ROR,Q_M,R_M,Ci_C,WS_P,    ,NZC ,0x7E  -- 7E: ROR abs,X
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_X,    ,0x8E  -- 8E: STX abs
+    SPC2    0,LST,XFR,Q_M,R_M,Ci_C,    ,OS_X,    ,0x40  -- 8E: STX abs
     VAL     0,LST,XFR,Q_M,R_M,Ci_C,    ,    ,    ,0x9E  -- 9E:*STZ abs,X
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xAE  -- AE: LDX abs
-    VAL     0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0xBE  -- BE: LDX abs,Y
+    SPC2    0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0x40  -- AE: LDX abs
+    SPC2    0,LST,XFR,Q_M,R_M,Ci_C,WS_X,OS_M,NZ  ,0x40  -- BE: LDX abs,Y
     VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- CE: DEC abs
     VAL     1,IDC,DEC,Q_M,R_K,Ci_0,WS_P,    ,NZ  ,0x00  -- DE: DEC abs,X
     VAL     1,IDC,INC,Q_M,R_K,Ci_1,WS_P,    ,NZ  ,0x00  -- EE: INC abs

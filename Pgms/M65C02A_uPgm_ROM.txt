@@ -435,7 +435,7 @@ endh
 --  emulate the behavior of the 6502/65C02 processors with respect to zero page
 --  and stack page addressing.
 --
---  Within the microprogram, the SPR sub-field, bit 0 of the uP_Cntl field, is
+--  Within the microprogram, the SPR sub-field, bit 3 of the uP_Cntl field, is
 --  set whenever an instruction uses an addressing mode that can be converted to
 --  SP-relative if the OSX prefix precedes the opcode. If the OSX flag is pre-
 --  sent, then S is used as the base of the address instead of the default of 0.
@@ -878,7 +878,7 @@ _RO_zp:
 --------------------------------------------------------------------------------
 
 _RO_zpXII:
-    FTCH    $,RMD, ZPX, RD, OP1                     -- Read zp Mem Ptr Lo
+    FTCH    $,MOD, ZPX, RD, OP1                     -- Read zp Mem Ptr Lo
     BRV0    _RO_absI,MOD, Nxt, RD, OP2              -- Read zp Mem Ptr Hi
 
 --------------------------------------------------------------------------------
@@ -889,7 +889,7 @@ _RO_zpXII:
 --------------------------------------------------------------------------------
 
 _RO_zpXI:
-    FTCH    $,RMD, ZPX, RD, OP1                     -- Read zp Mem Ptr Lo (zp,X)
+    FTCH    $,MOD, ZPX, RD, OP1                     -- Read zp Mem Ptr Lo (zp,X)
     BRV0    _RO_abs_Exit,MOD, Nxt, RD, OP2          -- Read zp Mem Ptr Hi
 
 --------------------------------------------------------------------------------
@@ -900,7 +900,7 @@ _RO_zpXI:
 --------------------------------------------------------------------------------
 
 _RO_zpX:
-    BMW     _Nxt,RSM, ZPX, RD, OP1                  -- Read Operand Lo
+    BMW     _Nxt,SMD, ZPX, RD, OP1                  -- Read Operand Lo
     BMW     _Nxt,MOD, Nxt, RD, OP2                  -- Read Operand Hi
 
 --------------------------------------------------------------------------------
@@ -974,7 +974,7 @@ _WO_zp:
 --------------------------------------------------------------------------------
 
 _WO_zpXII:
-    FTCH    $,RMD, ZPX, RD, OP1                     -- Read zp Mem Ptr Lo
+    FTCH    $,MOD, ZPX, RD, OP1                     -- Read zp Mem Ptr Lo
     BRV0    _WO_absI,MOD, Nxt, RD, OP2              -- Read zp Mem Ptr Hi
 
 --------------------------------------------------------------------------------
@@ -985,7 +985,7 @@ _WO_zpXII:
 --------------------------------------------------------------------------------
 
 _WO_zpXI:
-    FTCH    $,RMD, ZPX, RD, OP1                     -- Read zp Mem Ptr Lo
+    FTCH    $,MOD, ZPX, RD, OP1                     -- Read zp Mem Ptr Lo
     BRV0    _WO_abs_Exit,MOD, Nxt, RD, OP2          -- Read zp Mem Ptr Hi
 
 --------------------------------------------------------------------------------
@@ -993,7 +993,7 @@ _WO_zpXI:
 --------------------------------------------------------------------------------
 
 _WO_zpX:
-    BMW     _Nxt,RSM, ZPX, WR, ALU, WE_R            -- Write Memory Lo
+    BMW     _Nxt,SMD, ZPX, WR, ALU, WE_R            -- Write Memory Lo
     BMW     _Nxt,MOD, Nxt, WR, ALU, WE_R            -- Write Memory Hi
 
 --------------------------------------------------------------------------------
@@ -1059,7 +1059,7 @@ _RO_absX:
 --------------------------------------------------------------------------------
 
 _RO_absXI:
-    FTCH    $,SPR, LDAX, RD, OP1                    -- Read Mem Ptr Lo
+    FTCH    $,, LDAX, RD, OP1                       -- Read Mem Ptr Lo
     BRV0    _RO_abs_Exit,, Nxt, RD, OP2             -- Read Mem Ptr Hi
 --
     BMW     _Nxt,SIZ, LDAX, RD, OP1                 -- Read Operand Lo
@@ -1113,7 +1113,7 @@ _WO_absX:
 --------------------------------------------------------------------------------
 
 _WO_absIX:
-    FTCH    $,SPR, LDAX, RD, OP1                    -- Read Mem Ptr Lo
+    FTCH    $,, LDAX, RD, OP1                       -- Read Mem Ptr Lo
     BRV0    _WO_abs_Exit,, Nxt, RD, OP2             -- Read Mem Ptr Hi
 --
     BMW     _Nxt,SIZ, LDAX, WR, ALU, WE_R           -- Write Memory Lo
@@ -1179,7 +1179,7 @@ _RMW_zp_S:                                          -- MW<=010<={0,~IND,  SIZ}
 
 _RMW_absX:
     FTCH    $,, Inc, IF, OP2                        -- Rd Mem Ptr Hi
-    BMW1    _RMW_abs_IS,SPR, LDAX, RD, OP1          -- Rd Op/Op Ptr Lo
+    BMW1    _RMW_abs_IS,, LDAX, RD, OP1          -- Rd Op/Op Ptr Lo
 
 --------------------------------------------------------------------------------
 --  Read-Modify-Write Absolute - RMW abs
@@ -1510,7 +1510,7 @@ _MOV:
 --------------------------------------------------------------------------------
 
 _XMA_zpX:
-    BMW1    _XMA_zpX_IS,RMD, ZPX, RD, OP1           -- Read Op/Op Ptr Lo
+    BMW1    _XMA_zpX_IS,MOD, ZPX, RD, OP1           -- Read Op/Op Ptr Lo
 
 --------------------------------------------------------------------------------
 --  Jump Table: XMA zp,X; XMA.w zp,X; XMA (zp,X); XMA.w (zp,X);
