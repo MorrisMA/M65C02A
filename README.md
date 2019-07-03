@@ -111,7 +111,7 @@ processor provides the following enhancements to 6502/65C02 processors:
     register. Now, in the latest release, prefix-selected indirection will result 
     in pre-indexed indirect addressing if X is the index register, and post-
     indexed indirect addressing if Y is the index register: label,x => (label,x); 
-    (label,x) => ((label,x)); lablely => (label),y; (label),y => ((label),y)
+    (label,x) => ((label,x)); lablely => (label),y; (label),y => ((label)),y
     
     (10)    M65C02A core provides a prefix instruction, SIZ, ISZ (OSZ), which 
     promotes the width of the ALU operation from 8 to 16 bits. The only 
@@ -188,7 +188,8 @@ processor provides the following enhancements to 6502/65C02 processors:
     (19)    M65C02A core implements a zero page pre-indexed by X accumulator-
     memory exchange instruction. The M65C02A prefix instructions may be used as 
     needed to add indirection to the addressing mode, override the operand width, 
-    and the source and destination accumulator/register.
+    and the source and destination accumulator/register. With the appropriate 
+    prefix instruction, the exchange can be performed in a stack-relative manner.
     
     (20)    M65C02A core supports position-independent code. It provides an 
     unconditional PC-relative jump instruction (JRL rel16) using the IND BRA rel16 
