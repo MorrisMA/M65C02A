@@ -92,7 +92,7 @@ processor provides the following enhancements to 6502/65C02 processors:
     user mode routines. (Note: A 6502/65C02 program will stay in the kernel mode 
     unless bit 5 (kernel mode) of the PSW on the system stack is cleared when an 
     rti instruction is performed. On reset, the M65C02A defaults to kernel mode 
-    for compatibility with 6502/65C02 microprocessors.)
+    for compatibility with 6502/65C02 microprocessors.);
 
     (8)     M65C02A core provides automatic support for stacks greater than 256 
     bytes. This feature is automatically activated whenever stacks are allocated 
@@ -138,7 +138,7 @@ processor provides the following enhancements to 6502/65C02 processors:
     inner interpreter with single byte instruction, and it also implements the
     ENTER/DOCOLON operation with another single byte instruction. The ITC FORTH
     version of these operations are supported using the IND prefix instruction.
-    Instructions for pushing, popping, and incrementing IP and W are also included. 
+    Instructions for pushing, popping, and incrementing IP and W are also included; 
             
     (13)    M65C02A core provides transfers between IP and the ATOS: TAI, TIA,
     and XAI. XAI allows the exchange of IP and ATOS. These instructions are useful
@@ -209,12 +209,12 @@ To demonstrate the use of the M65C02A core, an example of its application as
 a microcomputer is provided as part of the release. The example microcomputer 
 constructed using the M65C02A core provides the following features:
 
-    •	M65C02A core (synthesizable, enhanced 6502/65C02-compatible core)
-    •	a Multi-Source (16) Interrupt Handler                            
-    •	a Memory Management Unit (with support for Kernel and User modes)
-    •	28kB of memory (built from synchronous Block RAM)                
-    •	2 Universal Asynchronous Receiver/Transmitter (UARTs)            
-    •	1 Synchronous Peripheral Interface (SPI)                         
+    Â•	M65C02A core (synthesizable, enhanced 6502/65C02-compatible core)
+    Â•	a Multi-Source (16) Interrupt Handler                            
+    Â•	a Memory Management Unit (with support for Kernel and User modes)
+    Â•	28kB of memory (built from synchronous Block RAM)                
+    Â•	2 Universal Asynchronous Receiver/Transmitter (UARTs)            
+    Â•	1 Synchronous Peripheral Interface (SPI)                         
 
 Implementation
 --------------
