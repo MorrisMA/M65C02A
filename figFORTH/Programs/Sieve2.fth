@@ -1,3 +1,4 @@
+decimal
 8192 constant size
 0 variable flags size 1 - allot
 : sieve

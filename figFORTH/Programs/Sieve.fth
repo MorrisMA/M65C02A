@@ -1,4 +1,5 @@
 : 2DROP drop drop ;
+DECIMAL
 16384 2 / CONSTANT maxp 
 : SIEVE                             ( -- n )
   HERE maxp 1 FILL
