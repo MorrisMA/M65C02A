@@ -140,7 +140,7 @@ processor provides the following enhancements to 6502/65C02 processors:
     version of these operations are supported using the IND prefix instruction.
     Instructions for pushing, popping, and incrementing IP and W are also included; 
             
-    (13)    M65C02A core provides transfers between IP and the ATOS: TAI, TIA,
+    (14)    M65C02A core provides transfers between IP and the ATOS: TAI, TIA,
     and XAI. XAI allows the exchange of IP and ATOS. These instructions are useful
     for supporting VMs, but they can also be used to enable register indirect
     accesses using the M65C02A-specific IP-relative instructions defined in the
