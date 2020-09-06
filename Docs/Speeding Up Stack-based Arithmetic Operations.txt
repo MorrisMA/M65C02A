@@ -14,21 +14,22 @@ since a 16-bit offset can be naturally considered as signed.)
 
 The SP-relative addressing mode uses only unsigned offsets. Data pushed onto the
 stack is accessed using SP-relative offsets. The recursive descent compiler is
-fairly simply and its parsing of expressions proceeds from right to left. As a
+fairly simple and its parsing of expressions proceeds from left to right. As a
 consequence, the left operand of any two operand expression is pushed onto the 
-stack first. The right operand follows. When evaluating the expression, the
+stack first and the right operand follows. When evaluating the expression, the
 right operand is pulled from the stack into the accumulator first. For all dual 
 operand operations except subtraction, the order of the operands is not signi-
-ficant. For subtraction, the order of the operations is significant. To confi-
-gure the expression operands in the correct order for subtraction, the M65C02A
-exchanges the right operand in the accumulator with the left operand on the
-stack, and then the subtraction instruction subtracts the right operand on the
-stack from the left operand in the accumulator. 
+ficant, but the operand order is significant for subtraction and compare ins-
+tructions. To configure the expression operands in the correct order for sub-
+traction or comparison instructions, the M65C02A currently exchanges the right
+operand in the accumulator with the left operand on the stack, and then the
+subtraction / compare instruction subtracts the right operand on the stack from
+the left operand in the accumulator. 
 
-This instruction sequence required to properly deal with the required order of
-operands for subtraction operations makes subtractions more expensive than addi-
-tions. The following is the instruction sequence needed to perform subtractions
-using operands on the stack:
+This instruction sequence, required to properly deal with the required order of
+operands for subtraction / comparison operations, makes subtractions more expen-
+sive than additions. The following is the instruction sequence needed to perform
+subtractions using operands on the stack:
 
         pla.w       ; (4) Pull right operand from stack
         xma.w 1,S   ; (7) Exchange right and left operands, put right on stack
@@ -40,24 +41,22 @@ Thus, subtraction requires an additional 7 cycles, i.e. the xma.w 1,S instruc-
 tion. In addition, the adj #2 instruction is required because the right operand
 remains on the stack after the subtraction is complete.
 
-Two simple changes can be implemented to the M65C02A's SP-relative addressing 
-mode can reduce the number of clock cycles and instructions needed to correctly
+A simple change can be implemented to the M65C02A's SP-relative addressing mode
+that can reduce the number of clock cycles and instructions needed to correctly
 implement stack-based subtraction, and evaluation of stack-based expressions.
-The first change is that subtraction using the SP-relative addressing mode
-reverses the order of the operands into the ALU. In other words, the accumulator
-is treated as the right operand and the value on the stack is treated as the 
-left operand. The second is that any ALU operation, except lda/sta sp,S, using
-the SP-relative addressing mode will automatically adjust the stack for the
-operand size. If these changes are made, then the previous instruction sequence
+That is, change subtraction using the SP-relative addressing mode so that the
+the order of the operands into the ALU is reversed. In other words, the accumu-
+lator is treated as the right operand and the value on the stack is treated as
+the left operand. If this change is made, then the previous instruction sequence
 for subtraction becomes the same as that required for any other dual operand ALU
 stack-based expression evaluation operations:
 
         pla.w       ; (4) pull right operand from stack
         sec         ; (1) initialize C for subtraction
         sbc.w 1,S   ; (5) execute subtraction: A <= (1,S) - A
+        adj #2      ; (2) adjust S, remove right operand from stack
              
 This sequence, or similar operations, performs 16-bit stack-based expression
-evaluations in 10 clock cycles instead of the 19 clock cycles previously needed.
-That is roughly a 2x performance improvement without any other optimizations for
-subtraction. The changes also result in a reduction from 12 clock cycles to 10
-clock cycles for any of the other operations, i.e. roughly an 17% improvement.
+evaluations in 12 clock cycles instead of the 19 clock cycles previously needed.
+That is roughly a 37% performance improvement without any other optimizations
+for subtraction or comparison instructions.

@@ -27,7 +27,7 @@ will have to be applied as peephole optimizations in the assemble and link
 phase and not during the code generation phase. As it stands at the moment, the
 first comparison operation requires 9 clock cycles if True and 11 if False. The
 second test adds an additional 4 cycles if the first test is True or an addi-
-tional 7 cycles if the first test was False. Altogether, and True test requires
+tional 7 cycles if the first test was False. Altogether, a True test requires
 13 cycles to implement and a False test requires 18 cycles to implement.
 
 Since logical tests are such a big part of HLL programming, the M65C02A would be 
@@ -48,13 +48,14 @@ The branch instructions of the 6502/65C02 are currently overloaded in the
 M65C02A using the SIZ, IND, and ISZ prefix instructions. The SIZ prefix instruc-
 tion causes the eight (8) 6502/65C02 branch instructions to support multi-flag
 tests to implement four (4) signed comparisons, LT, LE, GE, and GT, and four (4)
-unsigned comparisons, LO, LOS (LS), HIS (HS), and HI, while retaining an 8-bit
+unsigned comparisons, LO, LS (LOS), HS (HIS), and HI, while retaining an 8-bit
 PC-relative displacement field. If the IND prefix is used, the the displacement
 field of the 8 standard branch instructions is extended into a 16-bit PC-rela-
 tive displacement field. If both SIZ and IND are applied, i.e. either by using
-the SIZ and the IND or the ISZ prefix instructions, then both modifications are
-applied to the 8 standard branch instructions; the multi-flag signed/unsigned
-branch instructions have a 16-bit PC-relative branch field.
+separate SIZ and IND prefix instructions, or the combination ISZ prefix instruc-
+tion, then both modifications are applied to the 8 standard branch instructions;
+the multi-flag signed/unsigned branch instructions have a 16-bit PC-relative
+branch field.
 
 If these existing instructions could be further modified by the addition of a
 third prefix instruction, say OSX, then it would be possible to perform the
