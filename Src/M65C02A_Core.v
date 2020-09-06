@@ -604,50 +604,8 @@ begin
         rIR <= #1 DI;
 end
 
-//  Assign Internal Registers
-
 assign IR = rIR;
-assign M  = ((COP_En) ? COP_DO : {OP2, OP1});
 
-//  Co-Processor Interface
-
-assign COP_En    = COP & Reg_WE;
-
-assign COP_Sel   = COP & OP2[7:5];
-assign COP_RA    = COP & OP2[2:1];
-assign COP_Dir   = COP & OP2[0];
-assign COP_DI    = COP & ALU_DO;
-
-assign COP_Start = COP & (OP2[4:3] == 2'b01) & (OP2[2:1] == 2'b00);
-assign COP_Clear = COP & (OP2[4:3] == 2'b10) & (OP2[2:1] == 2'b00);
-assign COP_Pulse = COP & (OP2[4:3] == 2'b11) & (OP2[2:1] == 2'b00);
-
-//
-//  Co-Processor Status Interface
-//      As implemented sets the V flag in PSW according to the desired test.
-//
-//      Alternative implementation, which may be better, would be to map the
-//      Co-Processor status signals, Done and Busy, into N and V of PSW. A
-//      Co-Processor status poll instruction would set the N and V flags in the
-//      PSW so a normal processor branch instructions can be used to test the
-//      condition. In other words, treat a co-processor status check as a BIT
-//      instruction, setting N, V, and Z flags in the manner already defined in
-//      the ALU module. MAM, 18H12.
-//
-
-//reg   COP_SO;
-//
-//always @(*)
-//begin
-//    case({COP_En & (OP2[2:0] == 3'b001), OP2[4:3]})
-//        3'b100  : COP_SO <= ~COP_Busy;  // Set V if Co-Processor not Busy
-//        3'b101  : COP_SO <=  COP_Busy;  // Set V if Co-Processor Busy
-//        3'b110  : COP_SO <= ~COP_Done;  // Set V if Co-Processor not Done
-//        3'b111  : COP_SO <=  COP_Done;  // Set V if Co-Processor Done
-//        default : COP_SO <= 0;          // Otherwise do not set V 
-//    endcase
-//end
- 
 //  Infer Instruction Decode ROM and initialize with file created by SMRTool
 
 initial
@@ -851,6 +809,45 @@ begin
         VP <= #1 Mod;
 end
 
+//  Co-Processor Interface
+
+assign COP_En    = COP & Reg_WE;
+
+assign COP_Sel   = COP & OP2[7:5];
+assign COP_RA    = COP & OP2[2:1];
+assign COP_Dir   = COP & OP2[0];
+assign COP_DI    = COP & ALU_DO;
+
+assign COP_Start = COP & (OP2[4:3] == 2'b01) & (OP2[2:1] == 2'b00);
+assign COP_Clear = COP & (OP2[4:3] == 2'b10) & (OP2[2:1] == 2'b00);
+assign COP_Pulse = COP & (OP2[4:3] == 2'b11) & (OP2[2:1] == 2'b00);
+
+//
+//  Co-Processor Status Interface
+//      As implemented sets the V flag in PSW according to the desired test.
+//
+//      Alternative implementation, which may be better, would be to map the
+//      Co-Processor status signals, Done and Busy, into N and V of PSW. A
+//      Co-Processor status poll instruction would set the N and V flags in the
+//      PSW so a normal processor branch instructions can be used to test the
+//      condition. In other words, treat a co-processor status check as a BIT
+//      instruction, setting N, V, and Z flags in the manner already defined in
+//      the ALU module. MAM, 18H12.
+//
+
+//reg   COP_SO;
+//
+//always @(*)
+//begin
+//    case({COP_En & (OP2[2:0] == 3'b001), OP2[4:3]})
+//        3'b100  : COP_SO <= ~COP_Busy;  // Set V if Co-Processor not Busy
+//        3'b101  : COP_SO <=  COP_Busy;  // Set V if Co-Processor Busy
+//        3'b110  : COP_SO <= ~COP_Done;  // Set V if Co-Processor not Done
+//        3'b111  : COP_SO <=  COP_Done;  // Set V if Co-Processor Done
+//        default : COP_SO <= 0;          // Otherwise do not set V 
+//    endcase
+//end
+ 
 // Instantiate the FORTH VM module
 
 M65C02A_ForthVM FVM (
@@ -879,6 +876,7 @@ M65C02A_ForthVM FVM (
 //  Instantiate the M65C02 ALU Module
 
 assign En = Reg_WE;
+assign M  = ((COP_En) ? COP_DO : {OP2, OP1});
 
 M65C02A_ALUv2   ALUv2 (
                     .Rst(Rst),          // System Reset

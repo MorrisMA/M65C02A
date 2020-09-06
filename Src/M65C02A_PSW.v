@@ -187,7 +187,7 @@ assign B = (BRK | PHP); // Break
 assign D = PSW[3];  // Decimal, set/cleared by SED/CLD, cleared on ISR entry
 assign I = PSW[2];  // Interrupt Mask, set/cleared by SEI/CLI, set on ISR entry
 assign Z = PSW[1];  // Zero, nominally ~|Out, but ~|(A&M) if BIT/TRB/TSB
-assign C = PSW[0];  // Carry, set by ADC/SBC, and ASL/ROL/LSR/ROR instructions
+assign C = PSW[0];  // Carry, set/cleared  by SEC/CLC, ADC/SBC, ASL/ROL/LSR/ROR
 
 //  Assign PSW bits to P (PSW output port)
 

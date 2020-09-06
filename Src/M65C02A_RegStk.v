@@ -187,21 +187,6 @@ begin
             endcase
 end
 
-//always @(posedge Clk)
-//begin
-//    if(Rst)
-//        {TOS, NOS, BOS} <= #1 {pTOS, pNOS, pBOS};
-//    else
-//        if(Rdy & Valid)
-//            case({Sel, DUP, SWP, ROT})  // Note: controls are one-hot
-//                4'b1000 : {TOS, NOS, BOS} <= #1 {  D, NOS, BOS};  // Load TOS
-//                4'b0100 : {TOS, NOS, BOS} <= #1 {TOS, TOS, NOS};  // DUP
-//                4'b0010 : {TOS, NOS, BOS} <= #1 {NOS, TOS, BOS};  // SWP
-//                4'b0001 : {TOS, NOS, BOS} <= #1 {NOS, BOS, TOS};  // ROT
-//                default : {TOS, NOS, BOS} <= #1 {TOS, NOS, BOS};  // NOP
-//            endcase
-//end
-
 assign Q = TOS;
 
 endmodule
