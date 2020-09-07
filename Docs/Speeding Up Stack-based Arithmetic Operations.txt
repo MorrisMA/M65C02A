@@ -5,26 +5,28 @@ has been by enabling BP-relative and SP-relative addressing modes.
 BP-relative enables the use of a stack frame by allowing subroutine parameters
 to be accessed using positive offsets from the Base Pointer (BP), i.e. the X
 register, and local variables as negative offsets from the BP. To accomplish
-this, if the value of X is greater than 512, i.e. the stack is not in page 1 and
-limited by default to 256 bytes, then the zp parameter is automatically treated
-as a signed offset relative to X for any zp,X or (zp,X) addressing mode instruc-
-tions by the M65C02A address generator. (Note: there is no need for this
-specialized treatment of the offset for the abs,X and (abs,X) addressing modes
-since a 16-bit offset can be naturally considered as signed.)
+this, if the value of X is greater than 512, i.e. the stack is not in page 1 or
+page 0 and limited by default to 256 bytes, then the zp parameter is automatic-
+ally treated as a signed offset relative to X for any zp,X or (zp,X) addressing
+mode instructions by the M65C02A address generator. (Note: there is no need for
+this specialized treatment of the offset for the abs,X and (abs,X) addressing
+modes since a 16-bit offset can be naturally considered as signed.)
 
 The SP-relative addressing mode uses only unsigned offsets. Data pushed onto the
-stack is accessed using SP-relative offsets. The recursive descent compiler is
-fairly simple and its parsing of expressions proceeds from left to right. As a
-consequence, the left operand of any two operand expression is pushed onto the 
-stack first and the right operand follows. When evaluating the expression, the
-right operand is pulled from the stack into the accumulator first. For all dual 
-operand operations except subtraction, the order of the operands is not signi-
-ficant, but the operand order is significant for subtraction and compare ins-
-tructions. To configure the expression operands in the correct order for sub-
-traction or comparison instructions, the M65C02A currently exchanges the right
-operand in the accumulator with the left operand on the stack, and then the
-subtraction / compare instruction subtracts the right operand on the stack from
-the left operand in the accumulator. 
+stack is accessed using SP-relative unsigned offsets.
+
+The recursive descent compiler is fairly simple and its parsing of expressions
+proceeds from left to right. As a consequence, the left operand of any two
+operand expression is pushed onto the stack first and the right operand follows.
+When evaluating the expression, the right operand is pulled from the stack into
+the accumulator first.
+
+For all dual operand operations except subtraction, the order of the operands is
+not significant, but the operand order is significant for subtraction and com-
+pare instructions. To configure the expression operands in the correct order for subtraction or comparison instructions, the M65C02A Pascal compiler currently
+exchanges the right operand in the accumulator with the left operand on the
+stack, and then the subtraction / compare instruction subtracts the right oper-
+and on the stack from the left operand in the accumulator. 
 
 This instruction sequence, required to properly deal with the required order of
 operands for subtraction / comparison operations, makes subtractions more expen-
@@ -60,3 +62,27 @@ This sequence, or similar operations, performs 16-bit stack-based expression
 evaluations in 12 clock cycles instead of the 19 clock cycles previously needed.
 That is roughly a 37% performance improvement without any other optimizations
 for subtraction or comparison instructions.
+
+Alternatively, a new set of instructions in Column 3 can be defined which are
+optimized to perform ALU operations based on the stack-based model used by HLLs
+like C and Pascal. One approach would be to create instructions that use A and Y
+as working registers, and that perform ALU operations using registers A, Y as
+the right and left operands, respectively. For example, if the operands as found
+on the stack, then the following instruction sequence can replace those above:
+
+        pla.w       ; (4) pull right operand from stack into A
+        psya.w      ; (4) pull left operand from stack into Y, A <= Y + ~A + 1
+        
+This set of instructions can significantly reduce the number of cycles required
+to perform the required ALU operations for arguments passed on the stack. As
+shown in the preceding instruction sequence, the number of cycles required to
+subtract two values found on the evaluation stack is reduced from 19 to 8. The
+reduction in the number of cycles is due to the reduction of the number of 
+operations to essentially two 16-bit evaluation stack pops. The definition of
+the subtraction operation performed was changed in the preceding instruction
+sequence so that the normally required sec instruction was not required. The
+definition of the subtraction operation could be preserved so that the sec
+instruction is required. The additional clock cycle would not decrease the sav-
+ings that are apparent with these instructions: 19 versus 9 instead of 19 vs. 8.
+In either case, the overall decrease in the number of cycles required is signi-
+ficant, either 53% or 58%, respectively. 
