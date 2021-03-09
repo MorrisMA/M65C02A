@@ -804,7 +804,7 @@ M65C02A_RegStk  RegA (
 //  binary mode. The decimal mode support in the adder functional unit is res-
 //  tricted to the 8-bit mode. Performing 16-bit BCD addition/subtraction must
 //  be done using cascaded 8-bit operations using the normal 6502/65C02 instruc-
-//  tion set; the 16-bit added does not support decimal mode arithmetic.
+//  tion set; the 16-bit adder does not support decimal mode arithmetic.
 
 wire    iD;     // Temporary Decimal Status
 

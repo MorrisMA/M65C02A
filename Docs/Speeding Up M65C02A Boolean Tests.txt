@@ -17,7 +17,7 @@ with a test and branch instruction:
         lda #0          ; (2) load boolean False
 
 lbl_01: cmp #1          ; (2) test acc for boolean True
-        bne lbl_02      ; (2) branch to True label
+        beq lbl_02      ; (2) branch to True label
         jmp lbl_03      ; (3) jump to False label
         
 The recursive descent structure of the compiler makes combining the two tests

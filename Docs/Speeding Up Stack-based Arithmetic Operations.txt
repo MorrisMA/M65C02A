@@ -23,7 +23,8 @@ the accumulator first.
 
 For all dual operand operations except subtraction, the order of the operands is
 not significant, but the operand order is significant for subtraction and com-
-pare instructions. To configure the expression operands in the correct order for subtraction or comparison instructions, the M65C02A Pascal compiler currently
+pare instructions. To configure the expression operands in the correct order for
+subtraction or comparison instructions, the M65C02A Pascal compiler currently
 exchanges the right operand in the accumulator with the left operand on the
 stack, and then the subtraction / compare instruction subtracts the right oper-
 and on the stack from the left operand in the accumulator. 
