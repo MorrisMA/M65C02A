@@ -53,7 +53,7 @@
 //  Working (W) register.
 //
 //  The IP and W registers may be loaded from memory (M) or incremented by 1
-/// or 2. IP may also be loaded with the value in the W register.
+//  or 2. IP may also be loaded with the value in the W register.
 //
 //  The operation of this module are controlled by the En signal, the 3-bit
 //  microprogram control field (VMCntl), the IND prefix flag, PHI signal and the

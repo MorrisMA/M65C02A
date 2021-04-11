@@ -15,7 +15,7 @@ modes since a 16-bit offset can be naturally considered as signed.)
 The SP-relative addressing mode uses only unsigned offsets. Data pushed onto the
 stack is accessed using SP-relative unsigned offsets.
 
-The recursive descent compiler is fairly simple and its parsing of expressions
+The recursive descent compiler is fairly simple and it's parsing of expressions
 proceeds from left to right. As a consequence, the left operand of any two
 operand expression is pushed onto the stack first and the right operand follows.
 When evaluating the expression, the right operand is pulled from the stack into
@@ -64,12 +64,13 @@ evaluations in 12 clock cycles instead of the 19 clock cycles previously needed.
 That is roughly a 37% performance improvement without any other optimizations
 for subtraction or comparison instructions.
 
-Alternatively, a new set of instructions in Column 3 can be defined which are
-optimized to perform ALU operations based on the stack-based model used by HLLs
-like C and Pascal. One approach would be to create instructions that use A and Y
-as working registers, and that perform ALU operations using registers A, Y as
-the right and left operands, respectively. For example, if the operands as found
-on the stack, then the following instruction sequence can replace those above:
+As a first alternative, a new set of instructions in Column 3 can be defined
+which are optimized to perform ALU operations based on the stack-based model
+used by HLLs like C and Pascal. One approach would be to create instructions
+that use A and Y as working registers, and that perform ALU operations using
+registers A, Y as the right and left operands, respectively. For example, if the
+operands as found on the stack, then the following instruction sequence can
+replace those above:
 
         pla.w       ; (4) pull right operand from stack into A
         psya.w      ; (4) pull left operand from stack into Y, A <= Y + ~A + 1
@@ -86,4 +87,30 @@ definition of the subtraction operation could be preserved so that the sec
 instruction is required. The additional clock cycle would not decrease the sav-
 ings that are apparent with these instructions: 19 versus 9 instead of 19 vs. 8.
 In either case, the overall decrease in the number of cycles required is signi-
-ficant, either 53% or 58%, respectively. 
+ficant, either 53% or 58%, respectively.
+
+A second alternative, a new set of instuctions can be defined in Column 3 that
+use the register stack for the two operands: NOS - right operand, and TOS - left
+operand. In this way, the register stack is used for both operands as is natural
+for such a structure, and the order of the operands on the external and the in-
+ternal stacks is maintained in the natural order of the recursive descent compi-
+ler. The instruction sequence required would be the same as in the previous 
+example except that the second instruction would use TOS and NOS of the A regis-
+ter stack instead of the TOS registers of both the A and Y register stacks:
+
+        pla.w       ; (4) pull right operand from external stack into ATOS
+        psub.w      ; (4) push ATOS to ANOS, pull left operand from ext. stack
+                    ;     into ATOS, and ATOS <= ATOS - ANOS, ANOS <= ABOS
+        
+Like the previous set of istructions, this approach maximizes the utility of the
+existing A register stack resources without altering the contents of another
+register stack. The operand evaluation order of the instructions, relative to
+the operands on the external stack does not change, which is a benefit from the
+compiler's perspective. Except in those rare instances where all three register
+stack registers are being used, this approach automatically restores the NOS
+register contents from the BOS register. In those cases where three registers
+of the register stack are used, the BOS would be lost unless previously saved, 
+or the register stack is extended with one more register into which the BOS is
+saved and restored from. Finally, the overall cost of the substraction operation
+is reduced by either 53% or 58%, depending on whether the SEC instruction is 
+required by the definition of these new  subtraction / addition instructions.
