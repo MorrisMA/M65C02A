@@ -19,16 +19,14 @@ OSX CPX abs     =>  (5) CPS abs     |   (8) OSX IND CPX abs     =>  CPS (abs)
 
 Effect of OSX and OSX IND on instructions using the stack:
 
-OSX BRK imm     =>  ( 7) (X--) <= PC            | (Y--) <= P            | PC    <= Vec(BRK)             |               |
+OSX BRK imm     =>  ( 7) (X--) <= PC            | (X--) <= P            | PC    <= Vec(BRK)             |               |
 OSX JSR abs     =>  ( 7) (X--) <= PC            | PC    <= OP           |                               |               |
 OSX IND JSR abs =>  (10) (X--) <= PC            | OP    <= (OP)         | PC    <= OP                   |               |
 OSX RTI         =>  ( 6) P     <= (++X)         | OP    <= (++X)        | PC    <= OP                   |               | 
 OSX RTS         =>  ( 5) OP    <= (++X)         | PC    <= OP           |                               |               |
-OSX COP imm     =>  ( 7) (X--) <= PC            | (Y--) <= P            | PC    <= Vec(COP), Y <= imm   |               |
-OSX PHR rel16   =>  ( 7) MAR   <= PC + 3 + OP   | (Y--) <= MAR          |                               |               |
-OSX JMP (s,S),Y =>  ( 6) OP    <= ({0,X} + OPL) | PC    <= OP + {0,Y}   |                               |               |
+OSX COP imm     =>  ( 7) (X--) <= PC            | (X--) <= P            | PC    <= Vec(COP), Y <= imm   |               |
+OSX PHR rel16   =>  ( 7) MAR   <= PC + 3 + OP   | (X--) <= MAR          |                               |               |
 OSX PLW zp      =>  ( 8) MAR   <= {0,OPL}       | OP    <= (++X)        | (MAR) <= OP                   |               |
 OSX IND PLW zp  =>  (11) MAR   <= {0,OPL}       | MAR   <= (MAR)        | OP    <= (++X)                | (MAR) <= OP   |
 OSX PLW abs     =>  ( 9) MAR   <= OP            | OP    <= (++X)        | (MAR) <= OP                   |               |
 OSX IND PLW abs =>  (12) MAR   <= OP            | MAR   <= (MAR)        | OP    <= (++X)                | (MAR) <= OP   |
-OSX ORA s,S     =>  (  ) 
