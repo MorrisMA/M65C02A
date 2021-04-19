@@ -73,7 +73,7 @@ operands as found on the stack, then the following instruction sequence can
 replace those above:
 
         pla.w       ; (4) pull right operand from stack into A
-        psya.w      ; (4) pull left operand from stack into Y, A <= Y + ~A + 1
+        psya.w      ; (4) pull left operand from stack into Y, A <= Y - A
         
 This set of instructions can significantly reduce the number of cycles required
 to perform the required ALU operations for arguments passed on the stack. As
@@ -82,8 +82,8 @@ subtract two values found on the evaluation stack is reduced from 19 to 8. The
 reduction in the number of cycles is due to the reduction of the number of 
 operations to essentially two 16-bit evaluation stack pops. The definition of
 the subtraction operation performed was changed in the preceding instruction
-sequence so that the normally required sec instruction was not required. The
-definition of the subtraction operation could be preserved so that the sec
+sequence so that the normally required SEC instruction was not required. The
+definition of the subtraction operation could be preserved so that the SEC
 instruction is required. The additional clock cycle would not decrease the sav-
 ings that are apparent with these instructions: 19 versus 9 instead of 19 vs. 8.
 In either case, the overall decrease in the number of cycles required is signi-
@@ -96,7 +96,7 @@ for such a structure, and the order of the operands on the external and the in-
 ternal stacks is maintained in the natural order of the recursive descent compi-
 ler. The instruction sequence required would be the same as in the previous 
 example except that the second instruction would use TOS and NOS of the A regis-
-ter stack instead of the TOS registers of both the A and Y register stacks:
+ter stack instead of the TOS registers of the A and Y register stacks:
 
         pla.w       ; (4) pull right operand from external stack into ATOS
         psub.w      ; (4) push ATOS to ANOS, pull left operand from ext. stack
@@ -113,4 +113,4 @@ of the register stack are used, the BOS would be lost unless previously saved,
 or the register stack is extended with one more register into which the BOS is
 saved and restored from. Finally, the overall cost of the substraction operation
 is reduced by either 53% or 58%, depending on whether the SEC instruction is 
-required by the definition of these new  subtraction / addition instructions.
+required by the definition of these new subtraction / addition instructions.

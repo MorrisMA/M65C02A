@@ -1,0 +1,65 @@
+Proposed changes to M65C02A Instruction Set
+
+The proposed changes to the M65C02A instruction set and the rationale for the
+changes is documented in this memorandun. The proposed changes in the M65C02A
+instruction set are motivated by the following results with the PC65 compiler:
+
+    (1) evaluation of Pascal / C logical operators require many cycles to imple-
+        ment with the M65C02A instruction set;
+    (2) the M65C02A Column 3 Forth IP (with autoincrement) instructions are not
+        used by the PC65 compiler except for the LDA/STA ip,I++ instructions and
+        the autoincrement feature frequently is in conflict with the desired 
+        operations, i.e. autoincrement of the Forth IP (when used to support 
+        register indirect addressing) is not always desired;
+    (3) the order of operands on the M65C02A stack is in the reverse order of
+        that required for comparison and subtraction.
+    (4) the OSX prefix instruction is often paired with the IND prefix instruc-
+        tion, and there is no available prefix instruction that provides these
+        to prefix instructions in a single prefix instruction like the ISZ pre-
+        fix instruction. This lack of an OSX+IND leads to the PC65 code genera-
+        tor having the insert both the OSX and the IND prefix instructions for
+        operations that are frequently required to support the stack-relative
+        addressing modes of the M65C02A that the PC65 compiler makes frequent 
+        use of because of the virtual machine that the PC65 expects of the
+        microprocessor to which it is targeted.
+        
+The first item is discussed in "Speeding Up M65C02A Boolean Tests.txt". Essen-
+tially the proposed changes make two modifications to the conditional branch
+instructions of the M65C02A:
+
+    (1) the BRA rel instruction is modified into a conditional instruction when
+        the OSZ / OSI prefix instructions are applied. These prefix instructions
+        change the BRA instruction to a branch instruction using 8-bit or 16-bit
+        pc-relative branches conditional on whether the accumulator is non-zero, 
+        i.e., branch taken, or zero, i.e., branch not taken;
+    (2) applying the OSX prefix instruction to the M65C02A branch instructions,
+        i.e., BPL / BMI, BVC / BVS, BVC / BCS, and BNE / BEQ, in the form of 
+        OSX, OSZ, OSI, and OIS prefix instructions causes these instructions to
+        store into the accumulator the CC flag used to determine if the branch
+        is taken or not taken. In other words, if the branch is taken, CC = 1,
+        then the accumulator is filled with a 0x01, and if the branch is not
+        taken, then the accumulator is filled with a 0x00.
+
+These modifications to the M65C02A branch instructions, denoted by the yellow
+highlight in the M65C02C tab of the spreadheet, reduce the execution time of a
+PC65 logical test from 13(T)/18(F) cycles to 6(T)/7(F) cycles. Given that the
+accumulator is used by the PC65 virtual machine to hold the boolean variable
+that represents the logical state of the logic expression, the modification of
+the conditional branch instructions is not expected to impact the usage of the
+accumulator by the PC65 code generator.
+
+The second result indicates that what is required is continued support for the 
+register indirect addressing mode provided by the Forth IP register. Instead of 
+the I++ addressing mode, what will be supported instead is an I,Y addressing
+mode. The previously defined 16 instructions in the Column 3 will have the even
+row insructions converted from the ip,I++ addressing mode to the I,Y addressing
+mode. Like any other Y-based indexed addressing mode, this new addressing mode
+provides indirection with post-indexing by Y: (I),Y. Incrementing the index, or
+the IP register is easy with the INY and INI instructions. It is also planned
+that a decrement operation on IP will also be added to the instruction set. The
+new decrement IP instruction, DEI, will be a two cycle instruction instead of
+the one cycle increment IP instruction, INI, but it will save quite a few cycles
+if decrementing the base indirect address in IP is desirable.
+
+
+
