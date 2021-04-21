@@ -8,8 +8,8 @@ instruction set are motivated by the following results with the PC65 compiler:
         ment with the M65C02A instruction set;
     (2) the M65C02A Column 3 Forth IP (with autoincrement) instructions are not
         used by the PC65 compiler except for the LDA/STA ip,I++ instructions and
-        the autoincrement feature frequently is in conflict with the desired 
-        operations, i.e. autoincrement of the Forth IP (when used to support 
+        the autoincrement feature frequently is in conflict with the desired
+        operations, i.e. autoincrement of the Forth IP (when used to support
         register indirect addressing) is not always desired;
     (3) the order of operands on the M65C02A stack is in the reverse order of
         that required for comparison and subtraction.
@@ -19,10 +19,9 @@ instruction set are motivated by the following results with the PC65 compiler:
         fix instruction. This lack of an OSX+IND leads to the PC65 code genera-
         tor having the insert both the OSX and the IND prefix instructions for
         operations that are frequently required to support the stack-relative
-        addressing modes of the M65C02A that the PC65 compiler makes frequent 
-        use of because of the virtual machine that the PC65 expects of the
-        microprocessor to which it is targeted.
-        
+        addressing modes of the M65C02A of which the PC65 compiler makes frequent
+        use.
+
 The first item is discussed in "Speeding Up M65C02A Boolean Tests.txt". Essen-
 tially the proposed changes make two modifications to the conditional branch
 instructions of the M65C02A:
@@ -30,36 +29,98 @@ instructions of the M65C02A:
     (1) the BRA rel instruction is modified into a conditional instruction when
         the OSZ / OSI prefix instructions are applied. These prefix instructions
         change the BRA instruction to a branch instruction using 8-bit or 16-bit
-        pc-relative branches conditional on whether the accumulator is non-zero, 
+        pc-relative branches conditional on whether the accumulator is non-zero,
         i.e., branch taken, or zero, i.e., branch not taken;
     (2) applying the OSX prefix instruction to the M65C02A branch instructions,
-        i.e., BPL / BMI, BVC / BVS, BVC / BCS, and BNE / BEQ, in the form of 
+        i.e., BPL / BMI, BVC / BVS, BVC / BCS, and BNE / BEQ, in the form of
         OSX, OSZ, OSI, and OIS prefix instructions causes these instructions to
         store into the accumulator the CC flag used to determine if the branch
         is taken or not taken. In other words, if the branch is taken, CC = 1,
         then the accumulator is filled with a 0x01, and if the branch is not
         taken, then the accumulator is filled with a 0x00.
 
-These modifications to the M65C02A branch instructions, denoted by the yellow
-highlight in the M65C02C tab of the spreadheet, reduce the execution time of a
-PC65 logical test from 13(T)/18(F) cycles to 6(T)/7(F) cycles. Given that the
-accumulator is used by the PC65 virtual machine to hold the boolean variable
-that represents the logical state of the logic expression, the modification of
-the conditional branch instructions is not expected to impact the usage of the
-accumulator by the PC65 code generator.
+These modifications to the M65C02A branch instructions, denoted by negatively
+sloped diagonal line in the cells of the M65C02C tab of the spreadheet, reduce
+the execution time of a PC65 logical test from 13(T)/18(F) cycles to 6(T)/7(F)
+cycles. Given that the accumulator is used by the PC65 virtual machine to hold
+the boolean variable that represents the logical state of the logic expression,
+the modification of the conditional branch instructions is not expected to im-
+pact the usage of the accumulator by the PC65 code generator.
 
-The second result indicates that what is required is continued support for the 
-register indirect addressing mode provided by the Forth IP register. Instead of 
+The second result indicates that what is required is continued support for the
+register indirect addressing mode provided by the Forth IP register. Instead of
 the I++ addressing mode, what will be supported instead is an I,Y addressing
-mode. The previously defined 16 instructions in the Column 3 will have the even
+mode. The previously defined 16 instructions in the column 3 will have the odd
 row insructions converted from the ip,I++ addressing mode to the I,Y addressing
-mode. Like any other Y-based indexed addressing mode, this new addressing mode
-provides indirection with post-indexing by Y: (I),Y. Incrementing the index, or
-the IP register is easy with the INY and INI instructions. It is also planned
-that a decrement operation on IP will also be added to the instruction set. The
-new decrement IP instruction, DEI, will be a two cycle instruction instead of
-the one cycle increment IP instruction, INI, but it will save quite a few cycles
-if decrementing the base indirect address in IP is desirable.
+mode, which is a register indirect post-indexed by Y addressing mode. Like other
+post-indexed (by Y) addressing mode, this new addressing mode allows indirection
+with post-indexing by Y: (I),Y. Incrementing the index, or the IP register, is
+easy with the INY, or INI, instructions, respectively. It is also planned that a
+decrement operation on IP will also be added to the instruction set. The new
+decrement IP instruction, DEI, will be a two cycle instruction instead of the
+one cycle increment IP instruction, INI, but it will save quite a few cycles if
+decrementing IP is required.
+
+Previously in column 3, a set of 16 instructions with the ip,I++ addressing mode
+was defined. As previously stated, with the exception of the LDA/STA ip,I++ in-
+structions, the other 14 column 3 instructions were unused by the PC65 compiler.
+The modification to the column 3 instructions goes beyond changeing the address-
+ing mode from ip,I++ to I,Y. The changes also combine the popping of the system
+stack. The I,Y address mode instructions, in the odd rows of column 3, will 
+automatically pull the pointer on the top of the system stack into IP and then
+perform the indicated operation. If indirection is applied, it will be performed
+using the pointer in the IP register, and following the second indirection, the
+offset held in the Y register will be applied. The automatic pulling of the TOS
+pointer into IP will save a stack cleanup operation, ADJ #2, after these stan-
+dard types of PC65 operations.
+
+Since these 8 instructions, PORA/PAND/PEOR/PADC/PSTA/PLDA/PCMP/PSBC I,Y, all re-
+quire that Y be loaded with an offset, these instructions may frequently require
+that Y be cleared before executing any of the 8 instructions. The more frequent
+operations required are loading and storing the accumulator to specific address-
+es without indexing. Thus, in addition to PSTA/PLDA I,Y instructions, two com-
+plementary instructions PSTA/PLDA I will be included in column 3 as well. This
+will provide the PC65 code generator the option of register indirect load and
+store accumulator instructions with and without indexing. (Clearing the Y regis-
+ter will remain a 2 cycle penalty for the other 6 instructions in the odd rows
+of column 3. Those operations are not as frequently utilized as the load / store
+operations, so the 2 two cycle penalty to clear the Y register before use is 
+likely an acceptable compromise.) The remaining 6 available instruction slots in
+column 3 will be filled with implicit addressing mode instructions: 
+PORA/PAND/PEOR/PADC/-/-/PCMP/PSBC M. These instructions will operate by the TOS
+into the internal memory operand register, M, and then performing the required
+operation between that internal register and the accumulator. 
+
+The ALU operations defined with the column 3 instructions will automatically re-
+verse the order of the operands into the ALU functional units. This behavior
+will allow the subtraction operation required by the compare and subtract
+instructions to be re-ordered as required without introducing instructions to
+reverse the TOS and NOS operands on the system stack. Since the order of the
+operands is not important to the ORA/AND/EOR/ADC instructions, this change to
+the operand order for column 3 instructions will have no effect other than mak-
+ing the speed of additional and substraction the same, as it should be, by re-
+moving the penalty associated with having to change the operand order on the
+system stack for subtraction operations. In summary, the column 3 instructions 
+are defined as follows:
+
+0x03:   PORA M      // M <= (++S); A <= M | A
+0x13:   PORA I,Y    // I <= (++S); M <= (I + Y); A <= M | A
+0x23:   PAND M      // M <= (++S); A <= M & A
+0x33:   PAND I,Y    // I <= (++S); M <= (I + Y); A <= M & A
+0x43:   PEOR M      // M <= (++S); A <= M ^ A
+0x53:   PEOR I,Y    // I <= (++S); M <= (I + Y); A <= M ^ A
+0x63:   PADC M      // M <= (++S); A <= M + A
+0x73:   PADC I,Y    // I <= (++S); M <= (I + Y); A <= M + A
+0x83:   PSTA I      // I <= (++S); (I) <= A
+0x93:   PSTA I,Y    // I <= (++S); (I + Y) <= A
+0xA3:   PLDA I      // I <= (++S); A <= (I)
+0xB3:   PLDA I,Y    // I <= (++S); A <= (I + Y)
+0xC3:   PCMP M      // M <= (++S); (SIZ ? {N,V,Z,C} : {N,Z,C}) <= M - A
+0xD3:   PCMP I,Y    // I <= (++S); {N,V,C,Z} <= M - A
+0xE3:   PSBC M      // M <= (++S); A <= M - A
+0xF3:   PSBC I,Y    // I <= (++S); M <= (I + Y); A <= M - A
+
+
 
 
 
