@@ -121,21 +121,21 @@ are defined as follows:
 0xF3:   PSUB I,Y    // I <= (++S); M <= (I + Y); A <= M - A
 
 I was looking to add single byte instructions for three common operations on the
-accumulator: clear, complement, and negate. There wasn't enough available opcode
-space to assign three to these functions / instructions. Anyways, if there had
-been sufficient opcode space with which to define these instructions, for a 16-
-bit operand size, there would have been no significant advantage for the CLR A
-instruction because that operation could be performed for either operand size as
-LDA #0 [2 cycles] (because the upper byte of any M65C02A accumulator is cleared
-on any 8-bit operations), and as CLR A [1] or CLR.W A [2]. Similarly, a 16-bit 
-complement accumulator with a 2 byte instruction, CPL.W A [2], would only pro-
-vide a 2 cycle advantage over the EOR.W #0xFFFF [4] instruction. Finally, a 16-
-bit negate accumulator operation, NEG.W A [2], would have a 6/4 cycle advantage
-over a 16-bit accumulator negation sequence with standard M65C02A instructions:
-LDA #0 [2]; SEC [1]; SBC.W zp,S [5], or LDA #0 [2]; PSUB.W M [4]. Thus,
-only for the negation operation would a dedicated NEG A instruction provide any
-significant advantage over the equivalent operations implemented with the stan-
-dard instructions of the M65C02A.
+accumulator: clear, complement, and negate. There wasn't enough opcode space
+available to assign three to these functions / instructions. Anyways, if there
+had been sufficient opcode space with which to define these instructions, for a
+16-bit operand size, there would have been no significant advantage for the
+CLR A [1] instruction because that operation could be performed for either ope-
+rand size as LDA #0 [2 cycles] (because the upper byte of any M65C02A accumula-
+tor is cleared on any 8-bit operations), and as CLR A [1] or CLR.W A [2]. Simi-
+larly, a 16-bit complement accumulator with a 2 byte instruction, CPL.W A [2],
+would only provide a 2 cycle advantage over the EOR.W #0xFFFF [4] instruction. 
+Finally, a 16-bit negate accumulator operation, NEG.W A [2], would have a 6/4 
+cycle advantage over a 16-bit accumulator negation sequence with standard 
+M65C02A instructions: LDA #0 [2]; SEC [1]; SBC.W 1,S [5], or LDA #0 [2]; 
+PSUB.W M [4]. Thus, only for the negation operation would a dedicated NEG A ins-
+truction provide any significant advantage over the equivalent operations imple-
+mented with the standard instructions of the M65C02A.
 
 
 
