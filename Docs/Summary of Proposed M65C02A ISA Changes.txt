@@ -100,13 +100,20 @@ The definitions of the column 3 instructions follow:
 
 The third item describes an issue with how the PC65 compiler places the operands
 on the stack when comparison / subtraction operations are required. The changes
-to the Column 3 instruction, shown in the preceding table, adjust the order of
-operations for all instructions so that the operand on the top of the stack is 
-taken to be the left operand of the comparison / subtraction operation. This
-change means that an exchange between the accumulator and the variable on the
-top of the stack are not required before a comparison / subtraction is perform-
-ed. The proposed change will save at least 7 cycles for each comparison / sub-
-traction performed by a PC65 program.
+to the column 3 instructions, shown in the preceding table, adjust the order of
+operations for all instructions so that the operand on the top of the stack, M, 
+or the Y register, is taken to be the left operand of the comparison / subtrac-
+tion operation. This change means that an exchange between the accumulator and
+the variable on the top of the stack are not required before a comparison / sub-
+traction is performed. In addition, instead of using a stack-relative addressing
+mode for accessing the variable on the top of the stack, which often requires
+the compiler to also issue a pop instruction to properly maintain the stack, the
+compiler can instead pop the variable on the top of the stack into the Y regis-
+ter. The instructions in column 3 using Y and A as the operands can then be used
+in a manner that orders the operations as needed for correct operations. The 
+proposed instruction set changes in column 3 will save at least 7 cycles for
+each comparison / subtraction performed by a PC65 program because the XMA zp 
+instruction will not be required to correctly order the operands.
 
 The fourth item requires the allocation of an opcoded and implementation of
 another prefix instruction: OSI. This new prefix instruction combines OSX + IND
@@ -118,7 +125,7 @@ first of these, 0x02, is reserved for the M65C02A/B coprocessor interface. Thus,
 free opcodes will be used to implement three new instructions, which may be
 useful with a C/C++ compiler:
 
-0x22:   JSR`I,Y
+0x22:   JSR I,Y
 0x42:   OSI
 0x62:   OWI
 0x82:   JMP I,Y
@@ -130,9 +137,7 @@ these instructions will support the use of the IND prefix instruction. If the
 OSX prefix is also applied to the JSR I,Y instruction, the default stack, Sk, is
 overridden, and the return address is pushed onto the auxiliary stack, Sx. Both
 OSX and IND can be applied to the JSR I,Y instruction, with the expected beha-
-vioral changes.
-
-The 0x62 opcode implements a register override prefix instruction, OWI, which
-will override the IP register with the W register. This allows both the IP and W
-registers from the Forth VM logic to be used as register indirect address poin-
-ters.
+vioral changes. The 0x62 opcode implements a register override prefix instruc-
+tion, OWI, which will override the IP register with the W register. This allows
+both the IP and W registers from the Forth VM logic to be used as register indi-
+rect address pointers.
