@@ -10,14 +10,14 @@ instruction set are motivated by the following results with the PC65 compiler:
         used by the PC65 compiler except for the LDA/STA/ADC ip,I++ instructions
         and the autoincrement feature frequently is in conflict with the desired
         operations, i.e. autoincrement of the Forth IP (when used to support
-        register indirect addressing) is not always desired;
+        general purpose register indirect addressing) is not always desired;
     (3) the order of operands on the M65C02A stack is in the reverse order of
         that required for comparison and subtraction.
     (4) the OSX prefix instruction is often paired with the IND prefix instruc-
-        tion, and there is no available prefix instruction that provides these
-        to prefix instructions in a single prefix instruction like the ISZ pre-
-        fix instruction. This lack of an OSX+IND leads to the PC65 code genera-
-        tor having the insert both the OSX and the IND prefix instructions for
+        tion, and there is no available prefix instruction that combines these
+        prefix instructions in a single prefix instruction like the ISZ prefix
+        instruction. This lack of an OSX+IND leads to the PC65 code generator
+        having the insert both the OSX and the IND prefix instructions for 
         operations that are frequently required to support the stack-relative
         addressing modes of the M65C02A of which the PC65 compiler makes frequent
         use.
@@ -27,17 +27,17 @@ tially the proposed changes make two modifications to the conditional branch
 instructions of the M65C02A:
 
     (1) the BRA rel instruction is modified into a conditional instruction when
-        the OSZ / OSI prefix instructions are applied. These prefix instructions
-        change the BRA instruction to a branch instruction using 8-bit or 16-bit
-        pc-relative branches conditional on whether the accumulator is non-zero,
-        i.e., branch taken, or zero, i.e., branch not taken;
+        the OSI / OSZ prefix instructions are applied. These prefix instructions
+        change the BRA instruction to a branch instruction using 8-bit (OSI) or
+        16-bit (OSZ) pc-relative branches conditional on whether the accumulator
+        is non-zero, i.e., branch taken, or zero, i.e., branch not taken;
     (2) applying the OSX prefix instruction to the M65C02A branch instructions,
         i.e., BPL / BMI, BVC / BVS, BVC / BCS, and BNE / BEQ, in the form of
         OSX, OSZ, OSI, and OIS prefix instructions causes these instructions to
         store into the accumulator the CC flag used to determine if the branch
         is taken or not taken. In other words, if the branch is taken, CC = 1,
-        then the accumulator is filled with a 0x01, and if the branch is not
-        taken, then the accumulator is filled with a 0x00.
+        then the accumulator is filled with a 0x0001, and if the branch is not
+        taken, then the accumulator is filled with a 0x0000.
 
 These modifications to the M65C02A branch instructions, reduce the execution
 time of a PC65 logical test from 13(T)/18(F) cycles to 6(T)/7(F) cycles. Given
@@ -46,7 +46,7 @@ variable that represents the logical state of the logic expression, the modifi-
 cation of the conditional branch instructions is not expected to impact the
 usage of the accumulator by the PC65 code generator.
 
-The second result indicates that what is required is continued support for the
+The second item indicates that what is required is continued support for the
 register indirect addressing mode provided by the Forth IP register. Instead of
 the I++ addressing mode, what will be supported instead is an I,Y addressing
 mode. The previously defined 16 instructions in the column 3 will have some 
@@ -98,5 +98,41 @@ The definitions of the column 3 instructions follow:
 0xE3:   SBC  I,Y    // M <= [I+Y]; A <= M + ~A + C
 0xF3:   SBC  Y      // A <= Y + ~A + C
 
+The third item describes an issue with how the PC65 compiler places the operands
+on the stack when comparison / subtraction operations are required. The changes
+to the Column 3 instruction, shown in the preceding table, adjust the order of
+operations for all instructions so that the operand on the top of the stack is 
+taken to be the left operand of the comparison / subtraction operation. This
+change means that an exchange between the accumulator and the variable on the
+top of the stack are not required before a comparison / subtraction is perform-
+ed. The proposed change will save at least 7 cycles for each comparison / sub-
+traction performed by a PC65 program.
 
+The fourth item requires the allocation of an opcoded and implementation of
+another prefix instruction: OSI. This new prefix instruction combines OSX + IND
+into a single instruction, and directly supports the improved boolean test mode
+that will be added to the branch instructions. There are only five unused op-
+codes remaining in the M65C02B opcode map: 0x02, 0x22, 0x42, 0x62, and 0x82. The
+first of these, 0x02, is reserved for the M65C02A/B coprocessor interface. Thus,
+0x42 will be allocated to implement the OSI prefix instruction. The other three
+free opcodes will be used to implement three new instructions, which may be
+useful with a C/C++ compiler:
 
+0x22:   JSR`I,Y
+0x42:   OSI
+0x62:   OWI
+0x82:   JMP I,Y
+
+The 0x22 opcocde performs a subroutine call using register indirect addressing
+post-indexed by the Y index register. Similarly, the 0x82 opcode performs a jump
+using register indirect addressing post-indexed by the Y index register. Both of
+these instructions will support the use of the IND prefix instruction. If the
+OSX prefix is also applied to the JSR I,Y instruction, the default stack, Sk, is
+overridden, and the return address is pushed onto the auxiliary stack, Sx. Both
+OSX and IND can be applied to the JSR I,Y instruction, with the expected beha-
+vioral changes.
+
+The 0x62 opcode implements a register override prefix instruction, OWI, which
+will override the IP register with the W register. This allows both the IP and W
+registers from the Forth VM logic to be used as register indirect address poin-
+ters.
