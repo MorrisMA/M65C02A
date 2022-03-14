@@ -9,18 +9,24 @@ The result is that a simple logical test of any kind generally requires the
 following instruction sequence to perform what would otherwise be a simple test
 with a test and branch instruction:
 
-        cmp.w 1,S       ; (5) compare operands
+        pla.w           ; (3) pull right operand from stack
+        xma.w 1,S       ; (7) exchange left operand on stack with right operand
+        cmp.w 1,S       ; (5) compare operands (set all flags: NVZC)
+        adj #2          ; (2) adjust stack pointer - pop right operand off stack
         
         php             ; (2) save P because lda #imm instruction affects flags
         lda #1          ; (2) load boolean True into accumulator
         plp             ; (2) restore flags set by comparison instruction
-        bcc lbl_01      ; (3) if cc matches, leave True in acc, else load False
+        bxx lbl_01      ; (3) if xx matches, leave True in acc, else load False
         lda #0          ; (2) load boolean False
 
 lbl_01: cmp #1          ; (2) test acc for boolean True
         beq lbl_02      ; (2) branch to True label
         jmp lbl_03      ; (3) jump to False label
         
+(Note: the 16-bit CMP instruction sets NVZC while the 8-bit CMP instruction only
+sets the NZC flags.)
+
 The recursive descent structure of the compiler makes combining the two tests
 into a single comparison and branch operation a bit difficult. These operations
 will probably have to remain separate, and any optimizations that can be applied
@@ -56,19 +62,20 @@ tive displacement field. If both SIZ and IND are applied, i.e. either by using
 separate SIZ and IND prefix instructions, or the combination ISZ prefix instruc-
 tion, then both modifications are applied to the 8 standard branch instructions;
 the multi-flag signed/unsigned branch instructions have a 16-bit PC-relative
-branch field.
+branch field. 
 
 If these existing instructions could be further modified by the addition of a
-third prefix instruction, say OSX, then it would be possible to perform the
+third prefix instruction flag, say OSX, then it would be possible to perform the
 branch operation and simultaneously set the accumulator to the CC internal test
 signal value. Without increasing the number of instruction bytes, the OSZ and 
-OIS prefix codes which are equivalent to OSX+SIZ and OSX+IND+SIZ, respectively,
-can be used to add this capability to the M65C02A. Adding OSZ would enable the
-new capability to multi-flag signed/unsigned branch instructions with 8-bit 
-PC-relative displacements, which are presently the most used branch instructions
-in the Mak-Pascal compiler other than the standard beq/bne rel8 instructions.
-The version of the M65C02A branch instructions with 16-bit displacements are
-presently not used by the PC65 Mak-Pascal compiler's code generator.
+OIS prefix codes, which are equivalent to OSX+SIZ and OSX+IND+SIZ, respectively,
+can be used to add this capability to the M65C02A. Adding OSI, equivalent to 
+OSX+IND, would add this new capability to the base branch instructions with
+16-bit PC-relative displacements, although branch instructions with 16-bit dis-
+placements are not currently used by the Mak-Pascal compiler. (Note: adding OSI
+would round out the prefix codes, and make the 8-bit stack-relative indirect
+addressing mode (with 8-bit displacement) equal in length to the 16-bit version
+of the same instruction.)
 
 The second test can also be sped up by using a different code sequence:
 
@@ -76,10 +83,10 @@ The second test can also be sped up by using a different code sequence:
         bcs lbl_02      ; (2) branch if C is set to True label
         jmp lbl_03      ; (3) jump to False label
         
-With the changed suggested above, a conditional test would require just 6/7
-clock cycles instead of 13/18 clock cycles. The change the the M65C02A branch
-instructions would provide greater than 2x improvement for this common HLL
-instruction sequence.
+With the change suggested above, a conditional test would require just 6/7 clock
+cycles instead of 13/18 clock cycles. The change the the M65C02A branch instruc-
+tions would provide greater than 2x improvement for this common HLL instruction
+sequence.
 
 In the case of C, rather than Pascal, a boolean is true if it non-zero, false
 otherwise. The previous instruction sequence could be implemented as:
@@ -95,7 +102,15 @@ extends the displacement from 8 bits to 16 bits. In the example above, OSX+SIZ
 modifies the unconditional branch instruction into a conditional branch instruc-
 tion that takes the branch if the accumulator is not zero, i.e. True, and does
 not take the branch if the accumulator is zero, i.e. False. The number of cycles
-for the second test is unchanged, i.e. 3 clock cycles, but the modification to
-bra rel makes the instruction a more flexible way of handling boolean variable
-testing in both C and Pascal. 
+for the second (if true) test is unchanged, i.e. 3 clock cycles, but the modifi-
+cation to BRA rel makes the instruction a more flexible way of handling boolean
+variable testing in both C and Pascal.
 
+This is especially true if a boolean variable is saved and subsequently reload-
+ed. A conditional branch using a standard BNZ rel or a OSZ BRA rel could be used
+instead of the standard sequence currently generated / used by the compiler, as
+given above:
+
+            lda.w BOOLEAN     ; (6) Load A with BOOLEAN (16-bit address/boolean)
+            jnz lbl_002       ; (2) if A <> 0, branch to True destination
+            jmp lbl_003       ; (3) jump to False branch destination
