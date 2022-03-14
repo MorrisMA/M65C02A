@@ -1,8 +1,9 @@
 The normal way of testing a boolean in Pascal, as defined in the current PC65
-Mak-Pascal compiler, is to perform a comparison operation, followed by code to
-set the accumulator to either a 1 (True) or a 0 (False). These operations are
-generally followed by a second comparison operation which tests the boolean
-value in the accumulator with a comparison against an immediate value of 1.
+Mak-Pascal compiler, is to perform a comparison operation, followed by instruc-
+tions to set the accumulator to either a 1 (True) or a 0 (False). These opera-
+tions are generally followed by a second comparison operation which tests the
+boolean value in the accumulator with a comparison against an immediate value of
+0x0001.
 
 The result is that a simple logical test of any kind generally requires the
 following instruction sequence to perform what would otherwise be a simple test
@@ -87,7 +88,7 @@ otherwise. The previous instruction sequence could be implemented as:
         bra lbl_02
         jmp lbl_03
         
-The bra rel instruction is presently implemented in the M65C02A such that its
+The bra rel8 instruction is presently implemented in the M65C02A such that its
 behavior is only modified by the IND prefix instruction in the manner described
 above for the other branch instructions: IND applied to a branch instruction 
 extends the displacement from 8 bits to 16 bits. In the example above, OSX+SIZ

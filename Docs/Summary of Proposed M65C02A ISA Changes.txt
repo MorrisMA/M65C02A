@@ -141,3 +141,35 @@ vioral changes. The 0x62 opcode implements a register override prefix instruc-
 tion, OWI, which will override the IP register with the W register. This allows
 both the IP and W registers from the Forth VM logic to be used as register indi-
 rect address pointers.
+
+The document, "Speeding Up Stack-based Artihmetic Operations.txt", describes
+several mechanisms for speeding up stack-based arithmetic operations: (1) con-
+verting the SP-relative instruction to use the reverse operand order, and (2) 
+potentially defining Column 3 instructions to use the register stacks and auto-
+matically popping the operands from the stack to save the usual stack adjustment
+operation performed after the arithmetic operation has been performed using
+instructions that rely on the SP-relative addressing mode specific to the
+M65C02A.
+
+With the modifications described above to Column 3 instructions, the stack-based
+arithmetic operations of the PC65 compiler result in shorter instruction sequen-
+ces:
+
+        ;--current sequence --
+        pla.w       ; (4) Pull right operand from stack
+        xma.w 1,S   ; (7) Exchange right and left operands, put right on stack
+        sec         ; (1) Initialize C for subtraction
+        sbc.w 1,S   ; (5) subtract: left - right,  A <= A - (1,S)
+        adj #2      ; (2) adjust S, remove right operand from stack
+
+        ;-- new sequence --
+        pla.w       ; (4) pull right operand from stack
+        ply.w       ; (4) pull left operand from stack
+        sec         ; (1) initialize C for subtraction
+        sbc.w Y     ; (1) A <= Y - A = Y + ~A + 1
+        
+This current sequence requires 19 cycles to perform subtraction / comparisons,
+and the new sequence only requires 10 cycles to perform. The new sequence for 
+subtraction / comparison usingthe new column 3 instructions is almost 2x faster
+than the current sequence. It also makes additions, subtractions, and compari-
+sons execute in the same number of cycles, which is also a good result.
